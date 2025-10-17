@@ -67,6 +67,51 @@ Future<List<dynamic>> fetchNewTopics() async {
   }
 }
 
+// キャッシュ対応のトピック取得
+Future<List<dynamic>> fetchNewTopicsWithCache() async {
+  try {
+    final response = await http.get(Uri.parse('$apiBase/topics/new'));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      // キャッシュに保存
+      await CacheService.save('new_topics', data);
+      return data;
+    } else {
+      throw Exception('Failed to load topics');
+    }
+  } catch (e) {
+    // エラー時はキャッシュから取得
+    final cached = await CacheService.load('new_topics');
+    if (cached.isNotEmpty) {
+      return cached;
+    }
+    rethrow;
+  }
+}
+
+// キャッシュ対応のコメント取得
+Future<List<dynamic>> fetchCommentsWithCache(int topicId) async {
+  try {
+    final response = await http.get(Uri.parse('$apiBase/topic/$topicId'));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final comments = data['comments'] ?? [];
+      // キャッシュに保存
+      await CacheService.save('comments_$topicId', comments);
+      return comments;
+    } else {
+      throw Exception('Failed to load comments');
+    }
+  } catch (e) {
+    // エラー時はキャッシュから取得
+    final cached = await CacheService.load('comments_$topicId');
+    if (cached.isNotEmpty) {
+      return cached;
+    }
+    rethrow;
+  }
+}
+
 // ========== お気に入り関連 ==========
 
 Future<List<int>> getFavoriteIds() async {

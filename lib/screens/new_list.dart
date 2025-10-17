@@ -22,7 +22,20 @@ class _NewListScreenState extends State<NewListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadFromCache();
+    _load();
+  }
+
+  Future<void> _load() async {
+    // キャッシュの存在確認
+    final hasCached = await CacheService.exists(cacheKey);
+    
+    if (hasCached) {
+      // キャッシュがあれば表示
+      await _loadFromCache();
+    } else {
+      // キャッシュがなければAPIから取得
+      await _fetchFromServer();
+    }
   }
 
   // キャッシュからデータを読み込む
@@ -51,9 +64,19 @@ class _NewListScreenState extends State<NewListScreen> {
       }
     } catch (e) {
       debugPrint('API Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('通信に失敗しました（キャッシュを使用中）')),
-      );
+      // キャッシュがあればそれを使用
+      final cached = await CacheService.load(cacheKey);
+      setState(() {
+        if (cached.isNotEmpty) {
+          _topics = cached;
+        }
+        _loading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('通信に失敗しました（キャッシュを使用中）')),
+        );
+      }
     }
   }
 

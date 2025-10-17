@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import 'comment_post_webview.dart';
 
 class TopicDetailScreen extends StatefulWidget {
@@ -86,25 +87,60 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       final res = await http.get(Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}'));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        _comments = data['comments'];
+        final newComments = data['comments'] ?? [];
+        // コメントをキャッシュに保存
+        await CacheService.save('comments_${widget.topicId}', newComments);
+        
+        // ローカル投稿を追加
+        final local = await _loadLocalComments();
+        setState(() {
+          _comments = List.from(newComments)..addAll(local);
+          _loading = false;
+        });
       }
     } catch (e) {
       debugPrint('API Error: $e');
-    } finally {
-      setState(() => _loading = false);
+      // キャッシュがあればそれを使用
+      final cached = await CacheService.load('comments_${widget.topicId}');
+      final local = await _loadLocalComments();
+      setState(() {
+        if (cached.isNotEmpty) {
+          _comments = List.from(cached)..addAll(local);
+        }
+        _loading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('通信に失敗しました（キャッシュを使用中）')),
+        );
+      }
     }
   }
 
   // ===== 初期化処理 =====
   Future<void> _load() async {
     await _loadScrollPosition();
-    await fetchComments();
-    final local = await _loadLocalComments();
+    
+    // キャッシュの存在確認
+    final hasCached = await CacheService.exists('comments_${widget.topicId}');
     final favIds = await getFavoriteIds();
+    
     setState(() {
-      _comments.addAll(local);
       _isFavorite = favIds.contains(widget.topicId);
     });
+    
+    if (hasCached) {
+      // キャッシュがあれば表示
+      final cachedComments = await CacheService.load('comments_${widget.topicId}');
+      final local = await _loadLocalComments();
+      setState(() {
+        _comments = List.from(cachedComments)..addAll(local);
+        _loading = false;
+      });
+    } else {
+      // キャッシュがなければAPIから取得
+      await fetchComments();
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients && _savedOffset > 0) {
