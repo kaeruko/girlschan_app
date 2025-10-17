@@ -3,12 +3,14 @@ class Topic {
   final String url;
   final int comments;
   final String time;
+  final String? imageUrl;
 
   Topic({
     required this.title,
     required this.url,
     required this.comments,
     required this.time,
+    this.imageUrl,
   });
 
   factory Topic.fromCsv(List<String> row) {
@@ -17,6 +19,7 @@ class Topic {
       url: row[1],
       comments: int.tryParse(row[2]) ?? 0,
       time: row[3],
+      imageUrl: row.length > 4 ? row[4] : null,
     );
   }
 }
