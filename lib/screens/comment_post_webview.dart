@@ -19,7 +19,7 @@ class CommentPostWebView extends StatelessWidget {
       appBar: AppBar(title: const Text('投稿中...')),
       body: InAppWebView(
         initialUrlRequest: URLRequest(
-          url: Uri.parse('https://girlschannel.net/make_comment/$topicId/'),
+          url: WebUri('https://girlschannel.net/make_comment/$topicId/'),
           method: 'POST',
           body: postData,
           headers: {'Content-Type': 'application/x-www-form-urlencoded'},
