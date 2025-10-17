@@ -48,19 +48,13 @@ class _TopicListScreenState extends State<TopicListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return RefreshIndicator(
-      onRefresh: _fetchFromServer,
     return Scaffold(
       appBar: AppBar(title: const Text('GirlsChannel Offline')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchFromServer,
-              child: ListView.builder(
+      body: RefreshIndicator(
+        onRefresh: _fetchFromServer,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView.builder(
               itemCount: _topics.length,
               itemBuilder: (context, index) {
                 final topic = _topics[index];
