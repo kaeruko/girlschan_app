@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<!-- saved from url=(0029)https://girlschannel.net/new/ -->
+<html><head lang="ja"><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<script async="" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/js"></script>
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+	  gtag('config', 'G-RGH0XMCBQ0');
+	</script>
+    <title>新着トピック | ガールズちゃんねる - Girls Channel -</title>
+<!-- logly_noindex -->
+    
+
+    <meta name="description" content="女子の女子による女子のためのおしゃべりコミュニティ。女子の好きな話題にみんなでコメント、みんなで投票して盛り上がれる匿名掲示板「ガールズちゃんねる」へようこそ。">
+    <meta name="keywords" content="ガールズちゃんねる,Girls Channel">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0">
+
+    <meta property="og:title" content="ガールズちゃんねる - Girls Channel -">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://static.gc-img.net/img/parts_pc/ogp.png">
+    <meta property="og:url" content="https://girlschannel.net/">
+    <meta property="og:description" content="女子の女子による女子のためのおしゃべりコミュニティ。女子の好きな話題にみんなでコメント、みんなで投票して盛り上がれる匿名掲示板「ガールズちゃんねる」へようこそ。">
+    <meta property="og:site_name" content="ガールズちゃんねる - Girls Channel -">
+    
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="https://girlschannel.net/">
+    <meta name="twitter:title" content="ガールズちゃんねる - Girls Channel -">
+    <meta name="twitter:description" content="女子の女子による女子のためのおしゃべりコミュニティ。女子の好きな話題にみんなでコメント、みんなで投票して盛り上がれる匿名掲示板「ガールズちゃんねる」へようこそ。">
+    <meta name="twitter:image" content="https://static.gc-img.net/img/parts_pc/ogp.png">
+
+    <link rel="stylesheet" href="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/main.css" type="text/css">
+    <script>var API_URL = window.location.protocol+'//'+window.location.host+'/';</script>
+
+    <link rel="shortcut icon" href="https://girlschannel.net/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="https://static.gc-img.net/images_s/apple-touch-icon-precomposed.png">
+
+
+	    <link rel="canonical" href="https://girlschannel.net/new/">
+                <link rel="next" href="https://girlschannel.net/new/2/">
+    <script>
+  window.teads_analytics = window.teads_analytics || {};
+  window.teads_analytics.analytics_tag_id = "PUB_13075";
+  window.teads_analytics.share = window.teads_analytics.share || function() {
+    ;(window.teads_analytics.shared_data = window.teads_analytics.shared_data || []).push(arguments)
+  };
+</script>
+<script async="" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/tag.js"></script>
+
+</head>
+
+<body>
+    <header>
+      <div class="title"><a href="https://girlschannel.net/"><img src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/logo.svg" width="252" height="46" alt="ガールズちゃんねる"></a></div>
+    </header>
+    <nav>
+      <div class="header-nav flc">
+        <div class="catch">女子の好きな話題で毎日おしゃべり♪</div>
+        <form action="https://girlschannel.net/topics/search/">
+          <input type="text" name="q" id="q" value="" placeholder="トピックを検索">
+          <input type="hidden" name="date" value="y">
+          <div class="search">
+            <div class="icon-search"></div>
+            <input type="submit">
+          </div>
+        </form>
+      </div>
+    </nav>
+
+    <div class="wrap flc">
+      <div class="main">
+        <div class="topic-list-wrap">
+          <div class="tab-wrap">
+            <div class="tab tab-rank"><a href="https://girlschannel.net/rank/"><span class="icon-rank"></span>今日の人気トピック</a></div>
+            <div class="tab tab-new on"><a href="https://girlschannel.net/new/"><span class="icon-new"></span>
+                <h1>新着トピック</h1></a></div>
+          </div>
+          <div class="topic-list-header mb20">
+            <span class="prev"><span class="icon-arrow_l"></span>前の500件</span>            <h2>最新のトピック</h2>
+            <span class="next"><a href="https://girlschannel.net/new/2/" rel="next">次の500件<span class="icon-arrow_r"></span></a></span>          </div>
+          <ul class="topic-list">
+
+
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5887799/">
+                <img data-src="https://static.gc-img.net/img/parts/thum_noimage@2x.png" width="60" height="60" class="img lazyload loaded" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/thum_noimage@2x.png" data-ll-status="loaded">
+                <noscript><img src="https://static.gc-img.net/img/parts/thum_noimage@2x.png"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>7コメント</span><span class="datetime">2秒前</span>
+                  </p>
+                </div>
+                <p class="title">ロボット掃除機にあったらいい機能</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5887796/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/6uRUWIyRbM4LQkI_18395_s.jpeg" width="60" height="60" class="img lazyload loaded" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/6uRUWIyRbM4LQkI_18395_s.jpeg" data-ll-status="loaded">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/6uRUWIyRbM4LQkI_18395_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>18コメント</span><span class="datetime">13秒前</span>
+                  </p>
+                </div>
+                <p class="title">たった砂糖1gで0.02歳老化する!?「若返り」の秘密は食事にあり。「世界長寿サミット」から見えてきた老化予防のヒントとは【京都府立医科大学大学院教授が解説】</p></a>
+            </li>
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885798/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/Js6UucyQdgKtvkK_11037_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/Js6UucyQdgKtvkK_11037_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>169コメント</span><span class="datetime">15時間前</span>
+                  </p>
+                </div>
+                <p class="title">文明の力すげーっと思ったこと</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885792/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/eZ8MEcX4AfMagqU_25012_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/eZ8MEcX4AfMagqU_25012_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>891コメント</span><span class="datetime">1時間前</span>
+                  </p>
+                </div>
+                <p class="title">やっぱり東京が一番だった…10年間妄信した「軽井沢移住」の失策。年金22万円のお金持ち老夫婦が「1億円の終の棲家」を捨て、帰京した理由</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885785/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/jC8vwzQDq8Uh1uO_6955_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/jC8vwzQDq8Uh1uO_6955_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>140コメント</span><span class="datetime">8時間前</span>
+                  </p>
+                </div>
+                <p class="title">友達の定義</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885784/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/aRoMs5Cg1cAcCha_24960_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/aRoMs5Cg1cAcCha_24960_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>197コメント</span><span class="datetime">3時間前</span>
+                  </p>
+                </div>
+                <p class="title">結婚前に同棲は必要なのか…既婚者300人が教える、同棲のメリット＆デメリット</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885781/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/R7BNuMnOL1lisUi_7280_s.png" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/R7BNuMnOL1lisUi_7280_s.png"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>500コメント</span><span class="datetime">35分前</span>
+                  </p>
+                </div>
+                <p class="title">全肯定ファンが苦手</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885778/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/Z9XXtOVBXKfgjNs_22256_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/Z9XXtOVBXKfgjNs_22256_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>59コメント</span><span class="datetime">1日前</span>
+                  </p>
+                </div>
+                <p class="title">芸人さんにファンレター出したことある人</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885776/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/DqOU7DVzAJ3Z9ep_11661_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/DqOU7DVzAJ3Z9ep_11661_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>135コメント</span><span class="datetime">14時間前</span>
+                  </p>
+                </div>
+                <p class="title">【2025もうすぐツアー】カルロス・トシキファン集まれ！【君は1,000％】</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885766/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/AMzYSZe7J7ghxpH_24102_s.png" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/AMzYSZe7J7ghxpH_24102_s.png"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>95コメント</span><span class="datetime">18時間前</span>
+                  </p>
+                </div>
+                <p class="title">きっと帰ってくる… 二度と戻らない飼い主の帰宅を窓際で待ち続けるゴールデンレトリバー</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885763/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/9IVb46OFjfR7NSU_7111_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/9IVb46OFjfR7NSU_7111_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>197コメント</span><span class="datetime">11時間前</span>
+                  </p>
+                </div>
+                <p class="title">美容師の間で「AIサロンモデル」の起用拡大、ただ…仕上がりは画像のものとはほど遠く</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885762/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/ujq739wgxaQdXu1_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/ujq739wgxaQdXu1_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>183コメント</span><span class="datetime">1時間前</span>
+                  </p>
+                </div>
+                <p class="title">海外ブランドの爆上がりを悲しんでいる方</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885755/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/o1iwJChSHn56Stu_13221_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/o1iwJChSHn56Stu_13221_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>196コメント</span><span class="datetime">17時間前</span>
+                  </p>
+                </div>
+                <p class="title">中谷美紀、夫との2ショットを披露→「新婚さんみたい」「絵になりますね」と反響</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885751/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/H8Hqtt1maLi9cX1_15119_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/H8Hqtt1maLi9cX1_15119_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>108コメント</span><span class="datetime">3時間前</span>
+                  </p>
+                </div>
+                <p class="title">【画像】グルメ系YouTuberハシダ、手が大きすぎると話題 「ドーナツがミニチュアに見える」</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885748/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/gxwX9n4wGJMVHm7_16887_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/gxwX9n4wGJMVHm7_16887_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>136コメント</span><span class="datetime">12時間前</span>
+                  </p>
+                </div>
+                <p class="title">コンビニで一度でも買ったことあるものにプラス</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885742/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/ZU9wXRo7O1QuMoF_24453_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/ZU9wXRo7O1QuMoF_24453_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>477コメント</span><span class="datetime">8秒前</span>
+                  </p>
+                </div>
+                <p class="title">「出したいのか隠したいのか」ファンも困惑…板野友美、“顔出し終了” 宣言するも娘の横顔公開にツッコミ続出</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885740/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/3ulxDlhZ4rdiedO_17290_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/3ulxDlhZ4rdiedO_17290_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>70コメント</span><span class="datetime">22時間前</span>
+                  </p>
+                </div>
+                <p class="title">【アニメ漫画】納得しないと感動できない【映画】</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885732/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/8FKsctEfDxcTFxB_22061_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/8FKsctEfDxcTFxB_22061_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>154コメント</span><span class="datetime">15時間前</span>
+                  </p>
+                </div>
+                <p class="title">「小学生の女の子が車にはねられた」小学校の前の横断歩道で女の子（8）がはねられる　病院に搬送されるも重体　広島</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885730/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/oEgVju9o9IvryTc_21424_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/oEgVju9o9IvryTc_21424_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>86コメント</span><span class="datetime">6時間前</span>
+                  </p>
+                </div>
+                <p class="title">レターセット大量消費</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885727/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/yOg3HOMyb5SlKY1_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/yOg3HOMyb5SlKY1_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>332コメント</span><span class="datetime">19分前</span>
+                  </p>
+                </div>
+                <p class="title">Mrs. GREEN APPLE好きな人🍏part22【アンチ厳禁】</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885718/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/w9dhY8PIM1RMQ9F_17992_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/w9dhY8PIM1RMQ9F_17992_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>144コメント</span><span class="datetime">6時間前</span>
+                  </p>
+                </div>
+                <p class="title">ケイティ・ペリー、トルドー元カナダ首相とのキスシーンが目撃される　水着姿でハグ</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885717/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/PRdS8f1X6LImn9Y_7111_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/PRdS8f1X6LImn9Y_7111_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>172コメント</span><span class="datetime">4時間前</span>
+                  </p>
+                </div>
+                <p class="title">50代妻に聞いた「夫とふたりでデートしてる？」リアルな夫婦の過ごし方</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885708/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/ciVYJ22UFFj46cW_7501_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/ciVYJ22UFFj46cW_7501_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>85コメント</span><span class="datetime">8時間前</span>
+                  </p>
+                </div>
+                <p class="title">字を書くのが苦手、嫌い、好きじゃない人</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885705/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/M92kmKcZCgsYkmK_8203_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/M92kmKcZCgsYkmK_8203_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>83コメント</span><span class="datetime">1日前</span>
+                  </p>
+                </div>
+                <p class="title">保田圭　出身地・千葉県富津市に引っ越してきた有名人を実名告白「町が大騒ぎになった」</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885702/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/6aDgkGQSWoaUgA9_6227_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/6aDgkGQSWoaUgA9_6227_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>104コメント</span><span class="datetime">2時間前</span>
+                  </p>
+                </div>
+                <p class="title">人気ラーメン店の魁力屋でバイトが「卵キャッチボール」　動画をSNS投稿、本社「法的措置も視野」</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885699/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/ykxIOhjOo4NwRcZ_14339_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/ykxIOhjOo4NwRcZ_14339_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>55コメント</span><span class="datetime">1日前</span>
+                  </p>
+                </div>
+                <p class="title">使ってるサイト語り</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885691/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/11CH2uip3elXgLk_14612_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/11CH2uip3elXgLk_14612_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>83コメント</span><span class="datetime">14時間前</span>
+                  </p>
+                </div>
+                <p class="title">子どもが行き渋りを始めてすぐに直面する3つの問題とは　「学校がすべてを解決してくれる、という思い込みは捨てて」と専門家</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885690/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/bi5nzs3m2mp1xOG_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/bi5nzs3m2mp1xOG_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>287コメント</span><span class="datetime">8時間前</span>
+                  </p>
+                </div>
+                <p class="title">ASAYANを語りたい</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885688/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/kKzLDJdBBRpvu5C_19097_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/kKzLDJdBBRpvu5C_19097_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>46コメント</span><span class="datetime">19時間前</span>
+                  </p>
+                </div>
+                <p class="title">「4日間も意識を失い、死ぬかもしれなかった…」と告白｜マドンナ（67歳）が感染した敗血症とは？</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885682/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/LVGCPyNe4uRp4Ho_24700_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/LVGCPyNe4uRp4Ho_24700_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>295コメント</span><span class="datetime">8時間前</span>
+                  </p>
+                </div>
+                <p class="title">「推し」にはまり「パパ活」の末に妊娠　産んだ赤ちゃんをごみ箱に捨てた女の生活</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885681/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/52mlVcS29GkwqWm_24583_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/52mlVcS29GkwqWm_24583_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>119コメント</span><span class="datetime">2時間前</span>
+                  </p>
+                </div>
+                <p class="title">仕事のモチベーションが湧かない‥</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885667/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/lonCKcr7zTpQI8X_19656_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/lonCKcr7zTpQI8X_19656_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>97コメント</span><span class="datetime">19時間前</span>
+                  </p>
+                </div>
+                <p class="title">脳出血で療養中・清原翔32歳、人気モデルらに囲まれ笑顔「愛されてますね」「素敵！」</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885666/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/vNjFk274lleTQcg_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/vNjFk274lleTQcg_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>253コメント</span><span class="datetime">3時間前</span>
+                  </p>
+                </div>
+                <p class="title">【実況・感想】＜火ドラ★イレブン＞娘の命を奪ったヤツを殺すのは罪ですか？ #02</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885665/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/qC2xY5nOjvKBBQ2_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/qC2xY5nOjvKBBQ2_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>192コメント</span><span class="datetime">6時間前</span>
+                  </p>
+                </div>
+                <p class="title">【夜遅くにごめんね】おにぎりの話をしない？🍙Part3</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885661/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/WcKM6Iscagm9ceU_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/WcKM6Iscagm9ceU_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>418コメント</span><span class="datetime">3時間前</span>
+                  </p>
+                </div>
+                <p class="title">料理研究家タレントの園山真希絵、昨年結婚していた　お相手は嵐の曲も手がける作詞作曲家「最初から別居婚」</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885659/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/z5hKIApk3m8EzLk_3939_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/z5hKIApk3m8EzLk_3939_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>735コメント</span><span class="datetime">57分前</span>
+                  </p>
+                </div>
+                <p class="title">身体の関係をもったら冷めてしまった。</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885652/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/DtmUpIzjmvZVbH3_6591_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/DtmUpIzjmvZVbH3_6591_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>53コメント</span><span class="datetime">19時間前</span>
+                  </p>
+                </div>
+                <p class="title">イラストレーターさん「あなたの愛猫を描きます！」→企画に寄せられた豪快すぎる画像に笑顔になる人々</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885646/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/LClovw9osu4Qixr_11583_s.webp" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/LClovw9osu4Qixr_11583_s.webp"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>104コメント</span><span class="datetime">1日前</span>
+                  </p>
+                </div>
+                <p class="title">腹立つ言い訳選手権🏅</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885641/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/bCBY8aWI4Y21Qd8_24128_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/bCBY8aWI4Y21Qd8_24128_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>1013コメント</span><span class="datetime">1時間前</span>
+                  </p>
+                </div>
+                <p class="title">【狭小】ペンシルハウスについて語ろう【3階建て】part3</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885640/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/2JXaq7CUtI6JBMt_22425_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/2JXaq7CUtI6JBMt_22425_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>112コメント</span><span class="datetime">14時間前</span>
+                  </p>
+                </div>
+                <p class="title">令和の学生寮が大変貌！ 人気を集めるシアター、プール付き下宿には「なめてるのか！」の声も…もはや貧乏学生は絶滅危惧種に</p></a>
+            </li>
+
+
+
+            <li class="flc"><a href="https://girlschannel.net/topics/5885633/">
+                <img data-src="https://up.gc-img.net/post_img_web/2025/10/a1vkLOz6SsrSubK_s.jpeg" width="60" height="60" class="img lazyload">
+                <noscript><img src="https://up.gc-img.net/post_img_web/2025/10/a1vkLOz6SsrSubK_s.jpeg"/></noscript>
+                <div class="info nn">
+                  <p class="comment"><span class="icon-comment"></span><span>89コメント</span><span class="datetime">21時間前</span>
+                  </p>
+                </div>
+                <p class="title">【ドラマ】『裸の大将 放浪記』観てた方</p></a>
+            </li>
+
+
+          </ul>
+          <ul class="pager">
+<li class="first"><span class="icon-arrow_l"></span><span class="icon-arrow_l"></span></li><li class="prev"><span class="icon-arrow_l"></span></li><li class="current">1</li><li><a href="https://girlschannel.net/new/2/">2</a></li><li><a href="https://girlschannel.net/new/3">3</a></li><li><a href="https://girlschannel.net/new/4">4</a></li><li><a href="https://girlschannel.net/new/5">5</a></li><li><a href="https://girlschannel.net/new/6">6</a></li><li><a href="https://girlschannel.net/new/7">7</a></li>...<li><a href="https://girlschannel.net/new/17">17</a></li><li><a href="https://girlschannel.net/new/18">18</a></li><li class="next"><a href="https://girlschannel.net/new/2/" rel="next"><span class="icon-arrow_r"></span></a></li><li class="last"><a href="https://girlschannel.net/new/18" rel="last"><span class="icon-arrow_r"></span><span class="icon-arrow_r"></span></a></li>          </ul>
+        </div>
+        <div class="tablet-sub tablet-sub-list"><a href="https://girlschannel.net/topics/make_topic/" class="btn btn-entry-topic mb20"><span class="icon-plus"></span>トピックを投稿する</a>
+          <div class="topic-wrap">
+            <div class="topic-list-wrap">
+              <h2 class="rank"><a href="https://girlschannel.net/topics/weekly/" class="head-link">一週間の人気トピック</a><a href="https://girlschannel.net/topics/weekly/" class="show-more">続きを見る<span class="icon-arrow_r"></span></a></h2>
+              <ul class="topic-list">
+ 一週間以内の人気のトピックはありません
+              </ul>
+              <h2 class="rank"><a href="https://girlschannel.net/rank/2/" class="head-link">前日の人気トピック</a><a href="https://girlschannel.net/rank/2/" class="show-more">続きを見る<span class="icon-arrow_r"></span></a></h2>
+              <ul class="topic-list">
+ 前日の人気のトピックはありません
+              </ul>
+              <h2 class="rank"><a href="https://girlschannel.net/topics/category/" class="head-link">カテゴリー</a></h2>
+              <ul class="category">
+                <li><a href="https://girlschannel.net/topics/category/love/">恋愛・結婚</a></li>
+                <li><a href="https://girlschannel.net/topics/category/cosme/">美容・コスメ</a></li>
+                <li><a href="https://girlschannel.net/topics/category/fashion/">ファッション</a></li>
+                <li><a href="https://girlschannel.net/topics/category/hair/">髪型</a></li>
+                <li><a href="https://girlschannel.net/topics/category/otona/">大人</a></li>
+                <li><a href="https://girlschannel.net/topics/category/gossip/">芸能人</a></li>
+                <li><a href="https://girlschannel.net/topics/category/cook/">料理・食べ物</a></li>
+                <li><a href="https://girlschannel.net/topics/category/diet/">ダイエット</a></li>
+                <li><a href="https://girlschannel.net/topics/category/family/">家族・子育て</a></li>
+                <li><a href="https://girlschannel.net/topics/category/health/">医療・健康</a></li>
+                <li><a href="https://girlschannel.net/topics/category/life/">生活</a></li>
+                <li><a href="https://girlschannel.net/topics/category/work/">仕事</a></li>
+                <li><a href="https://girlschannel.net/topics/category/realtime/">実況</a></li>
+                <li><a href="https://girlschannel.net/topics/category/tv/">テレビ・CM</a></li>
+                <li><a href="https://girlschannel.net/topics/category/movie/">ドラマ・映画</a></li>
+                <li><a href="https://girlschannel.net/topics/category/comic/">マンガ・アニメ・本</a></li>
+                <li><a href="https://girlschannel.net/topics/category/music/">音楽</a></li>
+                <li><a href="https://girlschannel.net/topics/category/images/">画像</a></li>
+                <li><a href="https://girlschannel.net/topics/category/news/">ニュース</a></li>
+                <li><a href="https://girlschannel.net/topics/category/politics/">政治・経済</a></li>
+                <li><a href="https://girlschannel.net/topics/category/sports/">スポーツ</a></li>
+                <li><a href="https://girlschannel.net/topics/category/tech/">IT・インターネット</a></li>
+                <li><a href="https://girlschannel.net/topics/category/animal/">犬・猫・動物</a></li>
+                <li><a href="https://girlschannel.net/topics/category/talk/">質問・雑談</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+
+      <div class="sub">
+        <a href="https://girlschannel.net/topics/make_topic/" class="btn btn-entry-topic mb20"><span class="icon-plus"></span>トピックを投稿する</a>
+
+
+
+<div class="sub-part sub-topics mb20">
+<p class="head"><a href="https://girlschannel.net/topics/weekly/" class="head-link">一週間の人気トピック</a></p>
+<ul><li class="flc"><a href="https://girlschannel.net/topics/5880379/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/h5aCgxGBoPqOfC3_s.jpeg" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/h5aCgxGBoPqOfC3_s.jpeg" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/h5aCgxGBoPqOfC3_s.jpeg"/></noscript>
+		<div class="icon-flag rank1"></div>
+		<p class="rank">1</p>
+	 </div>
+	 <div class="info">
+		<p class="title">ガル民が集まる秋の三連休雑談トピ</p>
+		<p class="comment"><span class="icon-comment"></span>44912コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5880523/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/Bwhyars9dJbZlEy_11206_s.png" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/Bwhyars9dJbZlEy_11206_s.png" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/Bwhyars9dJbZlEy_11206_s.png"/></noscript>
+		<div class="icon-flag rank2"></div>
+		<p class="rank">2</p>
+	 </div>
+	 <div class="info">
+		<p class="title">【衝撃スクープ】米倉涼子（50）麻薬取締法違反容疑でマトリが本格捜査へ！</p>
+		<p class="comment"><span class="icon-comment"></span>10481コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5879221/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/iJsjfexpHIiVIdD_6799_s.jpeg" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/iJsjfexpHIiVIdD_6799_s.jpeg" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/iJsjfexpHIiVIdD_6799_s.jpeg"/></noscript>
+		<div class="icon-flag rank3"></div>
+		<p class="rank">3</p>
+	 </div>
+	 <div class="info">
+		<p class="title">公明、連立離脱の見方強まる　閣外協力に転じる案が浮上</p>
+		<p class="comment"><span class="icon-comment"></span>9856コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5881310/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/uigvsoMEtA9Y54D_s.jpeg" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/uigvsoMEtA9Y54D_s.jpeg" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/uigvsoMEtA9Y54D_s.jpeg"/></noscript>
+		<div class="icon-flag rank4"></div>
+		<p class="rank">4</p>
+	 </div>
+	 <div class="info">
+		<p class="title">【実況・感想】キングオブコント2025</p>
+		<p class="comment"><span class="icon-comment"></span>7590コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5879903/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/Yr3IuvlXP6Qn9RI_24531_s.jpeg" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/Yr3IuvlXP6Qn9RI_24531_s.jpeg" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/Yr3IuvlXP6Qn9RI_24531_s.jpeg"/></noscript>
+		<div class="icon-flag rank5"></div>
+		<p class="rank">5</p>
+	 </div>
+	 <div class="info">
+		<p class="title">自民との連立政権「一旦白紙」公明・斎藤代表…「政治とカネ問題への基本姿勢に意見の相違」と説明　自民・高市総裁「一方的に。大変残念」公明党からの連立離脱の通告受けて</p>
+		<p class="comment"><span class="icon-comment"></span>7368コメント</p>
+	 </div></a></li>
+<a href="https://girlschannel.net/topics/weekly/" class="show-more">続きを見る<span class="icon-arrow_r"></span></a>
+</ul>
+</div>
+
+
+<div class="sub-part sub-topics sub-topics-yesterday flc mb20">
+<p class="head"><a href="https://girlschannel.net/rank/2/" class="head-link">前日の人気トピック</a></p>
+<ul><li class="flc"><a href="https://girlschannel.net/topics/5886093/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/XnLbRwUzcKfH3i4_8151_s.webp" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/XnLbRwUzcKfH3i4_8151_s.webp" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/XnLbRwUzcKfH3i4_8151_s.webp"/></noscript>
+		<div class="icon-flag rank1"></div>
+		<p class="rank">1</p>
+	 </div>
+	 <div class="info">
+		<p class="title">JO1大平祥生　活動休止を発表「規定に反する事案発覚」「見つめ直す期間が必要と判断」</p>
+		<p class="comment"><span class="icon-comment"></span>4400コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5885883/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/iXzxkwKelKvAb51_7163_s.jpeg" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/iXzxkwKelKvAb51_7163_s.jpeg" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/iXzxkwKelKvAb51_7163_s.jpeg"/></noscript>
+		<div class="icon-flag rank2"></div>
+		<p class="rank">2</p>
+	 </div>
+	 <div class="info">
+		<p class="title">timelesz原嘉孝＆篠塚大輝「ヒルマイルド」新CMに2人で出演「ドッキリだと思ってます」</p>
+		<p class="comment"><span class="icon-comment"></span>3308コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5885544/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/ow5etb3MmLjxUEA_12493_s.jpeg" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/ow5etb3MmLjxUEA_12493_s.jpeg" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/ow5etb3MmLjxUEA_12493_s.jpeg"/></noscript>
+		<div class="icon-flag rank3"></div>
+		<p class="rank">3</p>
+	 </div>
+	 <div class="info">
+		<p class="title">高市氏、公明離脱を陳謝　自民議員に「私の責任」</p>
+		<p class="comment"><span class="icon-comment"></span>1977コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5886155/">
+	 <div class="img">
+		<img class="lazyload loaded" data-src="https://up.gc-img.net/post_img_web/2025/10/hPAF7QmIvxwMXaB_23374_s.jpeg" width="60" height="60" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/hPAF7QmIvxwMXaB_23374_s.jpeg" data-ll-status="loaded">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/hPAF7QmIvxwMXaB_23374_s.jpeg"/></noscript>
+		<div class="icon-flag rank4"></div>
+		<p class="rank">4</p>
+	 </div>
+	 <div class="info">
+		<p class="title">Snow Man、新曲またも“歌割り格差”にファンもやもや“先輩グループ”との違いで“令和の国民的アイドル”への試練</p>
+		<p class="comment"><span class="icon-comment"></span>1816コメント</p>
+	 </div></a></li>
+<li class="flc"><a href="https://girlschannel.net/topics/5886487/">
+	 <div class="img">
+		<img class="lazyload" data-src="https://up.gc-img.net/post_img_web/2025/10/KgzEH7ggQrxTTVC_26416_s.jpeg" width="60" height="60">
+		<noscript><img src="https://up.gc-img.net/post_img_web/2025/10/KgzEH7ggQrxTTVC_26416_s.jpeg"/></noscript>
+		<div class="icon-flag rank5"></div>
+		<p class="rank">5</p>
+	 </div>
+	 <div class="info">
+		<p class="title">「批判してた人、どこいった？」　前評判は最悪だった「大阪・関西万博」が、結局“大成功で終わった”ワケ…「東京五輪」とは何が違ったのか</p>
+		<p class="comment"><span class="icon-comment"></span>1731コメント</p>
+	 </div></a></li>
+<a href="https://girlschannel.net/rank/2/" class="show-more">続きを見る<span class="icon-arrow_r"></span></a>
+</ul>
+</div>
+			<div class="sub-part sub-keywords mb20">
+	          <p class="head"><a class="head-link">人気のキーワード</a></p>
+              <ul class="keywords flc">
+                <li><a href="https://girlschannel.net/topics/keyword/%E7%8B%AC%E8%BA%AB/"># 独身</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E5%BD%BC%E6%B0%8F/"># 彼氏</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E5%AE%9F%E6%B3%81/"># 実況</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E6%81%8B%E6%84%9B/"># 恋愛</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E5%AD%90%E4%BE%9B/"># 子供</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E3%83%A1%E3%82%A4%E3%82%AF/"># メイク</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E3%81%82%E3%82%8B%E3%81%82%E3%82%8B/"># あるある</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E3%83%87%E3%83%BC%E3%83%88/"># デート</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E7%BE%8E%E4%BA%BA/"># 美人</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E3%82%A4%E3%82%B1%E3%83%A1%E3%83%B3/"># イケメン</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E3%82%B3%E3%82%B9%E3%83%A1/"># コスメ</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E5%A4%AB%E5%A9%A6/"># 夫婦</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E7%B5%90%E5%A9%9A/"># 結婚</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E9%9B%91%E8%AB%87/"># 雑談</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E3%81%8A%E9%87%91/"># お金</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E5%A9%9A%E6%B4%BB/"># 婚活</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E4%BB%95%E4%BA%8B/"># 仕事</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E8%B2%AF%E9%87%91/"># 貯金</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E3%83%80%E3%82%A4%E3%82%A8%E3%83%83%E3%83%88/"># ダイエット</a></li>
+                <li><a href="https://girlschannel.net/topics/keyword/%E5%A6%8A%E5%A8%A0/"># 妊娠</a></li>
+              </ul>
+				  <a href="https://girlschannel.net/topics/keyword/" class="show-more">続きを見る<span class="icon-arrow_r"></span></a>
+			</div>
+
+        <div class="sub-part sub-categories mb20">
+          <p class="head"><a href="https://girlschannel.net/topics/category/" class="head-link">カテゴリー</a></p>
+          <ul>
+            <a href="https://girlschannel.net/topics/category/love/"><li>恋愛・結婚</li></a>
+            <a href="https://girlschannel.net/topics/category/cosme/"><li>美容・コスメ</li></a>
+            <a href="https://girlschannel.net/topics/category/fashion/"><li>ファッション</li></a>
+            <a href="https://girlschannel.net/topics/category/hair/"><li>髪型</li></a>
+            <a href="https://girlschannel.net/topics/category/otona/"><li>大人</li></a>
+            <a href="https://girlschannel.net/topics/category/gossip/"><li>芸能人</li></a>
+            <a href="https://girlschannel.net/topics/category/cook/"><li>料理・食べ物</li></a>
+            <a href="https://girlschannel.net/topics/category/diet/"><li>ダイエット</li></a>
+            <a href="https://girlschannel.net/topics/category/family/"><li>家族・子育て</li></a>
+            <a href="https://girlschannel.net/topics/category/health/"><li>医療・健康</li></a>
+            <a href="https://girlschannel.net/topics/category/life/"><li>生活</li></a>
+            <a href="https://girlschannel.net/topics/category/work/"><li>仕事</li></a>
+            <a href="https://girlschannel.net/topics/category/realtime/"><li>実況</li></a>
+            <a href="https://girlschannel.net/topics/category/tv/"><li>テレビ・CM</li></a>
+            <a href="https://girlschannel.net/topics/category/movie/"><li>ドラマ・映画</li></a>
+            <a href="https://girlschannel.net/topics/category/comic/"><li>マンガ・アニメ・本</li></a>
+            <a href="https://girlschannel.net/topics/category/music/"><li>音楽</li></a>
+            <a href="https://girlschannel.net/topics/category/images/"><li>画像</li></a>
+            <a href="https://girlschannel.net/topics/category/news/"><li>ニュース</li></a>
+            <a href="https://girlschannel.net/topics/category/politics/"><li>政治・経済</li></a>
+            <a href="https://girlschannel.net/topics/category/sports/"><li>スポーツ</li></a>
+            <a href="https://girlschannel.net/topics/category/tech/"><li>IT・インターネット</li></a>
+            <a href="https://girlschannel.net/topics/category/animal/"><li>犬・猫・動物</li></a>
+            <a href="https://girlschannel.net/topics/category/talk/"><li>質問・雑談</li></a>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      <div class="footer-logo"><a href="https://girlschannel.net/"><img src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/logo_footer.svg" width="146" height="32"></a></div>
+      <div class="links flc"><a href="https://jsquared.co.jp/" target="_blank">運営会社</a><a href="https://girlschannel.net/contact.html">お問い合わせ</a><a href="https://girlschannel.net/help/">よくある質問</a><a href="https://girlschannel.net/agreement.html">利用規約</a><a href="https://girlschannel.net/userdata.html">利⽤者情報の外部送信規律</a></div>
+    </div>
+    <div id="scrollToTop" class="scroll-to-top" style="right: 23px;"><span class="icon-arrow_t"></span></div>
+
+
+<style type="text/css">
+body > a {
+	display:none;
+}
+</style>
+<script type="text/javascript">
+//<![CDATA[
+document.addEventListener('DOMContentLoaded', function() {
+  var topPrs = document.getElementsByClassName('top_pr');
+  for (var i = 0;i < topPrs.length;i++) {
+    topPrs[i].addEventListener('click', function() {
+      var myXml = new XMLHttpRequest();
+      var url = '/topics/pr_click/' + this.getAttribute('data-id') + '/0/' + this.getAttribute('data-device');
+      myXml.open('GET', url);
+      myXml.send(null);
+    });
+  }
+});
+//]]>
+</script>
+	<script type="text/javascript" src="./新着トピック _ ガールズちゃんねる - Girls Channel -_files/common.js"></script>
+
+
+</body></html>

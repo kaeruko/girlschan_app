@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "title": "好きな俳優トピ",
+    "created_at": "2025-10-10T12:00:00",
+    "comments_count": 120,
+    "thumbnail": "https://via.placeholder.com/80"
+  },
+  {
+    "id": 2,
+    "title": "最近のテレビつまらなくない？",
+    "created_at": "2025-10-12T08:30:00",
+    "comments_count": 84,
+    "thumbnail": "https://via.placeholder.com/80"
+  }
+]
