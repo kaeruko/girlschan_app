@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'new_list.dart';
 import 'topic_list.dart';
 import 'favorites_screen.dart';
+import 'clips_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,12 +18,14 @@ class _HomeScreenState extends State<HomeScreen> {
     NewListScreen(),
     TopicListScreen(),
     FavoritesScreen(),
+    ClipsScreen(),
   ];
 
   final _titles = const [
     '新着トピック',
     '人気トピック',
-    'お気に入り',
+    'ウォッチ',
+    'クリップ',
   ];
 
   @override
@@ -33,11 +36,13 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: Colors.pinkAccent,
+        type: BottomNavigationBarType.fixed,
         onTap: (i) => setState(() => _currentIndex = i),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.fiber_new), label: '新着'),
           BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: '人気'),
-          BottomNavigationBarItem(icon: Icon(Icons.star), label: 'お気に入り'),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'ウォッチ'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'クリップ'),
         ],
       ),
     );

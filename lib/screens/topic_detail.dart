@@ -28,9 +28,10 @@ class TopicDetailScreen extends StatefulWidget {
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
   List<dynamic> _comments = [];
   bool _loading = true;
-  bool _isFavorite = false;
+  bool _isWatched = false;
   final ScrollController _scrollController = ScrollController();
   double _savedOffset = 0.0;
+  Set<int> _clippedCommentNos = {};
 
   @override
   void initState() {
@@ -97,6 +98,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           _comments = List.from(newComments)..addAll(local);
           _loading = false;
         });
+        
+        // リフレッシュ後のスクロール復元
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients && _savedOffset > 0) {
+              _scrollController.jumpTo(_savedOffset);
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('API Error: $e');
@@ -121,27 +131,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Future<void> _load() async {
     await _loadScrollPosition();
     
-    // キャッシュの存在確認
-    final hasCached = await CacheService.exists('comments_${widget.topicId}');
-    final favIds = await getFavoriteIds();
+    // ウォッチ状態とクリップ状態を取得
+    final watchedIds = await getWatchedTopicIds();
+    final clips = await getClippedComments();
     
     setState(() {
-      _isFavorite = favIds.contains(widget.topicId);
+      _isWatched = watchedIds.contains(widget.topicId);
+      _clippedCommentNos = clips
+          .where((c) => c['topicId'] == widget.topicId)
+          .map<int>((c) => c['no'] as int)
+          .toSet();
     });
     
-    if (hasCached) {
-      // キャッシュがあれば表示
-      final cachedComments = await CacheService.load('comments_${widget.topicId}');
-      final local = await _loadLocalComments();
-      setState(() {
-        _comments = List.from(cachedComments)..addAll(local);
-        _loading = false;
-      });
-    } else {
-      // キャッシュがなければAPIから取得
-      await fetchComments();
-    }
+    // 常にAPIから全件取得する
+    await fetchComments();
 
+    // スクロール位置の復元
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients && _savedOffset > 0) {
         _scrollController.jumpTo(_savedOffset);
@@ -205,18 +210,45 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  // ===== お気に入り =====
-  Future<void> _toggleFavorite() async {
-    if (_isFavorite) {
-      await removeFavoriteId(widget.topicId);
+  // ===== ウォッチ（旧「お気に入り」） =====
+  Future<void> _toggleWatch() async {
+    if (_isWatched) {
+      await removeWatchedTopicId(widget.topicId);
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('お気に入り解除しました')));
+          .showSnackBar(const SnackBar(content: Text('ウォッチを解除しました')));
     } else {
-      await addFavoriteId(widget.topicId);
+      await addWatchedTopicId(widget.topicId);
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('お気に入りに追加しました')));
+          .showSnackBar(const SnackBar(content: Text('ウォッチに追加しました')));
     }
-    setState(() => _isFavorite = !_isFavorite);
+    setState(() => _isWatched = !_isWatched);
+  }
+
+  // ===== クリップ（コメント保存） =====
+  Future<void> _toggleClip(Map<String, dynamic> comment) async {
+    final no = comment['no'] as int;
+    final isClipped = _clippedCommentNos.contains(no);
+    
+    if (isClipped) {
+      await removeClippedComment(widget.topicId, no);
+      _clippedCommentNos.remove(no);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('クリップを解除しました')));
+    } else {
+      await addClippedComment(
+        topicId: widget.topicId,
+        topicTitle: widget.title,
+        commentNo: no,
+        commentBody: comment['body'] ?? '',
+        time: comment['time'] ?? '',
+        plus: comment['plus'] ?? 0,
+        minus: comment['minus'] ?? 0,
+      );
+      _clippedCommentNos.add(no);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('クリップに保存しました')));
+    }
+    setState(() {});
   }
 
   // ===== UI =====
@@ -227,8 +259,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         title: Text(widget.title),
         actions: [
           IconButton(
-            icon: Icon(_isFavorite ? Icons.star : Icons.star_border),
-            onPressed: _toggleFavorite,
+            icon: Icon(_isWatched ? Icons.bookmark : Icons.bookmark_border),
+            tooltip: _isWatched ? 'ウォッチ中' : 'ウォッチに追加',
+            onPressed: _toggleWatch,
           ),
         ],
       ),
@@ -313,43 +346,61 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                           ],
                           const SizedBox(height: 6),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              InkWell(
-                                onTap: () async {
-                                  // vbox{no} の形式でコメントIDを生成
-                                  final commentId = 'vbox${no}';
-                                  final success = await rateComment(widget.topicId, commentId, 1);
-                                  if (success && mounted) {
-                                    setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('プラスを送信しました')),
-                                    );
-                                  }
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text('＋$plus',
-                                      style: const TextStyle(color: Colors.redAccent)),
-                                ),
+                              Row(
+                                children: [
+                                  InkWell(
+                                    onTap: () async {
+                                      // vbox{no} の形式でコメントIDを生成
+                                      final commentId = 'vbox${no}';
+                                      final success = await rateComment(widget.topicId, commentId, 1);
+                                      if (success && mounted) {
+                                        setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('プラスを送信しました')),
+                                        );
+                                      }
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text('＋$plus',
+                                          style: const TextStyle(color: Colors.redAccent)),
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () async {
+                                      // vbox{no} の形式でコメントIDを生成
+                                      final commentId = 'vbox${no}';
+                                      final success = await rateComment(widget.topicId, commentId, -1);
+                                      if (success && mounted) {
+                                        setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('マイナスを送信しました')),
+                                        );
+                                      }
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text('−$minus',
+                                          style: const TextStyle(color: Colors.blueGrey)),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              InkWell(
-                                onTap: () async {
-                                  // vbox{no} の形式でコメントIDを生成
-                                  final commentId = 'vbox${no}';
-                                  final success = await rateComment(widget.topicId, commentId, -1);
-                                  if (success && mounted) {
-                                    setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('マイナスを送信しました')),
-                                    );
-                                  }
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text('−$minus',
-                                      style: const TextStyle(color: Colors.blueGrey)),
+                              IconButton(
+                                icon: Icon(
+                                  _clippedCommentNos.contains(no)
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: _clippedCommentNos.contains(no)
+                                      ? Colors.pinkAccent
+                                      : null,
+                                  size: 22,
                                 ),
+                                onPressed: () => _toggleClip(c),
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(4),
                               ),
                             ],
                           ),

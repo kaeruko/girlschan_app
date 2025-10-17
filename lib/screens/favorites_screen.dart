@@ -11,21 +11,36 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  List<int> _favorites = [];
+  List<int> _watchedTopics = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadFavorites();
+    _loadWatchedTopics();
   }
 
-  Future<void> _loadFavorites() async {
-    final ids = await getFavoriteIds();  // ← ローカルから読む
+  Future<void> _loadWatchedTopics() async {
+    final ids = await getWatchedTopicIds();
     setState(() {
-      _favorites = ids;
+      _watchedTopics = ids;
       _loading = false;
     });
+  }
+
+  Future<void> _refreshWatched() async {
+    setState(() => _loading = true);
+    await _loadWatchedTopics();
+  }
+
+  Future<void> _removeFromWatch(int topicId) async {
+    await removeWatchedTopicId(topicId);
+    setState(() {
+      _watchedTopics.remove(topicId);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ウォッチを削除しました')),
+    );
   }
 
   @override
@@ -33,30 +48,65 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_favorites.isEmpty) {
-      return const Center(child: Text('お気に入りはありません'));
+
+    if (_watchedTopics.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.bookmark_border,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'ウォッチ中のトピックはありません',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'トピック詳細の📘をタップして登録',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
-    return ListView.builder(
-      itemCount: _favorites.length,
-      itemBuilder: (context, i) {
-        final id = _favorites[i];
-        return ListTile(
-          title: Text('トピックID: $id'),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TopicDetailScreen(
-                  topicId: id,
-                  title: 'お気に入りトピック $id',
-                  commentCount: 0,
+    return RefreshIndicator(
+      onRefresh: _refreshWatched,
+      child: ListView.builder(
+        itemCount: _watchedTopics.length,
+        itemBuilder: (context, i) {
+          final id = _watchedTopics[i];
+          return ListTile(
+            title: Text('トピックID: $id'),
+            trailing: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => _removeFromWatch(id),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TopicDetailScreen(
+                    topicId: id,
+                    title: 'ウォッチ中のトピック $id',
+                    commentCount: 0,
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

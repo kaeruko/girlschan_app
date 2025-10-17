@@ -112,26 +112,102 @@ Future<List<dynamic>> fetchCommentsWithCache(int topicId) async {
   }
 }
 
-// ========== お気に入り関連 ==========
+// ========== ウォッチリスト関連（旧「お気に入りトピック」） ==========
 
-Future<List<int>> getFavoriteIds() async {
+Future<List<int>> getWatchedTopicIds() async {
   final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList('favorites') ?? [];
+  final ids = prefs.getStringList('watched_topics') ?? [];
   return ids.map(int.parse).toList();
 }
 
-Future<void> addFavoriteId(int id) async {
+Future<void> addWatchedTopicId(int id) async {
   final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList('favorites') ?? [];
+  final ids = prefs.getStringList('watched_topics') ?? [];
   if (!ids.contains(id.toString())) {
     ids.add(id.toString());
-    await prefs.setStringList('favorites', ids);
+    await prefs.setStringList('watched_topics', ids);
   }
 }
 
-Future<void> removeFavoriteId(int id) async {
+Future<void> removeWatchedTopicId(int id) async {
   final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList('favorites') ?? [];
+  final ids = prefs.getStringList('watched_topics') ?? [];
   ids.remove(id.toString());
-  await prefs.setStringList('favorites', ids);
+  await prefs.setStringList('watched_topics', ids);
 }
+
+// ========== クリップ関連（コメント保存） ==========
+
+Future<List<Map<String, dynamic>>> getClippedComments() async {
+  final prefs = await SharedPreferences.getInstance();
+  final jsonList = prefs.getStringList('clipped_comments') ?? [];
+  return jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+}
+
+Future<void> addClippedComment({
+  required int topicId,
+  required String topicTitle,
+  required int commentNo,
+  required String commentBody,
+  required String time,
+  required int plus,
+  required int minus,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final clips = prefs.getStringList('clipped_comments') ?? [];
+  
+  final clip = {
+    'topicId': topicId,
+    'topicTitle': topicTitle,
+    'no': commentNo,
+    'body': commentBody,
+    'time': time,
+    'plus': plus,
+    'minus': minus,
+    'clipDate': DateTime.now().toIso8601String(),
+  };
+  
+  // 重複チェック（同じトピックの同じコメント）
+  final isDuplicate = clips.any((e) {
+    final existing = jsonDecode(e) as Map<String, dynamic>;
+    return existing['topicId'] == topicId && existing['no'] == commentNo;
+  });
+  
+  if (!isDuplicate) {
+    clips.add(jsonEncode(clip));
+    await prefs.setStringList('clipped_comments', clips);
+  }
+}
+
+Future<void> removeClippedComment(int topicId, int commentNo) async {
+  final prefs = await SharedPreferences.getInstance();
+  final clips = prefs.getStringList('clipped_comments') ?? [];
+  
+  clips.removeWhere((e) {
+    final clip = jsonDecode(e) as Map<String, dynamic>;
+    return clip['topicId'] == topicId && clip['no'] == commentNo;
+  });
+  
+  await prefs.setStringList('clipped_comments', clips);
+}
+
+Future<bool> isCommentClipped(int topicId, int commentNo) async {
+  final clips = await getClippedComments();
+  return clips.any((c) => c['topicId'] == topicId && c['no'] == commentNo);
+}
+
+// ========== 後方互換性（旧「お気に入り」→「ウォッチ」に移行） ==========
+
+Future<List<int>> getFavoriteIds() async {
+  // 古いキーがあれば新しいキーに移行
+  final prefs = await SharedPreferences.getInstance();
+  final oldFavs = prefs.getStringList('favorites') ?? [];
+  if (oldFavs.isNotEmpty) {
+    await prefs.setStringList('watched_topics', oldFavs);
+    await prefs.remove('favorites');
+  }
+  return getWatchedTopicIds();
+}
+
+Future<void> addFavoriteId(int id) async => addWatchedTopicId(id);
+Future<void> removeFavoriteId(int id) async => removeWatchedTopicId(id);
