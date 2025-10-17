@@ -279,11 +279,42 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text('＋$plus',
-                                  style: const TextStyle(color: Colors.redAccent)),
-                              const SizedBox(width: 8),
-                              Text('−$minus',
-                                  style: const TextStyle(color: Colors.blueGrey)),
+                              InkWell(
+                                onTap: () async {
+                                  // vbox{no} の形式でコメントIDを生成
+                                  final commentId = 'vbox${no}';
+                                  final success = await rateComment(widget.topicId, commentId, 1);
+                                  if (success && mounted) {
+                                    setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('プラスを送信しました')),
+                                    );
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text('＋$plus',
+                                      style: const TextStyle(color: Colors.redAccent)),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () async {
+                                  // vbox{no} の形式でコメントIDを生成
+                                  final commentId = 'vbox${no}';
+                                  final success = await rateComment(widget.topicId, commentId, -1);
+                                  if (success && mounted) {
+                                    setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('マイナスを送信しました')),
+                                    );
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text('−$minus',
+                                      style: const TextStyle(color: Colors.blueGrey)),
+                                ),
+                              ),
                             ],
                           ),
                         ],

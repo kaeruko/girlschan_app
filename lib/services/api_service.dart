@@ -6,6 +6,56 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final apiBase = AppConfig.apiBase;
 
+// ========== コメント評価 ==========
+
+// ========== コメント評価 ==========
+
+Future<bool> rateComment(int topicId, String commentId, int value) async {
+  try {
+    final url = 'https://girlschannel.net/topics/post_value?value=$value&topic_id=$topicId&comment_id=$commentId';
+    print('Request URL: $url');
+    
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'accept': 'application/json, text/plain, */*',
+        'accept-language': 'ja,en-US;q=0.9,en;q=0.8',
+        'dnt': '1',
+        'priority': 'u=1, i',
+        'referer': 'https://girlschannel.net/topics/$topicId/',
+        'sec-ch-ua': '"Chromium";v="141", "Not?A_Brand";v="8"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Android"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
+        'user-agent': 'Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 CrKey/1.54.248666',
+      },
+    );
+    
+    print('Rate response: ${response.statusCode}');
+    print('Rate response body: ${response.body}');
+    
+    if (response.statusCode == 200) {
+      if (response.body.isEmpty) {
+        return true;
+      }
+      try {
+        final data = jsonDecode(response.body);
+        print('Parsed JSON: $data');
+        return data['result'] == true;
+      } catch (e) {
+        print('JSON parse error: $e');
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    print('Rate error: $e');
+    return false;
+  }
+}
+
 // ========== トピック関連 ==========
 
 Future<List<dynamic>> fetchNewTopics() async {
