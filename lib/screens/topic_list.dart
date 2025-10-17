@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import '../services/cache_service.dart';
 import 'topic_detail.dart';
 
 class TopicListScreen extends StatefulWidget {
@@ -47,6 +48,12 @@ class _TopicListScreenState extends State<TopicListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchFromServer,
     return Scaffold(
       appBar: AppBar(title: const Text('GirlsChannel Offline')),
       body: _loading
