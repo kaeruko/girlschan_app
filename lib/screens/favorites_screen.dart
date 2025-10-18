@@ -11,7 +11,7 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  List<int> _watchedTopics = [];
+  List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
 
   @override
@@ -21,9 +21,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Future<void> _loadWatchedTopics() async {
-    final ids = await getWatchedTopicIds();
+    final topics = await getWatchedTopics();
     setState(() {
-      _watchedTopics = ids;
+      _watchedTopics = topics;
       _loading = false;
     });
   }
@@ -36,7 +36,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _removeFromWatch(int topicId) async {
     await removeWatchedTopicId(topicId);
     setState(() {
-      _watchedTopics.remove(topicId);
+      _watchedTopics.removeWhere((topic) => topic['id'] == topicId);
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('ウォッチを削除しました')),
@@ -85,9 +85,23 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       child: ListView.builder(
         itemCount: _watchedTopics.length,
         itemBuilder: (context, i) {
-          final id = _watchedTopics[i];
+          final topic = _watchedTopics[i];
+          final id = topic['id'] as int;
+          final title = topic['title'] as String? ?? 'タイトル不明';
+          final comments = topic['comments'] as int? ?? 0;
+          final time = topic['time'] as String? ?? '';
+          
           return ListTile(
-            title: Text('トピックID: $id'),
+            title: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              'コメント: $comments件 $time',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () => _removeFromWatch(id),
@@ -98,8 +112,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 MaterialPageRoute(
                   builder: (_) => TopicDetailScreen(
                     topicId: id,
-                    title: 'ウォッチ中のトピック $id',
-                    commentCount: 0,
+                    title: title,
+                    commentCount: comments,
                   ),
                 ),
               );

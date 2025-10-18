@@ -106,15 +106,28 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         final data = jsonDecode(res.body);
         final newComments = data['comments'] ?? [];
 
-        // 以前のコメントとマージ（重複排除）
-        final mergedComments = _mergeComments(_allComments, newComments);
+        debugPrint('APIから取得したコメント数: ${newComments.length}');
+        debugPrint('既存キャッシュコメント数: ${_allComments.length}');
 
-        // マージ後のコメントをキャッシュに保存
-        await CacheService.save('comments_${widget.topicId}', mergedComments);
+        // 既にキャッシュから読み込んでいるなら、そこに新規コメントを追加
+        // キャッシュから読み込んでいない場合はAPIのデータをそのまま使用
+        List<dynamic> allComments;
+        if (_allComments.isEmpty) {
+          // 初回取得時はAPIのデータをそのまま使用
+          allComments = newComments;
+        } else {
+          // 既存キャッシュがあれば、マージして更新
+          allComments = _mergeComments(_allComments, newComments);
+        }
+        
+        debugPrint('最終的なコメント数: ${allComments.length}');
+
+        // 全コメントをキャッシュに保存
+        await CacheService.save('comments_${widget.topicId}', allComments);
 
         setState(() {
-          _allComments = mergedComments;
-          _displayedComments = List.from(mergedComments); // 全件表示
+          _allComments = allComments;
+          _displayedComments = List.from(allComments); // 全件表示
           _currentPage = 0;
           _hasMoreComments = false; // ページング不要
           _loading = false;
@@ -290,7 +303,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('ウォッチを解除しました')));
     } else {
-      await addWatchedTopicId(widget.topicId);
+      await addWatchedTopicId(
+        widget.topicId,
+        title: widget.title,
+        url: '',
+        comments: widget.commentCount,
+        time: '',
+      );
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('ウォッチに追加しました')));
     }
@@ -322,6 +341,121 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           .showSnackBar(const SnackBar(content: Text('クリップに保存しました')));
     }
     setState(() {});
+  }
+
+  // ===== アンカー関連 =====
+  dynamic _getCommentByNo(int no) {
+    try {
+      return _displayedComments.firstWhere((c) => c['no'] == no);
+    } catch (e) {
+      return {};
+    }
+  }
+
+  void _jumpToComment(int no) {
+    final index = _displayedComments.indexWhere((c) => c['no'] == no);
+    if (index != -1) {
+      _scrollController.animateTo(
+        _scrollController.position.minScrollExtent + (index * 100.0),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No.$no へ移動しました')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('コメントが見つかりません')),
+      );
+    }
+  }
+
+  Widget _buildAnchorText(List<int> anchors) {
+    if (anchors.isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Wrap(
+        spacing: 4,
+        children: anchors.map((no) {
+          final referencedComment = _getCommentByNo(no);
+          final isAvailable = referencedComment.isNotEmpty;
+          
+          return GestureDetector(
+            onTap: isAvailable ? () => _jumpToComment(no) : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isAvailable ? Colors.blue.shade100 : Colors.grey.shade200,
+                border: Border.all(
+                  color: isAvailable ? Colors.blue.shade300 : Colors.grey.shade300,
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '>>$no',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isAvailable ? Colors.blue.shade700 : Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildReverseAnchorText(List<int> reverseAnchors) {
+    if (reverseAnchors.isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        children: [
+          const Text(
+            '参照されている: ',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          Expanded(
+            child: Wrap(
+              spacing: 4,
+              children: reverseAnchors.take(5).map((no) {
+                return GestureDetector(
+                  onTap: () => _jumpToComment(no),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      border: Border.all(
+                        color: Colors.orange.shade300,
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '<<$no',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          if (reverseAnchors.length > 5)
+            Text(
+              ' +${reverseAnchors.length - 5}件',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+        ],
+      ),
+    );
   }
 
   // ===== UI =====
@@ -362,12 +496,19 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                     final plus = c['plus'] ?? 0;
                     final minus = c['minus'] ?? 0;
 
+                    final anchors = List<int>.from(c['anchors'] ?? []);
+                    final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
+
                     return ListTile(
                       title: Text('No.$no  $time',
                           style: const TextStyle(fontSize: 13, color: Colors.grey)),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (anchors.isNotEmpty)
+                            _buildAnchorText(anchors),
+                          if (reverseAnchors.isNotEmpty)
+                            _buildReverseAnchorText(reverseAnchors),
                           Text(body, style: const TextStyle(fontSize: 15)),
                           if (c['image_url'] != null) ...[
                             const SizedBox(height: 8),

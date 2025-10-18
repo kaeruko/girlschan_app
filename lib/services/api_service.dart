@@ -114,26 +114,72 @@ Future<List<dynamic>> fetchCommentsWithCache(int topicId) async {
 
 // ========== ウォッチリスト関連（旧「お気に入りトピック」） ==========
 
+/// ウォッチ中のトピック完全情報を取得
+Future<List<Map<String, dynamic>>> getWatchedTopics() async {
+  final prefs = await SharedPreferences.getInstance();
+  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+  return jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+}
+
+/// ウォッチ中のトピックIDリストを取得（後方互換性用）
 Future<List<int>> getWatchedTopicIds() async {
   final prefs = await SharedPreferences.getInstance();
+  // 新形式を試す
+  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+  if (jsonList.isNotEmpty) {
+    return jsonList
+        .map((e) => (jsonDecode(e) as Map<String, dynamic>)['id'] as int)
+        .toList();
+  }
+  // 旧形式から移行
   final ids = prefs.getStringList('watched_topics') ?? [];
   return ids.map(int.parse).toList();
 }
 
-Future<void> addWatchedTopicId(int id) async {
+/// ウォッチに追加（完全情報を保存）
+Future<void> addWatchedTopicId(
+  int id, {
+  String? title,
+  String? url,
+  int? comments,
+  String? time,
+  String? imageUrl,
+}) async {
   final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList('watched_topics') ?? [];
-  if (!ids.contains(id.toString())) {
-    ids.add(id.toString());
-    await prefs.setStringList('watched_topics', ids);
+  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+  
+  // 重複チェック
+  final isDuplicate = jsonList.any((e) {
+    final topic = jsonDecode(e) as Map<String, dynamic>;
+    return topic['id'] == id;
+  });
+  
+  if (!isDuplicate) {
+    final topic = {
+      'id': id,
+      'title': title ?? 'トピック',
+      'url': url ?? '',
+      'comments': comments ?? 0,
+      'time': time ?? '',
+      'imageUrl': imageUrl,
+      'watchedAt': DateTime.now().toIso8601String(),
+    };
+    jsonList.add(jsonEncode(topic));
+    await prefs.setStringList('watched_topics_full', jsonList);
   }
 }
 
+/// ウォッチから削除
 Future<void> removeWatchedTopicId(int id) async {
   final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList('watched_topics') ?? [];
-  ids.remove(id.toString());
-  await prefs.setStringList('watched_topics', ids);
+  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+  
+  jsonList.removeWhere((e) {
+    final topic = jsonDecode(e) as Map<String, dynamic>;
+    return topic['id'] == id;
+  });
+  
+  await prefs.setStringList('watched_topics_full', jsonList);
 }
 
 // ========== クリップ関連（コメント保存） ==========
