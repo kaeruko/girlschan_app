@@ -104,26 +104,36 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           await http.get(Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}'));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        final allComments = data['comments'] ?? [];
+        final newComments = data['comments'] ?? [];
 
-        // コメントをキャッシュに保存
-        await CacheService.save('comments_${widget.topicId}', allComments);
+        // 以前のコメントとマージ（重複排除）
+        final mergedComments = _mergeComments(_allComments, newComments);
+
+        // マージ後のコメントをキャッシュに保存
+        await CacheService.save('comments_${widget.topicId}', mergedComments);
 
         setState(() {
-          _allComments = allComments;
-          _displayedComments = List.from(allComments); // 全件表示
+          _allComments = mergedComments;
+          _displayedComments = List.from(mergedComments); // 全件表示
           _currentPage = 0;
           _hasMoreComments = false; // ページング不要
           _loading = false;
         });
 
-        // スクロール復元
+        // スクロール位置を復元
         if (mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_scrollController.hasClients && _savedOffset > 0) {
               _scrollController.jumpTo(_savedOffset);
             }
           });
+        }
+
+        // 更新完了を通知
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('最新データを取得しました')),
+          );
         }
       }
     } catch (e) {
@@ -145,6 +155,36 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
+  // ===== コメントをマージ（重複排除） =====
+  List<dynamic> _mergeComments(List<dynamic> existing, List<dynamic> newComments) {
+    // noをキーにしたMapを作成（既存のコメントから）
+    final commentMap = <int, dynamic>{};
+    for (var comment in existing) {
+      final no = comment['no'] as int?;
+      if (no != null) {
+        commentMap[no] = comment;
+      }
+    }
+
+    // 新しいコメントで更新・追加
+    for (var comment in newComments) {
+      final no = comment['no'] as int?;
+      if (no != null) {
+        commentMap[no] = comment; // 新しいデータで上書き
+      }
+    }
+
+    // noの昇順でソート
+    final sorted = commentMap.values.toList();
+    sorted.sort((a, b) {
+      final noA = (a['no'] as int?) ?? 0;
+      final noB = (b['no'] as int?) ?? 0;
+      return noA.compareTo(noB);
+    });
+
+    return sorted;
+  }
+
   // ===== 初期化処理 =====
   Future<void> _load() async {
     await _loadScrollPosition();
@@ -161,15 +201,30 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           .toSet();
     });
     
-    // 常にAPIから全件取得する
-    await fetchComments();
-
-    // スクロール位置の復元
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && _savedOffset > 0) {
-        _scrollController.jumpTo(_savedOffset);
-      }
-    });
+    // キャッシュをチェック
+    final cacheKey = 'comments_${widget.topicId}';
+    final cached = await CacheService.load(cacheKey);
+    
+    if (cached.isNotEmpty) {
+      // キャッシュがあれば表示
+      setState(() {
+        _allComments = cached;
+        _displayedComments = List.from(cached);
+        _currentPage = 0;
+        _hasMoreComments = false;
+        _loading = false;
+      });
+      
+      // スクロール位置の復元
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients && _savedOffset > 0) {
+          _scrollController.jumpTo(_savedOffset);
+        }
+      });
+    } else {
+      // キャッシュがなければAPIから取得
+      await fetchComments();
+    }
   }
 
   // ===== 投稿ボタン =====
