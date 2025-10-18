@@ -25,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _titles = const [
     '新着トピック',
     '人気トピック',
-    'ウォッチ',
+    '履歴',
     'クリップ',
   ];
 
@@ -56,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.fiber_new), label: '新着'),
           BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: '人気'),
-          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'ウォッチ'),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: '履歴'),
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'クリップ'),
         ],
       ),

@@ -152,16 +152,16 @@ Future<List<dynamic>> fetchCommentsWithCache(int topicId) async {
   }
 }
 
-// ========== ウォッチリスト関連（旧「お気に入りトピック」） ==========
+// ========== 履歴リスト関連（旧「お気に入りトピック」） ==========
 
-/// ウォッチ中のトピック完全情報を取得
+/// 履歴のトピック完全情報を取得
 Future<List<Map<String, dynamic>>> getWatchedTopics() async {
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
   return jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
 }
 
-/// ウォッチ中のトピックIDリストを取得（後方互換性用）
+/// 履歴のトピックIDリストを取得（後方互換性用）
 Future<List<int>> getWatchedTopicIds() async {
   final prefs = await SharedPreferences.getInstance();
   // 新形式を試す
@@ -176,7 +176,7 @@ Future<List<int>> getWatchedTopicIds() async {
   return ids.map(int.parse).toList();
 }
 
-/// ウォッチに追加（完全情報を保存）
+/// 履歴に追加（完全情報を保存）
 Future<void> addWatchedTopicId(
   int id, {
   String? title,
@@ -209,7 +209,7 @@ Future<void> addWatchedTopicId(
   }
 }
 
-/// ウォッチから削除
+/// 履歴から削除
 Future<void> removeWatchedTopicId(int id) async {
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
@@ -282,7 +282,7 @@ Future<bool> isCommentClipped(int topicId, int commentNo) async {
   return clips.any((c) => c['topicId'] == topicId && c['no'] == commentNo);
 }
 
-// ========== 後方互換性（旧「お気に入り」→「ウォッチ」に移行） ==========
+// ========== 後方互換性（旧「お気に入り」→「履歴」に移行） ==========
 
 Future<List<int>> getFavoriteIds() async {
   // 古いキーがあれば新しいキーに移行

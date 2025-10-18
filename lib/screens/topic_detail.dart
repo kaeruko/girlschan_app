@@ -202,7 +202,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Future<void> _load() async {
     await _loadScrollPosition();
     
-    // ウォッチ状態とクリップ状態を取得
+    // 履歴状態とクリップ状態を取得
     final watchedIds = await getWatchedTopicIds();
     final clips = await getClippedComments();
     
@@ -213,6 +213,18 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           .map<int>((c) => c['no'] as int)
           .toSet();
     });
+    
+    // トピックを自動で履歴に追加
+    if (!_isWatched) {
+      await addWatchedTopicId(
+        widget.topicId,
+        title: widget.title,
+        url: '',
+        comments: widget.commentCount,
+        time: '',
+      );
+      setState(() => _isWatched = true);
+    }
     
     // キャッシュをチェック
     final cacheKey = 'comments_${widget.topicId}';
@@ -296,24 +308,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  // ===== ウォッチ（旧「お気に入り」） =====
-  Future<void> _toggleWatch() async {
-    if (_isWatched) {
-      await removeWatchedTopicId(widget.topicId);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('ウォッチを解除しました')));
-    } else {
-      await addWatchedTopicId(
-        widget.topicId,
-        title: widget.title,
-        url: '',
-        comments: widget.commentCount,
-        time: '',
-      );
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('ウォッチに追加しました')));
-    }
-    setState(() => _isWatched = !_isWatched);
+  // ===== 履歴（旧「お気に入り」） =====
+  // 削除のみ対応（追加は自動）
+  Future<void> _removeFromWatch() async {
+    await removeWatchedTopicId(widget.topicId);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('履歴から削除しました')));
+    setState(() => _isWatched = false);
   }
 
   // ===== クリップ（コメント保存） =====
@@ -646,13 +647,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(_isWatched ? Icons.bookmark : Icons.bookmark_border),
-            tooltip: _isWatched ? 'ウォッチ中' : 'ウォッチに追加',
-            onPressed: _toggleWatch,
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openPostDialog,

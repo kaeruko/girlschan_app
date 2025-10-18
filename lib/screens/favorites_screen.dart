@@ -39,7 +39,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       _watchedTopics.removeWhere((topic) => topic['id'] == topicId);
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ウォッチを削除しました')),
+      const SnackBar(content: Text('履歴を削除しました')),
     );
   }
 
@@ -61,7 +61,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'ウォッチ中のトピックはありません',
+              '履歴に登録されたトピックはありません',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
