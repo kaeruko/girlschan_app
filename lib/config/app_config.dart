@@ -1,6 +1,15 @@
+import 'package:http/http.dart' as http;
+
 class AppConfig {
   // ==== 接続先API ====
-  static const String apiBase = 'http://192.168.40.171:5050';
+  static late String apiBase;
+  
+  // Google Drive のファイル ID
+  static const String googleDriveFileId = '1dxoVmKCEHnIRinUC2gK-YC3ZinRE9GnA';
+  
+  // Google Drive からの読み込み URL (ダウンロード形式)
+  static String get googleDriveDownloadUrl =>
+      'https://drive.google.com/uc?export=download&id=$googleDriveFileId';
 
   // ==== キャッシュ関連 ====
   static const String cacheDirName = 'cache';
@@ -13,4 +22,32 @@ class AppConfig {
   // ==== テーマ・UI ====
   static const String appTitle = 'TalkBoard';
   static const double cornerRadius = 12.0;
+  
+  /// Google Drive から apiBase を読み込み初期化
+  static Future<void> initializeApiBase() async {
+    try {
+      final response = await _fetchApiBaseFromGoogleDrive();
+      apiBase = response.trim();
+    } catch (e) {
+      print('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
+      // フォールバック値を設定
+      apiBase = 'http://192.168.40.171:5050';
+    }
+  }
+  
+  /// Google Drive からテキストファイルを読み込み
+  static Future<String> _fetchApiBaseFromGoogleDrive() async {
+    final response = await http.get(
+      Uri.parse(googleDriveDownloadUrl),
+    ).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw Exception('タイムアウト: Google Drive からの読み込みがタイムアウトしました'),
+    );
+    
+    if (response.statusCode == 200) {
+      return response.body;
+    } else {
+      throw Exception('エラー: ステータスコード ${response.statusCode}');
+    }
+  }
 }
