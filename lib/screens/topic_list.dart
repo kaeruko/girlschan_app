@@ -65,7 +65,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('GirlsChannel Offline')),
+      appBar: AppBar(title: const Text('がるちゃんあぷり')),
       body: RefreshIndicator(
         onRefresh: _fetchFromServer,
         child: _loading

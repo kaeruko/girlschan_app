@@ -14,7 +14,7 @@ class GirlsChanApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ガールズあぷり',
+      title: 'がるちゃんあぷり',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
         useMaterial3: true,
