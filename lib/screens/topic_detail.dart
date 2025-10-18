@@ -33,7 +33,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _isWatched = false;
   bool _hasMoreComments = true;
   int _currentPage = 0;
-  static const int _commentsPerPage = 100;
+  int _totalComments = 0;
+  static const int _commentsPerPage = 500; // デバッグ用：10件ずつ
   final ScrollController _scrollController = ScrollController();
   double _savedOffset = 0.0;
   Set<int> _clippedCommentNos = {};
@@ -55,8 +56,63 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   // ===== スクロール検知（追加読み込み） =====
   void _onScroll() {
-    // 全件表示のため、追加読み込み不要
-    // 今後、コメント数が非常に多い場合の最適化ポイント
+    if (!_scrollController.hasClients) return;
+    
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+    
+    // 下から 300px 以内でページング
+    if (maxScroll - currentScroll < 300 && !_loadingMore && _hasMoreComments) {
+      _loadMoreComments();
+    }
+  }
+  
+  // ===== 追加コメント読み込み =====
+  Future<void> _loadMoreComments() async {
+    if (_loadingMore) return;
+    
+    setState(() => _loadingMore = true);
+    
+    try {
+      final offset = _displayedComments.length;
+      debugPrint('📄 ページング: offset=$offset, limit=$_commentsPerPage');
+      
+      final result = await http.get(
+        Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
+          queryParameters: {
+            'offset': offset.toString(),
+            'limit': _commentsPerPage.toString(),
+          },
+        ),
+      );
+      
+      if (result.statusCode == 200) {
+        final data = jsonDecode(result.body);
+        final newComments = data['comments'] as List<dynamic>? ?? [];
+        final total = data['total'] as int? ?? 0;
+        
+        debugPrint('✅ 取得: ${newComments.length}件, 合計: $total件');
+        
+        setState(() {
+          _allComments.addAll(newComments);
+          _displayedComments.addAll(newComments);
+          _totalComments = total;
+          _currentPage++;
+          
+          // すべて読み込んだかチェック
+          _hasMoreComments = _displayedComments.length < total;
+          
+          debugPrint('📊 表示中のコメント: ${_displayedComments.length}/${_totalComments}');
+        });
+        
+        // キャッシュに段階的に保存
+        await CacheService.save('comments_${widget.topicId}', _allComments);
+      }
+    } catch (e) {
+      debugPrint('❌ ページング読み込みエラー: $e');
+    } finally {
+      setState(() => _loadingMore = false);
+    }
   }
 
   // ===== スクロール位置保存 =====
@@ -97,41 +153,42 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     return stored.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
   }
 
-  // ===== APIから全コメント取得 =====
+  // ===== APIからコメント取得（リフレッシュ時） =====
   Future<void> fetchComments() async {
     try {
-      final res =
-          await http.get(Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}'));
+      setState(() => _loading = true);
+      
+      // キャッシュをクリア
+      _allComments.clear();
+      _displayedComments.clear();
+      _currentPage = 0;
+      _totalComments = 0;
+      
+      final uri = Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
+        queryParameters: {
+          'offset': '0',
+          'limit': _commentsPerPage.toString(),
+        },
+      );
+      
+      final res = await http.get(uri);
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        final newComments = data['comments'] ?? [];
+        final newComments = data['comments'] as List<dynamic>? ?? [];
+        final total = data['total'] as int? ?? newComments.length;
 
-        debugPrint('APIから取得したコメント数: ${newComments.length}');
-        debugPrint('既存キャッシュコメント数: ${_allComments.length}');
-
-        // 既にキャッシュから読み込んでいるなら、そこに新規コメントを追加
-        // キャッシュから読み込んでいない場合はAPIのデータをそのまま使用
-        List<dynamic> allComments;
-        if (_allComments.isEmpty) {
-          // 初回取得時はAPIのデータをそのまま使用
-          allComments = newComments;
-        } else {
-          // 既存キャッシュがあれば、マージして更新
-          allComments = _mergeComments(_allComments, newComments);
-        }
-        
-        debugPrint('最終的なコメント数: ${allComments.length}');
-
-        // 全コメントをキャッシュに保存
-        await CacheService.save('comments_${widget.topicId}', allComments);
+        debugPrint('🔄 リフレッシュ: ${newComments.length}/${total}件取得');
 
         setState(() {
-          _allComments = allComments;
-          _displayedComments = List.from(allComments); // 全件表示
-          _currentPage = 0;
-          _hasMoreComments = false; // ページング不要
+          _allComments = newComments;
+          _displayedComments = newComments;
+          _totalComments = total;
+          _hasMoreComments = newComments.length < total;
           _loading = false;
         });
+
+        // キャッシュに保存
+        await CacheService.save('comments_${widget.topicId}', _allComments);
 
         // スクロール位置を復元
         if (mounted) {
@@ -151,18 +208,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       }
     } catch (e) {
       debugPrint('API Error: $e');
-      // キャッシュがあればそれを使用
-      final cached = await CacheService.load('comments_${widget.topicId}');
-      setState(() {
-        _allComments = cached;
-        _displayedComments = List.from(cached); // 全件表示
-        _currentPage = 0;
-        _hasMoreComments = false;
-        _loading = false;
-      });
+      setState(() => _loading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('通信に失敗しました（キャッシュを使用中）')),
+          SnackBar(content: Text('更新失敗: $e')),
         );
       }
     }
@@ -231,14 +280,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final cached = await CacheService.load(cacheKey);
     
     if (cached.isNotEmpty) {
-      // キャッシュがあれば表示
+      // キャッシュがあれば最初の _commentsPerPage 件表示
       setState(() {
         _allComments = cached;
-        _displayedComments = List.from(cached);
+        _totalComments = cached.length;
+        _displayedComments = cached.take(_commentsPerPage).toList();
         _currentPage = 0;
-        _hasMoreComments = false;
+        _hasMoreComments = cached.length > _commentsPerPage;
         _loading = false;
       });
+      
+      debugPrint('📦 キャッシュから表示: ${_displayedComments.length}/${_totalComments}');
       
       // スクロール位置の復元
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -247,8 +299,49 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         }
       });
     } else {
-      // キャッシュがなければAPIから取得
-      await fetchComments();
+      // キャッシュがなければAPIから取得（最初の _commentsPerPage 件）
+      await _fetchFirstPage();
+    }
+  }
+  
+  // ===== 最初のページ取得 =====
+  Future<void> _fetchFirstPage() async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
+        queryParameters: {
+          'offset': '0',
+          'limit': _commentsPerPage.toString(),
+        },
+      );
+      
+      final res = await http.get(uri);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final newComments = data['comments'] as List<dynamic>? ?? [];
+        final total = data['total'] as int? ?? newComments.length;
+        
+        debugPrint('🚀 初期読み込み: ${newComments.length}/${total}件');
+        
+        setState(() {
+          _allComments = newComments;
+          _displayedComments = newComments;
+          _totalComments = total;
+          _currentPage = 0;
+          _hasMoreComments = newComments.length < total;
+          _loading = false;
+        });
+        
+        // キャッシュに保存
+        await CacheService.save('comments_${widget.topicId}', _allComments);
+      }
+    } catch (e) {
+      debugPrint('API Error: $e');
+      setState(() => _loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('コメント読み込み失敗: $e')),
+        );
+      }
     }
   }
 
@@ -642,7 +735,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           children: [
             Text(widget.title),
             Text(
-              'コメント数: ${_displayedComments.length}',
+              'コメント: ${_displayedComments.length}/${_totalComments}件',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
             ),
           ],
@@ -663,8 +756,27 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 onRefresh: fetchComments,
                 child: ListView.builder(
                   controller: _scrollController,
-                  itemCount: _displayedComments.length,
+                  itemCount: _displayedComments.length + (_loadingMore ? 1 : 0),
                   itemBuilder: (context, i) {
+                    // 最後のアイテムが読み込み中インジケーター
+                    if (i == _displayedComments.length) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              const CircularProgressIndicator(),
+                              const SizedBox(height: 8),
+                              Text(
+                                '読み込み中... (${_displayedComments.length}/${_totalComments})',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    
                     final c = _displayedComments[i];
                     final no = c['no'] ?? '-';
                     final time = c['time'] ?? '';

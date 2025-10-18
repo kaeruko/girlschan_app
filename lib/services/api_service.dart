@@ -129,10 +129,50 @@ Future<List<dynamic>> fetchNewTopicsWithCache() async {
   }
 }
 
-// キャッシュ対応のコメント取得
-Future<List<dynamic>> fetchCommentsWithCache(int topicId) async {
+// キャッシュ対応のコメント取得（ページング対応）
+Future<Map<String, dynamic>> fetchCommentsWithPagination(
+  int topicId, {
+  int offset = 0,
+  int limit = 10,
+}) async {
   try {
-    final response = await http.get(Uri.parse('$apiBase/topic/$topicId'));
+    final uri = Uri.parse('$apiBase/topic/$topicId').replace(
+      queryParameters: {
+        'offset': offset.toString(),
+        'limit': limit.toString(),
+      },
+    );
+    print('📥 Fetching comments: $uri');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final comments = data['comments'] as List<dynamic>? ?? [];
+      final total = data['total'] as int? ?? comments.length;
+      
+      print('✅ Fetched ${comments.length} comments (total: $total)');
+      
+      return {
+        'comments': comments,
+        'total': total,
+        'offset': offset,
+        'limit': limit,
+      };
+    } else {
+      throw Exception('Failed to load comments');
+    }
+  } catch (e) {
+    print('❌ Pagination error: $e');
+    rethrow;
+  }
+}
+
+// キャッシュ対応のコメント取得（旧版、互換性維持）
+Future<List<dynamic>> fetchCommentsWithCache(int topicId, {int limit = 10000}) async {
+  try {
+    final uri = Uri.parse('$apiBase/topic/$topicId').replace(
+      queryParameters: {'limit': limit.toString()},
+    );
+    final response = await http.get(uri);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final comments = data['comments'] ?? [];
