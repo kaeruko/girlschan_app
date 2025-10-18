@@ -78,9 +78,9 @@ class _TopicListScreenState extends State<TopicListScreen> {
                     leading: Container(
                       width: 60,
                       height: 60,
-                      child: topic['thumbnail'] != null
+                      child: topic['thumb'] != null
                           ? Image.network(
-                              topic['thumbnail'],
+                              topic['thumb'],
                               fit: BoxFit.cover,
                               loadingBuilder: (context, child, loadingProgress) {
                                 if (loadingProgress == null) return child;
@@ -105,7 +105,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
                     ),
                     title: Text(topic['title']),
                     subtitle: Text(
-                      '${topic['comments_count']}コメント • ${topic['created_at']}',
+                      '${topic['comments']}コメント • ${topic['time']}',
                     ),
                     onTap: () {
                       Navigator.push(
