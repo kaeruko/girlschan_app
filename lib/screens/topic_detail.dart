@@ -55,30 +55,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   // ===== スクロール検知（追加読み込み） =====
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 500) {
-      // 下から500pxの位置に達したら次ページを読み込み
-      if (!_loadingMore && _hasMoreComments) {
-        _loadMoreComments();
-      }
-    }
-  }
-
-  // ===== スクロール検知（追加読み込み） =====
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 500) {
-      // 下から500pxの位置に達したら次ページを読み込み
-      if (!_loadingMore && _hasMoreComments) {
-        _loadMoreComments();
-      }
-    }
+    // 全件表示のため、追加読み込み不要
+    // 今後、コメント数が非常に多い場合の最適化ポイント
   }
 
   // ===== スクロール位置保存 =====
   Future<void> _saveScrollPosition() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('scroll_${widget.topicId}', _scrollController.offset);
+    if (_scrollController.hasClients) {
+      await prefs.setDouble('scroll_${widget.topicId}', _scrollController.offset);
+    }
   }
 
   Future<void> _loadScrollPosition() async {
@@ -125,15 +111,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
         setState(() {
           _allComments = allComments;
-          _displayedComments = [];
+          _displayedComments = List.from(allComments); // 全件表示
           _currentPage = 0;
-          _hasMoreComments = true;
-          // 最初のページ分を追加
-          _addPageOfComments();
+          _hasMoreComments = false; // ページング不要
           _loading = false;
         });
 
-        // リフレッシュ後のスクロール復元
+        // スクロール復元
         if (mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_scrollController.hasClients && _savedOffset > 0) {
@@ -148,12 +132,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       final cached = await CacheService.load('comments_${widget.topicId}');
       setState(() {
         _allComments = cached;
-        _displayedComments = [];
+        _displayedComments = List.from(cached); // 全件表示
         _currentPage = 0;
-        _hasMoreComments = true;
-        if (cached.isNotEmpty) {
-          _addPageOfComments();
-        }
+        _hasMoreComments = false;
         _loading = false;
       });
       if (mounted) {
@@ -161,49 +142,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           const SnackBar(content: Text('通信に失敗しました（キャッシュを使用中）')),
         );
       }
-    }
-  }
-
-  // ===== 次ページのコメント読み込み =====
-  Future<void> _loadMoreComments() async {
-    if (_loadingMore || !_hasMoreComments) return;
-
-    setState(() => _loadingMore = true);
-
-    try {
-      // 少し遅延させてUX向上
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      setState(() {
-        _addPageOfComments();
-        _loadingMore = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading more comments: $e');
-      setState(() => _loadingMore = false);
-    }
-  }
-
-  // ===== ページ分のコメントを追加 =====
-  void _addPageOfComments() {
-    final start = _currentPage * _commentsPerPage;
-    final end = start + _commentsPerPage;
-
-    if (start >= _allComments.length) {
-      _hasMoreComments = false;
-      return;
-    }
-
-    final pageComments = _allComments.length > end
-        ? _allComments.sublist(start, end)
-        : _allComments.sublist(start);
-
-    _displayedComments.addAll(pageComments);
-    _currentPage++;
-
-    // 全コメントを読み込んだかチェック
-    if (_displayedComments.length >= _allComments.length) {
-      _hasMoreComments = false;
     }
   }
 
@@ -360,19 +298,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 onRefresh: fetchComments,
                 child: ListView.builder(
                   controller: _scrollController,
-                  itemCount: _displayedComments.length +
-                      (_loadingMore ? 1 : 0),
+                  itemCount: _displayedComments.length,
                   itemBuilder: (context, i) {
-                    // ローディング表示
-                    if (i == _displayedComments.length) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    }
-
                     final c = _displayedComments[i];
                     final no = c['no'] ?? '-';
                     final time = c['time'] ?? '';
@@ -382,8 +309,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
                     return ListTile(
                       title: Text('No.$no  $time',
-                          style: const TextStyle(
-                              fontSize: 13, color: Colors.grey)),
+                          style: const TextStyle(fontSize: 13, color: Colors.grey)),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -398,8 +324,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                                     child: Image.network(
                                       c['image_url'],
                                       fit: BoxFit.contain,
-                                      errorBuilder: (context, error,
-                                              stackTrace) =>
+                                      errorBuilder: (context, error, stackTrace) =>
                                           const Icon(Icons.error),
                                     ),
                                   ),
@@ -411,8 +336,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                                   c['image_url'],
                                   height: 200,
                                   fit: BoxFit.cover,
-                                  loadingBuilder: (context, child,
-                                      loadingProgress) {
+                                  loadingBuilder: (context, child, loadingProgress) {
                                     if (loadingProgress == null) return child;
                                     return const SizedBox(
                                       height: 200,
@@ -440,8 +364,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                           ],
                           const SizedBox(height: 6),
                           Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Row(
                                 children: [
@@ -449,50 +372,36 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                                     onTap: () async {
                                       // vbox{no} の形式でコメントIDを生成
                                       final commentId = 'vbox${no}';
-                                      final success = await rateComment(
-                                          widget.topicId, commentId, 1);
+                                      final success = await rateComment(widget.topicId, commentId, 1);
                                       if (success && mounted) {
-                                        setState(() =>
-                                            c['plus'] =
-                                                (c['plus'] ?? 0) + 1);
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                              content: Text(
-                                                  'プラスを送信しました')),
+                                        setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('プラスを送信しました')),
                                         );
                                       }
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.all(8.0),
                                       child: Text('＋$plus',
-                                          style: const TextStyle(
-                                              color: Colors.redAccent)),
+                                          style: const TextStyle(color: Colors.redAccent)),
                                     ),
                                   ),
                                   InkWell(
                                     onTap: () async {
                                       // vbox{no} の形式でコメントIDを生成
                                       final commentId = 'vbox${no}';
-                                      final success = await rateComment(
-                                          widget.topicId, commentId, -1);
+                                      final success = await rateComment(widget.topicId, commentId, -1);
                                       if (success && mounted) {
-                                        setState(() =>
-                                            c['minus'] =
-                                                (c['minus'] ?? 0) + 1);
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                              content: Text(
-                                                  'マイナスを送信しました')),
+                                        setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('マイナスを送信しました')),
                                         );
                                       }
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.all(8.0),
                                       child: Text('−$minus',
-                                          style: const TextStyle(
-                                              color: Colors.blueGrey)),
+                                          style: const TextStyle(color: Colors.blueGrey)),
                                     ),
                                   ),
                                 ],
