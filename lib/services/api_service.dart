@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import 'cache_service.dart';
@@ -57,6 +58,45 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
 }
 
 // ========== トピック関連 ==========
+
+/// 検索クエリでトピックを検索
+Future<Map<String, dynamic>> searchTopics({
+  required String query,
+  int page = 1,
+  int count = 50,
+  String? dateFilter,
+}) async {
+  try {
+    final uri = Uri.parse('$apiBase/search').replace(
+      queryParameters: {
+        'q': query,
+        'page': page.toString(),
+        'count': count.toString(),
+        if (dateFilter != null) 'date_filter': dateFilter,
+      },
+    );
+    
+    print('🌐 Search API URL: $uri');
+    print('📍 API Base: $apiBase');
+    
+    final response = await http.get(uri).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw Exception('タイムアウト: API応答がありません'),
+    );
+    
+    print('📡 Response status: ${response.statusCode}');
+    print('📦 Response body: ${response.body.substring(0, min(200, response.body.length))}');
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to search topics: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('❌ Search error: $e');
+    rethrow;
+  }
+}
 
 Future<List<dynamic>> fetchNewTopics() async {
   final response = await http.get(Uri.parse('$apiBase/topics/new'));
