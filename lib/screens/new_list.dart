@@ -26,25 +26,19 @@ class _NewListScreenState extends State<NewListScreen> {
   }
 
   Future<void> _load() async {
-    // キャッシュの存在確認
-    final hasCached = await CacheService.exists(cacheKey);
+    // キャッシュを読み込む（有効期限チェック済み）
+    final cached = await CacheService.load(cacheKey);
     
-    if (hasCached) {
+    if (cached.isNotEmpty) {
       // キャッシュがあれば表示
-      await _loadFromCache();
+      setState(() {
+        _topics = cached;
+        _loading = false;
+      });
     } else {
       // キャッシュがなければAPIから取得
       await _fetchFromServer();
     }
-  }
-
-  // キャッシュからデータを読み込む
-  Future<void> _loadFromCache() async {
-    final cached = await CacheService.load(cacheKey);
-    setState(() {
-      _topics = cached;
-      _loading = false;
-    });
   }
 
   // サーバーからデータを取得し、キャッシュを更新
