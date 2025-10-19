@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../utils/log.dart';
 import 'topic_detail.dart';
 
 /// タイルを一括で再評価するための簡易コントローラ
@@ -13,7 +14,9 @@ class _TopicListTileController {
   void unregister(_TopicListTileState tile) => _tiles.remove(tile);
 
   Future<void> refreshAll() async {
-    for (final t in _tiles) {
+    // イテレーション中の変更を避けるため、コピーを作成
+    final tilesToRefresh = List.from(_tiles);
+    for (final t in tilesToRefresh) {
       if (t.mounted) await t.refreshCacheState();
     }
   }
@@ -57,22 +60,35 @@ class _TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _loadFromCache() async {
+    logd('📂 [_loadFromCache] Loading topics from cache...', name: 'TopicList');
     final cached = await CacheService.load(cacheKey);
+    logd('📂 [_loadFromCache] Cached topics count: ${cached.length}', name: 'TopicList');
+    if (cached.length > 0) {
+      logd('📂 [_loadFromCache] First topic: ${cached[0]}', name: 'TopicList');
+    }
     if (cached.isNotEmpty) {
       setState(() {
         _topics = cached.cast<Map<String, dynamic>>();
         _loading = false;
       });
+      logd('✅ [_loadFromCache] Loaded ${_topics.length} topics from cache', name: 'TopicList');
     } else {
+      logd('⚠️ [_loadFromCache] No cached topics, fetching from server...', name: 'TopicList');
       await _fetchFromServer();
     }
   }
 
   Future<void> _fetchFromServer() async {
     try {
+      logd('🌐 [_fetchFromServer] Fetching new topics from server...', name: 'TopicList');
       final topics = await fetchNewTopics(); // API（api_service.dart）
       final list = topics.cast<Map<String, dynamic>>();
+      logd('🌐 [_fetchFromServer] Fetched ${list.length} topics from server', name: 'TopicList');
+      if (list.isNotEmpty) {
+        logd('🌐 [_fetchFromServer] First topic from server: ${list[0]}', name: 'TopicList');
+      }
       await CacheService.save(cacheKey, list);
+      logd('💾 [_fetchFromServer] Saved ${list.length} topics to cache', name: 'TopicList');
 
       if (!mounted) return;
       setState(() {
@@ -80,10 +96,13 @@ class _TopicListScreenState extends State<TopicListScreen>
         _loading = false;
       });
 
+      logd('🔄 [_fetchFromServer] Refreshing all tiles...', name: 'TopicList');
       _controller.refreshAll();
     } catch (e) {
+      logd('❌ [_fetchFromServer] Error fetching from server: $e', name: 'TopicList');
       // 失敗時でもキャッシュがあれば出す
       final cached = await CacheService.load(cacheKey);
+      logd('💾 [_fetchFromServer] Falling back to cached topics: ${cached.length}', name: 'TopicList');
       if (!mounted) return;
       setState(() {
         if (cached.isNotEmpty) {
@@ -155,9 +174,12 @@ class _TopicListTileState extends State<_TopicListTile> {
 
   Future<void> refreshCacheState() async {
     final id = widget.topic['id'];
+    logd('🔍 [refreshCacheState] Checking cache for topic ID: $id', name: 'TopicList');
     final hasCached = await CacheService.exists('comments_$id');
+    logd('🔍 [refreshCacheState] Topic ID: $id, hasCached: $hasCached', name: 'TopicList');
     if (!mounted) return;
     setState(() => _hasCachedComments = hasCached);
+    logd('✅ [refreshCacheState] Updated _hasCachedComments for ID $id: $hasCached', name: 'TopicList');
   }
 
   @override

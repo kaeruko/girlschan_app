@@ -159,9 +159,11 @@ class CacheService {
   static Future<bool> exists(String name) async {
     try {
       final file = await _file(name);
-      return await file.exists();
+      final exists = await file.exists();
+      print('💾 [CacheService.exists] Checking: $name -> exists: $exists (path: ${file.path})');
+      return exists;
     } catch (e) {
-      print('Cache exists check error: $e');
+      print('❌ Cache exists check error: $e');
       return false;
     }
   }
