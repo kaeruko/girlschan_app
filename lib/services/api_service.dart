@@ -2,19 +2,26 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import '../utils/log.dart';
 import 'cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 final apiBase = AppConfig.apiBase;
 
 // ========== コメント評価 ==========
 
-// ========== コメント評価 ==========
-
 Future<bool> rateComment(int topicId, String commentId, int value) async {
   try {
+    logd('');
+    logd('============================================');
+    logd('⭐ [rateComment] API呼び出し開始');
+    logd('============================================');
+    logd('');
+    
     final url = 'https://girlschannel.net/topics/post_value?value=$value&topic_id=$topicId&comment_id=$commentId';
-    print('Request URL: $url');
+    logd('⭐ [rateComment] Request URL: $url');
+    logd('⭐ [rateComment] Parameters: topicId=$topicId, commentId=$commentId, value=$value');
     
     final response = await http.get(
       Uri.parse(url),
@@ -34,25 +41,27 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
       },
     );
     
-    print('Rate response: ${response.statusCode}');
-    print('Rate response body: ${response.body}');
+    logd('⭐ [rateComment] Response status: ${response.statusCode}');
+    logd('⭐ [rateComment] Response body: ${response.body}');
     
     if (response.statusCode == 200) {
       if (response.body.isEmpty) {
+        logd('⭐ [rateComment] ✅ Success (empty body)');
         return true;
       }
       try {
         final data = jsonDecode(response.body);
-        print('Parsed JSON: $data');
+        logd('⭐ [rateComment] Parsed JSON: $data');
         return data['result'] == true;
       } catch (e) {
-        print('JSON parse error: $e');
+        logd('⭐ [rateComment] ⚠️ JSON parse error: $e');
         return true;
       }
     }
+    logd('⭐ [rateComment] ❌ Failed with status ${response.statusCode}');
     return false;
   } catch (e) {
-    print('Rate error: $e');
+    logd('⭐ [rateComment] ❌ Error: $e');
     return false;
   }
 }
@@ -67,6 +76,12 @@ Future<Map<String, dynamic>> searchTopics({
   String? dateFilter,
 }) async {
   try {
+    logd('');
+    logd('============================================');
+    logd('🔍 [searchTopics] API呼び出し開始');
+    logd('============================================');
+    logd('');
+    
     final uri = Uri.parse('$apiBase/search').replace(
       queryParameters: {
         'q': query,
@@ -76,55 +91,96 @@ Future<Map<String, dynamic>> searchTopics({
       },
     );
     
-    print('🌐 Search API URL: $uri');
-    print('📍 API Base: $apiBase');
+    logd('🔍 [searchTopics] API URL: $uri');
+    logd('� [searchTopics] Parameters:');
+    logd('   - query: $query');
+    logd('   - page: $page');
+    logd('   - count: $count');
+    if (dateFilter != null) logd('   - dateFilter: $dateFilter');
+    logd('🔍 [searchTopics] API Base: $apiBase');
     
     final response = await http.get(uri).timeout(
       const Duration(seconds: 10),
       onTimeout: () => throw Exception('タイムアウト: API応答がありません'),
     );
     
-    print('📡 Response status: ${response.statusCode}');
-    print('📦 Response body: ${response.body.substring(0, min(200, response.body.length))}');
+    logd('� [searchTopics] Response status: ${response.statusCode}');
+    logd('� [searchTopics] Response body (first 500 chars): ${response.body.substring(0, min(500, response.body.length))}');
     
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      logd('🔍 [searchTopics] ✅ Success');
+      return data;
     } else {
       throw Exception('Failed to search topics: ${response.statusCode}');
     }
   } catch (e) {
-    print('❌ Search error: $e');
+    logd('🔍 [searchTopics] ❌ Error: $e');
     rethrow;
   }
 }
 
 Future<List<dynamic>> fetchNewTopics() async {
-  final response = await http.get(Uri.parse('$apiBase/topics/new'));
-  if (response.statusCode == 200) {
-    return jsonDecode(response.body);
-  } else {
-    throw Exception('Failed to load topics');
+  try {
+    final uri = '$apiBase/topics/new';
+    logd('');
+    logd('============================================');
+    logd('📰 [fetchNewTopics] API呼び出し開始');
+    logd('📰 [fetchNewTopics] API URL: $uri');
+    logd('============================================');
+    logd('');
+    
+    final response = await http.get(Uri.parse(uri));
+    logd('📰 [fetchNewTopics] Response status: ${response.statusCode}');
+    logd('📰 [fetchNewTopics] Response body (first 300 chars): ${response.body.substring(0, min(300, response.body.length))}');
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List<dynamic>;
+      logd('📰 [fetchNewTopics] ✅ Success - Fetched ${data.length} topics');
+      return data;
+    } else {
+      throw Exception('Failed to load topics: ${response.statusCode}');
+    }
+  } catch (e) {
+    logd('📰 [fetchNewTopics] ❌ Error: $e');
+    rethrow;
   }
 }
 
 // キャッシュ対応のトピック取得
 Future<List<dynamic>> fetchNewTopicsWithCache() async {
   try {
-    final response = await http.get(Uri.parse('$apiBase/topics/new'));
+    logd('');
+    logd('============================================');
+    logd('📰 [fetchNewTopicsWithCache] API呼び出し開始');
+    logd('============================================');
+    logd('');
+    
+    final uri = '$apiBase/topics/new';
+    logd('📰 [fetchNewTopicsWithCache] API URL: $uri');
+    
+    final response = await http.get(Uri.parse(uri));
+    logd('📰 [fetchNewTopicsWithCache] Response status: ${response.statusCode}');
+    
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(response.body) as List<dynamic>;
+      logd('📰 [fetchNewTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
       // キャッシュに保存
       await CacheService.save('new_topics', data);
+      logd('📰 [fetchNewTopicsWithCache] 💾 Cached successfully');
       return data;
     } else {
-      throw Exception('Failed to load topics');
+      throw Exception('Failed to load topics: ${response.statusCode}');
     }
   } catch (e) {
+    logd('📰 [fetchNewTopicsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
     // エラー時はキャッシュから取得
     final cached = await CacheService.load('new_topics');
     if (cached.isNotEmpty) {
+      logd('📰 [fetchNewTopicsWithCache] 📂 Loaded from cache - ${cached.length} topics');
       return cached;
     }
+    logd('📰 [fetchNewTopicsWithCache] ❌ No cache available');
     rethrow;
   }
 }
@@ -136,20 +192,30 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
   int limit = 10,
 }) async {
   try {
+    logd('');
+    logd('============================================');
+    logd('💬 [fetchCommentsWithPagination] API呼び出し開始');
+    logd('============================================');
+    logd('');
+    
     final uri = Uri.parse('$apiBase/topic/$topicId').replace(
       queryParameters: {
         'offset': offset.toString(),
         'limit': limit.toString(),
       },
     );
-    print('📥 Fetching comments: $uri');
+    logd('💬 [fetchCommentsWithPagination] API URL: $uri');
+    logd('💬 [fetchCommentsWithPagination] Parameters: topicId=$topicId, offset=$offset, limit=$limit');
+    
     final response = await http.get(uri);
+    logd('💬 [fetchCommentsWithPagination] Response status: ${response.statusCode}');
+    
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final comments = data['comments'] as List<dynamic>? ?? [];
       final total = data['total'] as int? ?? comments.length;
       
-      print('✅ Fetched ${comments.length} comments (total: $total)');
+      logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
       
       return {
         'comments': comments,
@@ -158,10 +224,10 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
         'limit': limit,
       };
     } else {
-      throw Exception('Failed to load comments');
+      throw Exception('Failed to load comments: ${response.statusCode}');
     }
   } catch (e) {
-    print('❌ Pagination error: $e');
+    logd('💬 [fetchCommentsWithPagination] ❌ Error: $e');
     rethrow;
   }
 }
@@ -169,25 +235,42 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
 // キャッシュ対応のコメント取得（旧版、互換性維持）
 Future<List<dynamic>> fetchCommentsWithCache(int topicId, {int limit = 10000}) async {
   try {
+    logd('');
+    logd('============================================');
+    logd('💬 [fetchCommentsWithCache] API呼び出し開始');
+    logd('============================================');
+    logd('');
+    
     final uri = Uri.parse('$apiBase/topic/$topicId').replace(
       queryParameters: {'limit': limit.toString()},
     );
+    logd('💬 [fetchCommentsWithCache] API URL: $uri');
+    logd('💬 [fetchCommentsWithCache] Parameters: topicId=$topicId, limit=$limit');
+    
     final response = await http.get(uri);
+    logd('💬 [fetchCommentsWithCache] Response status: ${response.statusCode}');
+    
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final comments = data['comments'] ?? [];
+      final comments = data['comments'] as List<dynamic>;
+      logd('💬 [fetchCommentsWithCache] ✅ Fetched ${comments.length} comments');
+      
       // キャッシュに保存
       await CacheService.save('comments_$topicId', comments);
+      logd('💬 [fetchCommentsWithCache] 💾 Cached successfully');
       return comments;
     } else {
-      throw Exception('Failed to load comments');
+      throw Exception('Failed to load comments: ${response.statusCode}');
     }
   } catch (e) {
+    logd('💬 [fetchCommentsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
     // エラー時はキャッシュから取得
     final cached = await CacheService.load('comments_$topicId');
     if (cached.isNotEmpty) {
+      logd('💬 [fetchCommentsWithCache] 📂 Loaded from cache - ${cached.length} comments');
       return cached;
     }
+    logd('💬 [fetchCommentsWithCache] ❌ No cache available');
     rethrow;
   }
 }

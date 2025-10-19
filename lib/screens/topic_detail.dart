@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../utils/log.dart';
 import 'comment_post_webview.dart';
 
 class TopicDetailScreen extends StatefulWidget {
@@ -45,6 +46,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   void initState() {
     super.initState();
+    logd('initState: topicId=${widget.topicId}, title=${widget.title}');
     _scrollController.addListener(_onScroll);
     _load();
   }
