@@ -33,7 +33,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _loadingMore = false;
   bool _isWatched = false;
   bool _hasMoreComments = true;
-  int _totalComments = 0;                     // サーバが返す total
+  int _totalComments = 0;
+  bool _bottomCheckInFlight = false;
+  DateTime _lastBottomCheck = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _bottomCheckCooldown = Duration(seconds: 2);
 
   static const int _commentsPerPage = 10;
   final ScrollController _scrollController = ScrollController();
@@ -84,13 +87,67 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
 
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final currentScroll = _scrollController.offset;
+    final max = _scrollController.position.maxScrollExtent;
+    final cur = _scrollController.offset;
+    final remain = max - cur;
+    logd('_onScroll: cur=$cur max=$max remain=$remain loadingMore=$_loadingMore hasMore=$_hasMoreComments');
 
-    if (maxScroll - currentScroll < 300 && !_loadingMore && _hasMoreComments) {
+    // 通常ページネーション
+    if (remain < 300 && !_loadingMore && _hasMoreComments) {
+      logd('_onScroll: near bottom → load more');
       _loadMoreComments();
+      return;
+    }
+
+    // 末尾張り付きで hasMore=false の“つつき”（連打防止）
+    if (remain <= 0 && !_loadingMore && !_hasMoreComments && !_bottomCheckInFlight) {
+      final now = DateTime.now();
+      if (now.difference(_lastBottomCheck) >= _bottomCheckCooldown) {
+        _lastBottomCheck = now;
+        _bottomCheckInFlight = true;
+        logd('_onScroll: at end & no-more → delta check');
+        _fetchDeltaFromServer().whenComplete(() {
+          _bottomCheckInFlight = false;
+        });
+      }
     }
   }
+
+
+  // =========================================
+  // 最後のコメント到達後の下スワイプ検知
+  // =========================================
+  void _onOverscrollBottom() {
+    if (!_scrollController.hasClients) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final current = _scrollController.offset;
+    final remain = maxScroll - current;
+
+    logd('_onOverscrollBottom: cur=$current max=$maxScroll remain=$remain loadingMore=$_loadingMore hasMore=$_hasMoreComments');
+
+    // Case A: 通常ページネーション
+    if (remain < 50 && !_loadingMore && _hasMoreComments) {
+      logd('_onOverscrollBottom: paginate → load more');
+      _loadMoreComments();
+      return;
+    }
+
+    // Case B: 末尾に張り付いていて hasMore=false → 新着確認だけ叩く（クールダウン付き）
+    if (remain <= 0 && !_loadingMore && !_hasMoreComments && !_bottomCheckInFlight) {
+      final now = DateTime.now();
+      if (now.difference(_lastBottomCheck) < _bottomCheckCooldown) {
+        return; // 連打防止
+      }
+      _lastBottomCheck = now;
+      _bottomCheckInFlight = true;
+      logd('_onOverscrollBottom: no-more but at end → delta check');
+      _fetchDeltaFromServer().whenComplete(() {
+        _bottomCheckInFlight = false;
+      });
+    }
+  }
+
 
   // =========================================
   // 差分取得（サーバから offset 以降を取ってマージ） // ★ 修正: 新規
@@ -241,7 +298,9 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   // Pull to refresh（差分同期に変更） // ★ 修正
   // =========================================
   Future<void> fetchComments() async {
+    logd('Pull-to-Refresh: start');
     await _fetchDeltaFromServer();
+    logd('Pull-to-Refresh: done');
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('最新データに同期しました')),
@@ -713,162 +772,179 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           : NotificationListener<ScrollEndNotification>(
               onNotification: (_) {
                 _saveScrollPosition();
+                // 最後のコメント到達後の下スワイプ検知
+                _onOverscrollBottom();
                 return false;
               },
-              child: RefreshIndicator(
-                onRefresh: fetchComments, // ★ 修正: 差分同期
-                child: ListView.builder(
-                  key: PageStorageKey('topic_${widget.topicId}'), // ★ 修正: 追加（副次的に復元が安定）
-                  controller: _scrollController,
-                  itemCount: _allComments.length + (_loadingMore ? 1 : 0), // ★ 修正
-                  itemBuilder: (context, i) {
-                    if (i == _allComments.length) {
-                      return Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              const CircularProgressIndicator(),
-                              const SizedBox(height: 8),
-                              Text(
-                                '読み込み中... ($remoteCount/$_totalComments)',
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  // オーバースクロール（過度なスクロール）検知
+                  if (notification is OverscrollNotification) {
+                    // 下方向へのオーバースクロール（direction > 0）
+                    if (notification.overscroll > 0) {
+                      _onOverscrollBottom();
                     }
+                  }
+                  return false;
+                },
+                child: RefreshIndicator(
+                  onRefresh: fetchComments,
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    key: PageStorageKey('topic_${widget.topicId}'),
+                    controller: _scrollController,
+                    itemCount: _allComments.length + (_loadingMore ? 1 : 0),
+                    itemBuilder: (context, i) {
+                      if (i == _allComments.length) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                const CircularProgressIndicator(),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '読み込み中... ($remoteCount/$_totalComments)',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
 
-                    final c = _allComments[i];
-                    final no = c['no'] ?? '-';
-                    final time = c['time'] ?? '';
-                    final body = c['body'] ?? '';
-                    final plus = c['plus'] ?? 0;
-                    final minus = c['minus'] ?? 0;
-                    final anchors = List<int>.from(c['anchors'] ?? []);
-                    final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
+                      final c = _allComments[i];
+                      final no = c['no'] ?? '-';
+                      final time = c['time'] ?? '';
+                      final body = c['body'] ?? '';
+                      final plus = c['plus'] ?? 0;
+                      final minus = c['minus'] ?? 0;
+                      final anchors = List<int>.from(c['anchors'] ?? []);
+                      final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
 
-                    return ListTile(
-                      title: Text(
-                        'No.$no  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: ローカル表示
-                        style: const TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (anchors.isNotEmpty) _buildAnchorText(anchors),
-                          if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
-                          Text(body, style: const TextStyle(fontSize: 15)),
-                          if (c['image_url'] != null) ...[
-                            const SizedBox(height: 8),
-                            GestureDetector(
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => Dialog(
-                                    child: Image.network(
-                                      c['image_url'],
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) =>
-                                          const Icon(Icons.error),
+                      return ListTile(
+                        title: Text(
+                          'No.$no  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: ローカル表示
+                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (anchors.isNotEmpty) _buildAnchorText(anchors),
+                            if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
+                            Text(body, style: const TextStyle(fontSize: 15)),
+                            if (c['image_url'] != null) ...[
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => Dialog(
+                                      child: Image.network(
+                                        c['image_url'],
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            const Icon(Icons.error),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  c['image_url'],
-                                  height: 200,
-                                  fit: BoxFit.cover,
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const SizedBox(
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    c['image_url'],
+                                    height: 200,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return const SizedBox(
+                                        height: 200,
+                                        child: Center(
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) => const SizedBox(
                                       height: 200,
                                       child: Center(
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) => const SizedBox(
-                                    height: 200,
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.image_not_supported,
-                                        size: 40,
-                                        color: Colors.grey,
+                                        child: Icon(
+                                          Icons.image_not_supported,
+                                          size: 40,
+                                          color: Colors.grey,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  InkWell(
-                                    onTap: () async {
-                                      if (c['isLocal'] == true) return; // ★ 修正: ローカルは評価しない
-                                      final commentId = 'vbox$no';
-                                      final success = await rateComment(widget.topicId, commentId, 1);
-                                      if (success && mounted) {
-                                        setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('プラスを送信しました')),
-                                        );
-                                      }
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text('＋$plus',
-                                          style: const TextStyle(color: Colors.redAccent)),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () async {
-                                      if (c['isLocal'] == true) return; // ★ 修正
-                                      final commentId = 'vbox$no';
-                                      final success = await rateComment(widget.topicId, commentId, -1);
-                                      if (success && mounted) {
-                                        setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('マイナスを送信しました')),
-                                        );
-                                      }
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text('−$minus',
-                                          style: const TextStyle(color: Colors.blueGrey)),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  _clippedCommentNos.contains(no)
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                  color: _clippedCommentNos.contains(no)
-                                      ? Colors.pinkAccent
-                                      : null,
-                                  size: 22,
-                                ),
-                                onPressed: () => _toggleClip(c),
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(4),
                               ),
                             ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    InkWell(
+                                      onTap: () async {
+                                        if (c['isLocal'] == true) return; // ★ 修正: ローカルは評価しない
+                                        final commentId = 'vbox$no';
+                                        final success = await rateComment(widget.topicId, commentId, 1);
+                                        if (success && mounted) {
+                                          setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('プラスを送信しました')),
+                                          );
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text('＋$plus',
+                                            style: const TextStyle(color: Colors.redAccent)),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      onTap: () async {
+                                        if (c['isLocal'] == true) return; // ★ 修正
+                                        final commentId = 'vbox$no';
+                                        final success = await rateComment(widget.topicId, commentId, -1);
+                                        if (success && mounted) {
+                                          setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('マイナスを送信しました')),
+                                          );
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text('−$minus',
+                                            style: const TextStyle(color: Colors.blueGrey)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    _clippedCommentNos.contains(no)
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: _clippedCommentNos.contains(no)
+                                        ? Colors.pinkAccent
+                                        : null,
+                                    size: 22,
+                                  ),
+                                  onPressed: () => _toggleClip(c),
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(4),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
