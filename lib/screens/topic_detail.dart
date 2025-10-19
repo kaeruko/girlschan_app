@@ -34,7 +34,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _hasMoreComments = true;
   int _currentPage = 0;
   int _totalComments = 0;
-  static const int _commentsPerPage = 500; // デバッグ用：10件ずつ
+  static const int _commentsPerPage = 500;
   final ScrollController _scrollController = ScrollController();
   double _savedOffset = 0.0;
   Set<int> _clippedCommentNos = {};
