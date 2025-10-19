@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:math' as math; // ★ 修正: max 用
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
@@ -38,7 +38,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   DateTime _lastBottomCheck = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _bottomCheckCooldown = Duration(seconds: 2);
 
-  static const int _commentsPerPage = 10;
+  static const int _commentsPerPage = 500;
   final ScrollController _scrollController = ScrollController();
   double _savedOffset = 0.0;
   Set<int> _clippedCommentNos = {};
