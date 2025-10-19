@@ -166,7 +166,7 @@ Future<List<dynamic>> fetchNewTopicsWithCache() async {
       final data = jsonDecode(response.body) as List<dynamic>;
       logd('📰 [fetchNewTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
       // キャッシュに保存
-      await CacheService.save('new_topics', data);
+      await CacheService.saveList('new_topics', data);
       logd('📰 [fetchNewTopicsWithCache] 💾 Cached successfully');
       return data;
     } else {
@@ -175,7 +175,7 @@ Future<List<dynamic>> fetchNewTopicsWithCache() async {
   } catch (e) {
     logd('📰 [fetchNewTopicsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
     // エラー時はキャッシュから取得
-    final cached = await CacheService.load('new_topics');
+    final cached = await CacheService.loadList('new_topics');
     if (cached.isNotEmpty) {
       logd('📰 [fetchNewTopicsWithCache] 📂 Loaded from cache - ${cached.length} topics');
       return cached;
@@ -220,6 +220,10 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
       logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
       logd('💬 [fetchCommentsWithPagination] Offset: $offset, Limit: $limit');
       
+      // totalをメタキャッシュに保存（watched_topicsの更新用）
+      await CacheService.saveMap('topic_meta_$topicId', {'total': total});
+      logd('💬 [fetchCommentsWithPagination] 💾 Cached total: $total for topic $topicId');
+      
       return {
         'comments': comments,
         'total': total,
@@ -259,11 +263,17 @@ Future<List<dynamic>> fetchCommentsWithCache(int topicId, {int limit = 10000}) a
       logd('💬 [fetchCommentsWithCache] Parsing JSON...');
       final data = jsonDecode(response.body);
       final comments = data['comments'] as List<dynamic>;
-      logd('💬 [fetchCommentsWithCache] ✅ Successfully parsed ${comments.length} comments');
+      final total = data['total'] as int? ?? comments.length;
+      logd('💬 [fetchCommentsWithCache] ✅ Successfully parsed ${comments.length} comments (total: $total)');
       
-      // キャッシュに保存
-      await CacheService.save('comments_$topicId', comments);
+      // コメントをキャッシュに保存
+      await CacheService.saveList('comments_$topicId', comments);
       logd('💬 [fetchCommentsWithCache] 💾 Cached successfully - ${comments.length} comments stored');
+      
+      // totalをメタキャッシュに保存（watched_topicsの更新用）
+      await CacheService.saveMap('topic_meta_$topicId', {'total': total});
+      logd('💬 [fetchCommentsWithCache] 💾 Cached total: $total for topic $topicId');
+      
       return comments;
     } else {
       logd('💬 [fetchCommentsWithCache] ❌ API Error status: ${response.statusCode}');
@@ -272,7 +282,7 @@ Future<List<dynamic>> fetchCommentsWithCache(int topicId, {int limit = 10000}) a
   } catch (e) {
     logd('💬 [fetchCommentsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
     // エラー時はキャッシュから取得
-    final cached = await CacheService.load('comments_$topicId');
+    final cached = await CacheService.loadList('comments_$topicId');
     if (cached.isNotEmpty) {
       logd('💬 [fetchCommentsWithCache] 📂 Loaded from cache - ${cached.length} comments');
       return cached;
@@ -286,9 +296,47 @@ Future<List<dynamic>> fetchCommentsWithCache(int topicId, {int limit = 10000}) a
 
 /// 履歴のトピック完全情報を取得
 Future<List<Map<String, dynamic>>> getWatchedTopics() async {
+  logd('');
+  logd('============================================');
+  logd('📋 [getWatchedTopics] Start');
+  logd('============================================');
+  logd('');
+  
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  return jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
+  
+  final topics = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
+  
+  // 各トピックのメタキャッシュから最新のコメント数を取得
+  for (final topic in topics) {
+    final topicId = topic['id'] as int;
+    logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
+    
+    try {
+      logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
+      final meta = await CacheService.loadMap('topic_meta_$topicId');
+      
+      if (meta != null) {
+        final total = meta['total'] as int?;
+        logd('📋 [getWatchedTopics] Got meta: total=$total');
+        
+        if (total != null) {
+          logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
+          topic['comments'] = total;
+        }
+      } else {
+        logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
+      }
+    } catch (e, st) {
+      logd('📋 [getWatchedTopics] ❌ Error processing topic $topicId: $e');
+      logd('📋 [getWatchedTopics] Stack trace: $st');
+    }
+  }
+  
+  logd('📋 [getWatchedTopics] ✅ Complete');
+  return topics;
 }
 
 /// 履歴のトピックIDリストを取得（後方互換性用）
