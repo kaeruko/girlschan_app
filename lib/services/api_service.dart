@@ -209,13 +209,16 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     
     final response = await http.get(uri);
     logd('💬 [fetchCommentsWithPagination] Response status: ${response.statusCode}');
+    logd('💬 [fetchCommentsWithPagination] Response body length: ${response.body.length} bytes');
     
     if (response.statusCode == 200) {
+      logd('💬 [fetchCommentsWithPagination] Parsing JSON...');
       final data = jsonDecode(response.body);
       final comments = data['comments'] as List<dynamic>? ?? [];
       final total = data['total'] as int? ?? comments.length;
       
       logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
+      logd('💬 [fetchCommentsWithPagination] Offset: $offset, Limit: $limit');
       
       return {
         'comments': comments,
@@ -224,6 +227,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
         'limit': limit,
       };
     } else {
+      logd('💬 [fetchCommentsWithPagination] ❌ API Error status: ${response.statusCode}');
       throw Exception('Failed to load comments: ${response.statusCode}');
     }
   } catch (e) {
@@ -249,17 +253,20 @@ Future<List<dynamic>> fetchCommentsWithCache(int topicId, {int limit = 10000}) a
     
     final response = await http.get(uri);
     logd('💬 [fetchCommentsWithCache] Response status: ${response.statusCode}');
+    logd('💬 [fetchCommentsWithCache] Response body length: ${response.body.length} bytes');
     
     if (response.statusCode == 200) {
+      logd('💬 [fetchCommentsWithCache] Parsing JSON...');
       final data = jsonDecode(response.body);
       final comments = data['comments'] as List<dynamic>;
-      logd('💬 [fetchCommentsWithCache] ✅ Fetched ${comments.length} comments');
+      logd('💬 [fetchCommentsWithCache] ✅ Successfully parsed ${comments.length} comments');
       
       // キャッシュに保存
       await CacheService.save('comments_$topicId', comments);
-      logd('💬 [fetchCommentsWithCache] 💾 Cached successfully');
+      logd('💬 [fetchCommentsWithCache] 💾 Cached successfully - ${comments.length} comments stored');
       return comments;
     } else {
+      logd('💬 [fetchCommentsWithCache] ❌ API Error status: ${response.statusCode}');
       throw Exception('Failed to load comments: ${response.statusCode}');
     }
   } catch (e) {

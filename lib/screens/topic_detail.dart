@@ -95,56 +95,55 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   // 差分取得（サーバから offset 以降を取ってマージ） // ★ 修正: 新規
   // =========================================
-  Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
-    if (_loadingMore) return;
-    setState(() => _loadingMore = true);
+// 差分取得（サーバから offset 以降を取ってマージ）
+Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
+  if (_loadingMore) return;
+  setState(() => _loadingMore = true);
 
-    try {
-      final offset = overrideOffset ?? _serverSyncedCount();
-      final uri = Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
-        queryParameters: {
-          'offset': offset.toString(),
-          'limit': _commentsPerPage.toString(),
-        },
-      );
+  try {
+    final offset = overrideOffset ?? _serverSyncedCount();
 
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final newComments = data['comments'] as List<dynamic>? ?? [];
-        final total = data['total'] as int? ?? _totalComments;
+    // ← api_service を使う
+    final page = await fetchCommentsWithPagination(
+      widget.topicId,
+      offset: offset,
+      limit: _commentsPerPage,
+    );
 
-        final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
-        final mergedRemote  = _mergeComments(existingRemote, newComments);
-        final locals        = _allComments.where((c) => c['isLocal'] == true).toList();
+    final newComments = (page['comments'] as List<dynamic>? ?? []);
+    final total = (page['total'] as int?) ?? _totalComments;
 
-        setState(() {
-          _totalComments  = total;
-          _allComments    = [...mergedRemote, ...locals];
-          _displayedComments = List.of(_allComments);
-          _hasMoreComments = mergedRemote.length < total;
-        });
+    final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
+    final mergedRemote  = _mergeComments(existingRemote, newComments);
+    final locals        = _allComments.where((c) => c['isLocal'] == true).toList();
 
-        await CacheService.save('comments_${widget.topicId}', mergedRemote);
+    setState(() {
+      _totalComments  = total;
+      _allComments    = [...mergedRemote, ...locals];
+      _displayedComments = List.of(_allComments);
+      _hasMoreComments = mergedRemote.length < total;
+    });
 
-        // ★ 追加: 復元待ち && 目標件数に到達したらもう一度 jump
-        if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
-          _needsDeferredRestore = false;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollController.hasClients) {
-              final max = _scrollController.position.maxScrollExtent;
-              final jump = _savedOffset.clamp(0.0, max);
-              _scrollController.jumpTo(jump);
-            }
-          });
+    await CacheService.save('comments_${widget.topicId}', mergedRemote);
+
+    // 復元待ち && 目標件数に到達したらもう一度 jump
+    if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
+      _needsDeferredRestore = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          final max = _scrollController.position.maxScrollExtent;
+          final jump = _savedOffset.clamp(0.0, max);
+          _scrollController.jumpTo(jump);
         }
-      }
-    } catch (e) {
-      debugPrint('❌ 差分取得エラー: $e');
-    } finally {
-      if (mounted) setState(() => _loadingMore = false);
+      });
     }
+  } catch (e) {
+    debugPrint('❌ 差分取得エラー: $e');
+  } finally {
+    if (mounted) setState(() => _loadingMore = false);
   }
+}
+
 
 
   // =========================================
@@ -330,42 +329,34 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  // 最初のページ取得（キャッシュ保存 + ローカル投稿合成 + 復元） // ★ 修正
+  // 最初のページ取得（キャッシュ保存 + ローカル投稿合成 + 復元）
   Future<void> _fetchFirstPage() async {
     try {
-      final uri = Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
-        queryParameters: {
-          'offset': '0',
-          'limit': _commentsPerPage.toString(),
-        },
+      // ← api_service を使う
+      final page = await fetchCommentsWithPagination(
+        widget.topicId,
+        offset: 0,
+        limit: _commentsPerPage,
       );
+      final newComments = (page['comments'] as List<dynamic>? ?? []);
+      final total = (page['total'] as int?) ?? newComments.length;
 
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final newComments = data['comments'] as List<dynamic>? ?? [];
-        final total = data['total'] as int? ?? newComments.length;
+      debugPrint('🚀 初期読み込み: ${newComments.length}/$total件');
 
-        debugPrint('🚀 初期読み込み: ${newComments.length}/$total件');
+      _allComments = newComments;
+      _totalComments = total;
+      _hasMoreComments = newComments.length < total;
 
-        // まずサーバ同期済みで初期化
-        _allComments = newComments;
-        _totalComments = total;
-        _hasMoreComments = newComments.length < total;
+      await CacheService.save('comments_${widget.topicId}', _allComments);
 
-        // キャッシュ保存（サーバ同期済みのみ）
-        await CacheService.save('comments_${widget.topicId}', _allComments);
+      final locals = await _loadLocalComments();
+      setState(() {
+        _allComments = [..._allComments, ...locals];
+        _displayedComments = List.of(_allComments);
+        _loading = false;
+      });
 
-        // ローカル投稿も合成
-        final locals = await _loadLocalComments();
-        setState(() {
-          _allComments = [..._allComments, ...locals];
-          _displayedComments = List.of(_allComments); // ★ 修正: 全件表示
-          _loading = false;
-        });
-
-        _restoreScrollAfterBuild();
-      }
+      _restoreScrollAfterBuild();
     } catch (e) {
       debugPrint('API Error: $e');
       setState(() => _loading = false);
@@ -376,6 +367,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       }
     }
   }
+
 
   // =========================================
   // クリップ / アンカー関連（データソースを _allComments に変更） // ★ 修正
