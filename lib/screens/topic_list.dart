@@ -80,8 +80,8 @@ class _TopicListScreenState extends State<TopicListScreen>
 
   Future<void> _fetchFromServer() async {
     try {
-      logd('🌐 [_fetchFromServer] Fetching new topics from server...', name: 'TopicList');
-      final topics = await fetchNewTopics(); // API（api_service.dart）
+      logd('🌐 [_fetchFromServer] Fetching popular topics from server...', name: 'TopicList');
+      final topics = await fetchPopularTopicsWithCache(); // API（api_service.dart）- 人気トピック用
       final list = topics.cast<Map<String, dynamic>>();
       logd('🌐 [_fetchFromServer] Fetched ${list.length} topics from server', name: 'TopicList');
       if (list.isNotEmpty) {

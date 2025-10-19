@@ -421,7 +421,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       setState(() => _loading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('通信にしっぱいしました')),
+          SnackBar(content: Text('通信に失敗しました')),
         );
       }
     }
@@ -697,10 +697,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
         children: [
-          const Text(
-            '参照されている: ',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
           Expanded(
             child: Wrap(
               spacing: 4,
@@ -756,7 +752,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
             Text(widget.title),
             Text(
               // 例: 「表示: 123(リモート)/403 +2(ローカル)」
-              '表示: $remoteCount/$_totalComments'
+              'コメント: $remoteCount/$_totalComments'
               '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
             ),

@@ -147,6 +147,34 @@ Future<List<dynamic>> fetchNewTopics() async {
   }
 }
 
+/// 人気トピックを取得
+Future<List<dynamic>> fetchPopularTopics() async {
+  try {
+    final uri = '$apiBase/topics/popular';
+    logd('');
+    logd('============================================');
+    logd('⭐ [fetchPopularTopics] API呼び出し開始');
+    logd('⭐ [fetchPopularTopics] API URL: $uri');
+    logd('============================================');
+    logd('');
+    
+    final response = await http.get(Uri.parse(uri));
+    logd('⭐ [fetchPopularTopics] Response status: ${response.statusCode}');
+    logd('⭐ [fetchPopularTopics] Response body (first 300 chars): ${response.body.substring(0, min(300, response.body.length))}');
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List<dynamic>;
+      logd('⭐ [fetchPopularTopics] ✅ Success - Fetched ${data.length} topics');
+      return data;
+    } else {
+      throw Exception('Failed to load topics: ${response.statusCode}');
+    }
+  } catch (e) {
+    logd('⭐ [fetchPopularTopics] ❌ Error: $e');
+    rethrow;
+  }
+}
+
 // キャッシュ対応のトピック取得
 Future<List<dynamic>> fetchNewTopicsWithCache() async {
   try {
@@ -181,6 +209,44 @@ Future<List<dynamic>> fetchNewTopicsWithCache() async {
       return cached;
     }
     logd('📰 [fetchNewTopicsWithCache] ❌ No cache available');
+    rethrow;
+  }
+}
+
+/// キャッシュ対応の人気トピック取得
+Future<List<dynamic>> fetchPopularTopicsWithCache() async {
+  try {
+    logd('');
+    logd('============================================');
+    logd('⭐ [fetchPopularTopicsWithCache] API呼び出し開始');
+    logd('============================================');
+    logd('');
+    
+    final uri = '$apiBase/topics/popular';
+    logd('⭐ [fetchPopularTopicsWithCache] API URL: $uri');
+    
+    final response = await http.get(Uri.parse(uri));
+    logd('⭐ [fetchPopularTopicsWithCache] Response status: ${response.statusCode}');
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List<dynamic>;
+      logd('⭐ [fetchPopularTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
+      // キャッシュに保存
+      await CacheService.saveList('popular_topics', data);
+      logd('⭐ [fetchPopularTopicsWithCache] 💾 Cached successfully');
+      return data;
+    } else {
+      throw Exception('Failed to load topics: ${response.statusCode}');
+    }
+  } catch (e) {
+    logd('⭐ [fetchPopularTopicsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
+    // エラー時はキャッシュから取得
+    final cached = await CacheService.loadList('popular_topics');
+    if (cached.isNotEmpty) {
+      logd('⭐ [fetchPopularTopicsWithCache] 📂 Loaded from cache - ${cached.length} topics');
+      return cached;
+    }
+    logd('⭐ [fetchPopularTopicsWithCache] ❌ No cache available');
     rethrow;
   }
 }
@@ -458,19 +524,6 @@ Future<void> removeClippedComment(int topicId, int commentNo) async {
 Future<bool> isCommentClipped(int topicId, int commentNo) async {
   final clips = await getClippedComments();
   return clips.any((c) => c['topicId'] == topicId && c['no'] == commentNo);
-}
-
-// ========== 後方互換性（旧「お気に入り」→「履歴」に移行） ==========
-
-Future<List<int>> getFavoriteIds() async {
-  // 古いキーがあれば新しいキーに移行
-  final prefs = await SharedPreferences.getInstance();
-  final oldFavs = prefs.getStringList('favorites') ?? [];
-  if (oldFavs.isNotEmpty) {
-    await prefs.setStringList('watched_topics', oldFavs);
-    await prefs.remove('favorites');
-  }
-  return getWatchedTopicIds();
 }
 
 Future<void> addFavoriteId(int id) async => addWatchedTopicId(id);
