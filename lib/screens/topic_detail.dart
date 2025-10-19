@@ -882,48 +882,46 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                               ),
                             ],
                             const SizedBox(height: 6),
+                            _buildPlusMinusGraph(plus, minus),
+                            const SizedBox(height: 8),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                Row(
-                                  children: [
-                                    InkWell(
-                                      onTap: () async {
-                                        if (c['isLocal'] == true) return; // ★ 修正: ローカルは評価しない
-                                        final commentId = 'vbox$no';
-                                        final success = await rateComment(widget.topicId, commentId, 1);
-                                        if (success && mounted) {
-                                          setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('プラスを送信しました')),
-                                          );
-                                        }
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text('＋$plus',
-                                            style: const TextStyle(color: Colors.redAccent)),
-                                      ),
-                                    ),
-                                    InkWell(
-                                      onTap: () async {
-                                        if (c['isLocal'] == true) return; // ★ 修正
-                                        final commentId = 'vbox$no';
-                                        final success = await rateComment(widget.topicId, commentId, -1);
-                                        if (success && mounted) {
-                                          setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('マイナスを送信しました')),
-                                          );
-                                        }
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text('−$minus',
-                                            style: const TextStyle(color: Colors.blueGrey)),
-                                      ),
-                                    ),
-                                  ],
+                                InkWell(
+                                  onTap: () async {
+                                    if (c['isLocal'] == true) return; // ★ 修正: ローカルは評価しない
+                                    final commentId = 'vbox$no';
+                                    final success = await rateComment(widget.topicId, commentId, 1);
+                                    if (success && mounted) {
+                                      setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('プラスを送信しました')),
+                                      );
+                                    }
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text('＋$plus',
+                                        style: const TextStyle(color: Colors.redAccent)),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () async {
+                                    if (c['isLocal'] == true) return; // ★ 修正
+                                    final commentId = 'vbox$no';
+                                    final success = await rateComment(widget.topicId, commentId, -1);
+                                    if (success && mounted) {
+                                      setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('マイナスを送信しました')),
+                                      );
+                                    }
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text('−$minus',
+                                        style: const TextStyle(color: Colors.blueGrey)),
+                                  ),
                                 ),
                                 IconButton(
                                   icon: Icon(
@@ -1011,5 +1009,75 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('履歴から削除しました')));
     setState(() => _isWatched = false);
+  }
+
+  /// プラス・マイナスを表示する横長の棒グラフを作成
+  Widget _buildPlusMinusGraph(int plus, int minus) {
+    final total = plus + minus;
+    final maxWidth = 150.0;
+
+    // 合計が0の場合は表示しない
+    if (total == 0) {
+      return const SizedBox.shrink();
+    }
+
+    // プラス・マイナスの割合を計算
+    final plusRatio = plus / total;
+    final minusRatio = minus / total;
+
+    return Row(
+      children: [
+        // プラスの棒（ピンク）
+        Expanded(
+          flex: plus,
+          child: Container(
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.pink[300],
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(plus > 0 ? 4 : 0),
+                bottomLeft: Radius.circular(plus > 0 ? 4 : 0),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: plus > 0
+                ? Text(
+                    plus.toString(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  )
+                : null,
+          ),
+        ),
+        // マイナスの棒（灰色）
+        Expanded(
+          flex: minus,
+          child: Container(
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.grey[400],
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(minus > 0 ? 4 : 0),
+                bottomRight: Radius.circular(minus > 0 ? 4 : 0),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: minus > 0
+                ? Text(
+                    minus.toString(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  )
+                : null,
+          ),
+        ),
+      ],
+    );
   }
 }
