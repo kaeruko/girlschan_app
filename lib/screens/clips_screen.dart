@@ -95,59 +95,60 @@ class _ClipsScreenState extends State<ClipsScreen> {
 
     return RefreshIndicator(
       onRefresh: _refreshClips,
-      child: ListView.builder(
-        itemCount: _clips.length,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemBuilder: (context, i) {
-          final clip = _clips[i];
-          final topicTitle = clip['topicTitle'] as String;
-          final commentBody = clip['body'] as String;
-          final commentNo = clip['no'] as int;
-          final time = clip['time'] as String;
-          final plus = clip['plus'] as int;
-          final minus = clip['minus'] as int;
-          final topicId = clip['topicId'] as int;
+      child: Scrollbar(
+        child: ListView.builder(
+          itemCount: _clips.length,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemBuilder: (context, i) {
+            final clip = _clips[i];
+            final topicTitle = clip['topicTitle'] as String;
+            final commentBody = clip['body'] as String;
+            final commentNo = clip['no'] as int;
+            final time = clip['time'] as String;
+            final plus = clip['plus'] as int;
+            final minus = clip['minus'] as int;
+            final topicId = clip['topicId'] as int;
 
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => TopicDetailScreen(
-                      topicId: topicId,
-                      title: topicTitle,
-                      commentCount: 0,
-                    ),
-                  ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // トピックタイトル
-                    Text(
-                      topicTitle,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TopicDetailScreen(
+                        topicId: topicId,
+                        title: topicTitle,
+                        commentCount: 0,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
-                    // コメント本文
-                    Text(
-                      commentBody,
-                      style: const TextStyle(fontSize: 14),
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // トピックタイトル
+                      Text(
+                        topicTitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      // コメント本文
+                      Text(
+                        commentBody,
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
                     // 情報行（No・日時・評価）と削除ボタン
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -179,7 +180,8 @@ class _ClipsScreenState extends State<ClipsScreen> {
               ),
             ),
           );
-        },
+          },
+        ),
       ),
     );
   }

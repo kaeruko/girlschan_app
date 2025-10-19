@@ -179,12 +179,14 @@ class _NewListScreenState extends State<NewListScreen> {
 
     return RefreshIndicator(
       onRefresh: _fetchFromServer,
-      child: ListView.builder(
-        itemCount: _topics.length,
-        itemBuilder: (context, i) {
-          final t = _topics[i];
-          return _TopicTile(topic: t);
-        },
+      child: Scrollbar(
+        child: ListView.builder(
+          itemCount: _topics.length,
+          itemBuilder: (context, i) {
+            final t = _topics[i];
+            return _TopicTile(topic: t);
+          },
+        ),
       ),
     );
   }

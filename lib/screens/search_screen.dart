@@ -203,24 +203,26 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    return ListView.builder(
-      itemCount: _searchResults.length + (_hasMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == _searchResults.length) {
-          // ローディングインジケータ（さらに読み込む）
-          if (_hasMore) {
-            _loadMore();
-            return const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            );
+    return Scrollbar(
+      child: ListView.builder(
+        itemCount: _searchResults.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _searchResults.length) {
+            // ローディングインジケータ（さらに読み込む）
+            if (_hasMore) {
+              _loadMore();
+              return const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
+              );
+            }
+            return const SizedBox.shrink();
           }
-          return const SizedBox.shrink();
-        }
 
-        final topic = _searchResults[index];
-        return _buildTopicCard(context, topic);
-      },
+          final topic = _searchResults[index];
+          return _buildTopicCard(context, topic);
+        },
+      ),
     );
   }
 

@@ -789,15 +789,16 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                 },
                 child: RefreshIndicator(
                   onRefresh: fetchComments,
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: BouncingScrollPhysics(),
-                    ),
-                    key: PageStorageKey('topic_${widget.topicId}'),
-                    controller: _scrollController,
-                    itemCount: _allComments.length + (_loadingMore ? 1 : 0),
-                    itemBuilder: (context, i) {
-                      if (i == _allComments.length) {
+                  child: Scrollbar(
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      key: PageStorageKey('topic_${widget.topicId}'),
+                      controller: _scrollController,
+                      itemCount: _allComments.length + (_loadingMore ? 1 : 0),
+                      itemBuilder: (context, i) {
+                        if (i == _allComments.length) {
                         return Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Center(
@@ -943,15 +944,14 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                           ],
                         ),
                       );
-                    },
+                      },
+                    ),
                   ),
                 ),
               ),
             ),
     );
-  }
-
-  // 既存の _openPostDialog, _removeFromWatch などはそのまま使えます
+  }  // 既存の _openPostDialog, _removeFromWatch などはそのまま使えます
   Future<void> _openPostDialog() async {
     final controller = TextEditingController();
     final text = await showDialog<String>(

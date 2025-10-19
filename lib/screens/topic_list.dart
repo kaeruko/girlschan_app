@@ -83,12 +83,14 @@ class _TopicListScreenState extends State<TopicListScreen> {
         onRefresh: _fetchFromServer,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : ListView.builder(
-                itemCount: _topics.length,
-                itemBuilder: (context, index) {
-                  final topic = _topics[index];
-                  return _TopicListTile(topic: topic);
-                },
+            : Scrollbar(
+                child: ListView.builder(
+                  itemCount: _topics.length,
+                  itemBuilder: (context, index) {
+                    final topic = _topics[index];
+                    return _TopicListTile(topic: topic);
+                  },
+                ),
               ),
       ),
     );

@@ -83,12 +83,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     return RefreshIndicator(
       onRefresh: _refreshWatched,
-      child: ListView.builder(
-        itemCount: _watchedTopics.length,
-        itemBuilder: (context, i) {
-          final topic = _watchedTopics[i];
-          return _FavoritesTile(topic: topic, onRemove: _removeFromWatch);
-        },
+      child: Scrollbar(
+        child: ListView.builder(
+          itemCount: _watchedTopics.length,
+          itemBuilder: (context, i) {
+            final topic = _watchedTopics[i];
+            return _FavoritesTile(topic: topic, onRemove: _removeFromWatch);
+          },
+        ),
       ),
     );
   }
