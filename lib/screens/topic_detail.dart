@@ -421,7 +421,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       setState(() => _loading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('コメント読み込み失敗: $e')),
+          SnackBar(content: Text('通信にしっぱいしました')),
         );
       }
     }

@@ -87,54 +87,128 @@ class _TopicListScreenState extends State<TopicListScreen> {
                 itemCount: _topics.length,
                 itemBuilder: (context, index) {
                   final topic = _topics[index];
-                  return ListTile(
-                    leading: Container(
-                      width: 60,
-                      height: 60,
-                      child: topic['thumb'] != null
-                          ? Image.network(
-                              topic['thumb'],
-                              fit: BoxFit.cover,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                Icons.image_not_supported,
-                                size: 30,
-                                color: Colors.grey,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.image_not_supported,
-                              size: 30,
-                              color: Colors.grey,
-                            ),
-                    ),
-                    title: Text(topic['title']),
-                    subtitle: Text(
-                      '${topic['comments']}コメント • ${topic['time']}',
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => TopicDetailScreen(
-                            topicId: topic['id'],
-                            title: topic['title'],
-                            commentCount: topic['comments'],
-                          ),
-                        ),
-                      );
-                    },
-                  );
+                  return _TopicListTile(topic: topic);
                 },
               ),
+      ),
+    );
+  }
+}
+
+// キャッシュがあるトピックを表示するカスタムタイル
+class _TopicListTile extends StatefulWidget {
+  final dynamic topic;
+
+  const _TopicListTile({required this.topic});
+
+  @override
+  State<_TopicListTile> createState() => _TopicListTileState();
+}
+
+class _TopicListTileState extends State<_TopicListTile> {
+  bool _hasCachedComments = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCache();
+  }
+
+  Future<void> _checkCache() async {
+    final hasCached = await CacheService.exists('comments_${widget.topic['id']}');
+    setState(() {
+      _hasCachedComments = hasCached;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _hasCachedComments 
+            ? Colors.blue.withOpacity(0.05) 
+            : Colors.transparent,
+        border: _hasCachedComments
+            ? Border(
+                left: BorderSide(
+                  color: Colors.blue,
+                  width: 4,
+                ),
+              )
+            : null,
+      ),
+      child: ListTile(
+        leading: Stack(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              child: widget.topic['thumb'] != null
+                  ? Image.network(
+                      widget.topic['thumb'],
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(
+                        Icons.image_not_supported,
+                        size: 30,
+                        color: Colors.grey,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.image_not_supported,
+                      size: 30,
+                      color: Colors.grey,
+                    ),
+            ),
+            if (_hasCachedComments)
+              Positioned(
+                top: -8,
+                right: -8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        title: Text(
+          widget.topic['title'],
+          style: TextStyle(
+            fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.normal,
+            color: _hasCachedComments ? Colors.blue[800] : null,
+          ),
+        ),
+        subtitle: Text(
+          '${widget.topic['comments']}コメント • ${widget.topic['time']}',
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TopicDetailScreen(
+                topicId: widget.topic['id'],
+                title: widget.topic['title'],
+                commentCount: widget.topic['comments'],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

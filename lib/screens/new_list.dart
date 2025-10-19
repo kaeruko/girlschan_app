@@ -6,6 +6,103 @@ import '../config/app_config.dart';
 import '../services/cache_service.dart';
 import 'topic_detail.dart';
 
+// キャッシュがあるトピックを表示するカスタムタイル
+class _TopicTile extends StatefulWidget {
+  final dynamic topic;
+
+  const _TopicTile({required this.topic});
+
+  @override
+  State<_TopicTile> createState() => _TopicTileState();
+}
+
+class _TopicTileState extends State<_TopicTile> {
+  bool _hasCachedComments = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCache();
+  }
+
+  Future<void> _checkCache() async {
+    final hasCached = await CacheService.exists('comments_${widget.topic['id']}');
+    setState(() {
+      _hasCachedComments = hasCached;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _hasCachedComments 
+            ? Colors.blue.withOpacity(0.05) 
+            : Colors.transparent,
+        border: _hasCachedComments
+            ? Border(
+                left: BorderSide(
+                  color: Colors.blue,
+                  width: 4,
+                ),
+              )
+            : null,
+      ),
+      child: ListTile(
+        leading: Stack(
+          children: [
+            Image.network(
+              widget.topic['thumb'],
+              width: 64,
+              height: 64,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
+            ),
+            if (_hasCachedComments)
+              Positioned(
+                top: -8,
+                right: -8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        title: Text(
+          widget.topic['title'],
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.normal,
+            color: _hasCachedComments ? Colors.blue[800] : null,
+          ),
+        ),
+        subtitle: Text('${widget.topic['comments']}コメント • ${widget.topic['time']}'),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TopicDetailScreen(
+                topicId: widget.topic['id'],
+                title: widget.topic['title'],
+                commentCount: widget.topic['comments'],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class NewListScreen extends StatefulWidget {
   const NewListScreen({super.key});
 
@@ -86,29 +183,7 @@ class _NewListScreenState extends State<NewListScreen> {
         itemCount: _topics.length,
         itemBuilder: (context, i) {
           final t = _topics[i];
-          return ListTile(
-            leading: Image.network(
-              t['thumb'],
-              width: 64,
-              height: 64,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
-            ),
-            title: Text(t['title'], style: const TextStyle(fontSize: 15)),
-            subtitle: Text('${t['comments']}コメント • ${t['time']}'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => TopicDetailScreen(
-                    topicId: t['id'],
-                    title: t['title'],
-                    commentCount: t['comments'],
-                  ),
-                ),
-              );
-            },
-          );
+          return _TopicTile(topic: t);
         },
       ),
     );

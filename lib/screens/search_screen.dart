@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/topic.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import 'topic_detail.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -226,18 +227,54 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildTopicCard(BuildContext context, Topic topic) {
     print('🎨 カード描画: id=${topic.id}, title=${topic.title}, thumb=${topic.thumb}');
     
+    return _SearchTopicCard(topic: topic);
+  }
+}
+
+class _SearchTopicCard extends StatefulWidget {
+  final Topic topic;
+
+  const _SearchTopicCard({required this.topic});
+
+  @override
+  State<_SearchTopicCard> createState() => _SearchTopicCardState();
+}
+
+class _SearchTopicCardState extends State<_SearchTopicCard> {
+  bool _hasCachedComments = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCache();
+  }
+
+  Future<void> _checkCache() async {
+    if (widget.topic.id != null) {
+      final hasCached = await CacheService.exists('comments_${widget.topic.id}');
+      setState(() {
+        _hasCachedComments = hasCached;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      color: _hasCachedComments 
+          ? Colors.blue.withOpacity(0.05) 
+          : null,
       child: InkWell(
         onTap: () {
-          if (topic.id != null) {
-            print('📱 タップ: topicId=${topic.id}');
+          if (widget.topic.id != null) {
+            print('📱 タップ: topicId=${widget.topic.id}');
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => TopicDetailScreen(
-                  topicId: topic.id!,
-                  title: topic.title,
-                  commentCount: topic.comments,
+                  topicId: widget.topic.id!,
+                  title: widget.topic.title,
+                  commentCount: widget.topic.comments,
                 ),
               ),
             );
@@ -246,36 +283,64 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 左ボーダー（キャッシュある場合）
+            if (_hasCachedComments)
+              Container(
+                width: 4,
+                height: 80,
+                color: Colors.blue,
+              ),
             // サムネイル画像
-            if (topic.thumb != null && topic.thumb!.isNotEmpty)
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  bottomLeft: Radius.circular(4),
-                ),
-                child: Image.network(
-                  topic.thumb!,
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
+            if (widget.topic.thumb != null && widget.topic.thumb!.isNotEmpty)
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      bottomLeft: Radius.circular(4),
+                    ),
+                    child: Image.network(
+                      widget.topic.thumb!,
                       width: 80,
                       height: 80,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.image_not_supported),
-                    );
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      width: 80,
-                      height: 80,
-                      color: Colors.grey[200],
-                      child: const Center(child: SizedBox.shrink()),
-                    );
-                  },
-                ),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.image_not_supported),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey[200],
+                          child: const Center(child: SizedBox.shrink()),
+                        );
+                      },
+                    ),
+                  ),
+                  if (_hasCachedComments)
+                    Positioned(
+                      top: -8,
+                      right: -8,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                ],
               )
             else
               Container(
@@ -292,11 +357,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      topic.title,
+                      widget.topic.title,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
+                        fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
+                        color: _hasCachedComments ? Colors.blue[800] : null,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -305,13 +371,13 @@ class _SearchScreenState extends State<SearchScreen> {
                         Icon(Icons.comment, size: 14, color: Colors.grey[600]),
                         const SizedBox(width: 4),
                         Text(
-                          '${topic.comments}',
+                          '${widget.topic.comments}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            topic.time,
+                            widget.topic.time,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Colors.grey[600],
                             ),
