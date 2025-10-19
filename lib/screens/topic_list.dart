@@ -1,10 +1,23 @@
+// lib/screens/topic_list.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import '../services/cache_service.dart';
 import '../services/api_service.dart';
-import '../utils/log.dart';
+import '../services/cache_service.dart';
 import 'topic_detail.dart';
+
+/// タイルを一括で再評価するための簡易コントローラ
+class _TopicListTileController {
+  final Set<_TopicListTileState> _tiles = {};
+
+  void register(_TopicListTileState tile) => _tiles.add(tile);
+  void unregister(_TopicListTileState tile) => _tiles.remove(tile);
+
+  Future<void> refreshAll() async {
+    for (final t in _tiles) {
+      if (t.mounted) await t.refreshCacheState();
+    }
+  }
+}
 
 class TopicListScreen extends StatefulWidget {
   const TopicListScreen({super.key});
@@ -13,64 +26,74 @@ class TopicListScreen extends StatefulWidget {
   State<TopicListScreen> createState() => _TopicListScreenState();
 }
 
-class _TopicListScreenState extends State<TopicListScreen> {
+class _TopicListScreenState extends State<TopicListScreen>
+    with WidgetsBindingObserver {
   static const String cacheKey = 'topics';
-  List<dynamic> _topics = [];
+
+  final _controller = _TopicListTileController();
+
+  List<Map<String, dynamic>> _topics = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadFromCache();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// アプリがフォアグラウンドに戻ったら全タイル再評価
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _controller.refreshAll();
+    }
+  }
+
   Future<void> _loadFromCache() async {
-    try {
-      print('');
-      print('🔄 _loadFromCache() 開始');
-      final cached = await CacheService.load(cacheKey);
-      print('🔄 キャッシュ確認: ${cached != null ? 'あり (${(cached as List?)?.length ?? 0}件)' : 'なし'}');
-      
-      if (cached != null) {
-        setState(() {
-          _topics = cached;
-          _loading = false;
-        });
-        print('🔄 キャッシュから読み込み完了');
-      } else {
-        print('🔄 キャッシュなし、サーバーから取得開始');
-        await _fetchFromServer();
-      }
-    } catch (e) {
-      print('🔄 キャッシュ読み込みエラー: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('キャッシュの読み込みに失敗しました')),
-        );
-      }
+    final cached = await CacheService.load(cacheKey);
+    if (cached.isNotEmpty) {
+      setState(() {
+        _topics = cached.cast<Map<String, dynamic>>();
+        _loading = false;
+      });
+    } else {
       await _fetchFromServer();
     }
   }
 
   Future<void> _fetchFromServer() async {
     try {
-      print('');
-      print('🌐 _fetchFromServer() 開始');
-      final topics = await fetchNewTopics();
-      print('🌐 API取得成功: ${topics.length}件');
-      await CacheService.save(cacheKey, topics);
-      print('🌐 キャッシュ保存完了');
+      final topics = await fetchNewTopics(); // API（api_service.dart）
+      final list = topics.cast<Map<String, dynamic>>();
+      await CacheService.save(cacheKey, list);
 
+      if (!mounted) return;
       setState(() {
-        _topics = topics;
+        _topics = list;
         _loading = false;
       });
-      print('🌐 UI更新完了');
+
+      _controller.refreshAll();
     } catch (e) {
-      print('🌐 _fetchFromServer() エラー: $e');
+      // 失敗時でもキャッシュがあれば出す
+      final cached = await CacheService.load(cacheKey);
+      if (!mounted) return;
+      setState(() {
+        if (cached.isNotEmpty) {
+          _topics = cached.cast<Map<String, dynamic>>();
+        }
+        _loading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('データの更新に失敗しました')),
+          const SnackBar(content: Text('データの更新に失敗しました（キャッシュを使用）')),
         );
       }
     }
@@ -85,10 +108,13 @@ class _TopicListScreenState extends State<TopicListScreen> {
             ? const Center(child: CircularProgressIndicator())
             : Scrollbar(
                 child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
                   itemCount: _topics.length,
                   itemBuilder: (context, index) {
                     final topic = _topics[index];
-                    return _TopicListTile(topic: topic);
+                    return _TopicListTile(topic: topic, controller: _controller);
                   },
                 ),
               ),
@@ -97,11 +123,15 @@ class _TopicListScreenState extends State<TopicListScreen> {
   }
 }
 
-// キャッシュがあるトピックを表示するカスタムタイル
+/// キャッシュがあるトピックを表示するカスタムタイル
 class _TopicListTile extends StatefulWidget {
-  final dynamic topic;
+  final Map<String, dynamic> topic;
+  final _TopicListTileController controller;
 
-  const _TopicListTile({required this.topic});
+  const _TopicListTile({
+    required this.topic,
+    required this.controller,
+  });
 
   @override
   State<_TopicListTile> createState() => _TopicListTileState();
@@ -113,25 +143,36 @@ class _TopicListTileState extends State<_TopicListTile> {
   @override
   void initState() {
     super.initState();
-    _checkCache();
+    widget.controller.register(this);
+    refreshCacheState();
   }
 
-  Future<void> _checkCache() async {
-    final hasCached = await CacheService.exists('comments_${widget.topic['id']}');
-    setState(() {
-      _hasCachedComments = hasCached;
-    });
+  @override
+  void dispose() {
+    widget.controller.unregister(this);
+    super.dispose();
+  }
+
+  Future<void> refreshCacheState() async {
+    final id = widget.topic['id'];
+    final hasCached = await CacheService.exists('comments_$id');
+    if (!mounted) return;
+    setState(() => _hasCachedComments = hasCached);
   }
 
   @override
   Widget build(BuildContext context) {
+    final id = widget.topic['id'] as int;
+    final title = widget.topic['title'] as String? ?? '';
+    final comments = widget.topic['comments'] ?? 0;
+    final time = widget.topic['time'] as String? ?? '';
+    final thumb = widget.topic['thumb'] as String?;
+
     return Container(
       decoration: BoxDecoration(
-        color: _hasCachedComments 
-            ? Colors.blue.withOpacity(0.05) 
-            : Colors.transparent,
+        color: _hasCachedComments ? Colors.blue.withOpacity(0.05) : Colors.transparent,
         border: _hasCachedComments
-            ? Border(
+            ? const Border(
                 left: BorderSide(
                   color: Colors.blue,
                   width: 4,
@@ -141,75 +182,58 @@ class _TopicListTileState extends State<_TopicListTile> {
       ),
       child: ListTile(
         leading: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Container(
+            SizedBox(
               width: 60,
               height: 60,
-              child: widget.topic['thumb'] != null
+              child: (thumb != null && thumb.isNotEmpty)
                   ? Image.network(
-                      widget.topic['thumb'],
+                      thumb,
                       fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(
-                        Icons.image_not_supported,
-                        size: 30,
-                        color: Colors.grey,
-                      ),
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.image_not_supported, size: 30, color: Colors.grey),
                     )
-                  : const Icon(
-                      Icons.image_not_supported,
-                      size: 30,
-                      color: Colors.grey,
-                    ),
+                  : const Icon(Icons.image_not_supported, size: 30, color: Colors.grey),
             ),
             if (_hasCachedComments)
               Positioned(
                 top: -8,
                 right: -8,
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
+                  decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
                   padding: const EdgeInsets.all(4),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 16,
-                  ),
+                  child: const Icon(Icons.check, color: Colors.white, size: 16),
                 ),
               ),
           ],
         ),
         title: Text(
-          widget.topic['title'],
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.normal,
             color: _hasCachedComments ? Colors.blue[800] : null,
           ),
         ),
-        subtitle: Text(
-          '${widget.topic['comments']}コメント • ${widget.topic['time']}',
-        ),
-        onTap: () {
-          Navigator.push(
+        subtitle: Text('$commentsコメント • $time'),
+        onTap: () async {
+          // 詳細へ遷移 → 戻りで即再評価（自分＋全体）
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => TopicDetailScreen(
-                topicId: widget.topic['id'],
-                title: widget.topic['title'],
-                commentCount: widget.topic['comments'],
+                topicId: id,
+                title: title,
+                commentCount: comments is int ? comments : int.tryParse('$comments') ?? 0,
               ),
             ),
           );
+          if (mounted) {
+            await refreshCacheState();         // 自分を更新
+            widget.controller.refreshAll();    // 一覧全体も更新
+          }
         },
       ),
     );

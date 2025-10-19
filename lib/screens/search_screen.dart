@@ -4,6 +4,25 @@ import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import 'topic_detail.dart';
 
+// グローバルキー管理用クラス
+class _SearchTopicCardController {
+  final Set<_SearchTopicCardState> _cards = {};
+
+  void register(_SearchTopicCardState card) {
+    _cards.add(card);
+  }
+
+  void unregister(_SearchTopicCardState card) {
+    _cards.remove(card);
+  }
+
+  void refreshAll() {
+    for (var card in _cards) {
+      card._checkCache();
+    }
+  }
+}
+
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
 
@@ -13,7 +32,7 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver {
   late TextEditingController _searchController;
   List<Topic> _searchResults = [];
   bool _isLoading = false;
@@ -21,10 +40,13 @@ class _SearchScreenState extends State<SearchScreen> {
   int _currentPage = 1;
   int _totalCount = 0;
   bool _hasMore = true;
+  late _SearchTopicCardController _controller;
 
   @override
   void initState() {
     super.initState();
+    _controller = _SearchTopicCardController();
+    WidgetsBinding.instance.addObserver(this);
     _searchController = TextEditingController(text: widget.initialQuery ?? '');
     if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
       _performSearch(widget.initialQuery!);
@@ -33,8 +55,17 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // アプリがフォアグラウンドに戻ったときに全カードを再チェック
+      _controller.refreshAll();
+    }
   }
 
   Future<void> _performSearch(String query, {bool loadMore = false}) async {
@@ -229,14 +260,18 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildTopicCard(BuildContext context, Topic topic) {
     print('🎨 カード描画: id=${topic.id}, title=${topic.title}, thumb=${topic.thumb}');
     
-    return _SearchTopicCard(topic: topic);
+    return _SearchTopicCard(topic: topic, controller: _controller);
   }
 }
 
 class _SearchTopicCard extends StatefulWidget {
   final Topic topic;
+  final _SearchTopicCardController controller;
 
-  const _SearchTopicCard({required this.topic});
+  const _SearchTopicCard({
+    required this.topic,
+    required this.controller,
+  });
 
   @override
   State<_SearchTopicCard> createState() => _SearchTopicCardState();
@@ -248,15 +283,24 @@ class _SearchTopicCardState extends State<_SearchTopicCard> {
   @override
   void initState() {
     super.initState();
+    widget.controller.register(this);
     _checkCache();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.unregister(this);
+    super.dispose();
   }
 
   Future<void> _checkCache() async {
     if (widget.topic.id != null) {
       final hasCached = await CacheService.exists('comments_${widget.topic.id}');
-      setState(() {
-        _hasCachedComments = hasCached;
-      });
+      if (mounted) {
+        setState(() {
+          _hasCachedComments = hasCached;
+        });
+      }
     }
   }
 

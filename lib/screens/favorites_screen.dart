@@ -4,6 +4,25 @@ import '../services/cache_service.dart';
 import '../config/app_config.dart';
 import 'topic_detail.dart';
 
+// グローバルキー管理用クラス
+class _FavoritesTileController {
+  final Set<_FavoritesTileState> _tiles = {};
+
+  void register(_FavoritesTileState tile) {
+    _tiles.add(tile);
+  }
+
+  void unregister(_FavoritesTileState tile) {
+    _tiles.remove(tile);
+  }
+
+  void refreshAll() {
+    for (var tile in _tiles) {
+      tile._checkCache();
+    }
+  }
+}
+
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
 
@@ -11,14 +30,31 @@ class FavoritesScreen extends StatefulWidget {
   State<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
-class _FavoritesScreenState extends State<FavoritesScreen> {
+class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
+  late _FavoritesTileController _controller;
 
   @override
   void initState() {
     super.initState();
+    _controller = _FavoritesTileController();
+    WidgetsBinding.instance.addObserver(this);
     _loadWatchedTopics();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // アプリがフォアグラウンドに戻ったときに全タイルを再チェック
+      _controller.refreshAll();
+    }
   }
 
   Future<void> _loadWatchedTopics() async {
@@ -88,7 +124,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           itemCount: _watchedTopics.length,
           itemBuilder: (context, i) {
             final topic = _watchedTopics[i];
-            return _FavoritesTile(topic: topic, onRemove: _removeFromWatch);
+            return _FavoritesTile(
+              topic: topic,
+              onRemove: _removeFromWatch,
+              controller: _controller,
+            );
           },
         ),
       ),
@@ -100,10 +140,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 class _FavoritesTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final Function(int) onRemove;
+  final _FavoritesTileController controller;
 
   const _FavoritesTile({
     required this.topic,
     required this.onRemove,
+    required this.controller,
   });
 
   @override
@@ -116,15 +158,24 @@ class _FavoritesTileState extends State<_FavoritesTile> {
   @override
   void initState() {
     super.initState();
+    widget.controller.register(this);
     _checkCache();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.unregister(this);
+    super.dispose();
   }
 
   Future<void> _checkCache() async {
     final id = widget.topic['id'] as int;
     final hasCached = await CacheService.exists('comments_$id');
-    setState(() {
-      _hasCachedComments = hasCached;
-    });
+    if (mounted) {
+      setState(() {
+        _hasCachedComments = hasCached;
+      });
+    }
   }
 
   @override
