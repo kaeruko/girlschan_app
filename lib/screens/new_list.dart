@@ -1,11 +1,14 @@
 // lib/screens/new_list.dart
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
+import '../utils/platform_helper.dart';
 import 'topic_detail.dart';
 
 /// タイルを一括で再評価するための簡易コントローラ
@@ -71,6 +74,108 @@ class _TopicTileState extends State<_TopicTile> {
     final comments = widget.topic['comments'] ?? 0;
     final time = widget.topic['time'] as String? ?? '';
     final thumb = widget.topic['thumb'] as String?;
+
+    if (Platform.isMacOS) {
+      return GestureDetector(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (_) => TopicDetailScreen(
+                topicId: widget.topic['id'] as int,
+                title: title,
+                commentCount: comments is int ? comments : int.tryParse('$comments') ?? 0,
+              ),
+            ),
+          );
+          if (mounted) {
+            await refreshCacheState();
+            widget.controller.refreshAll();
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: _hasCachedComments ? CupertinoColors.systemBlue.withOpacity(0.1) : CupertinoColors.white,
+            border: Border(
+              bottom: BorderSide(
+                color: CupertinoColors.separator,
+                width: 0.5,
+              ),
+              left: _hasCachedComments
+                  ? BorderSide(
+                      color: CupertinoColors.systemBlue,
+                      width: 4,
+                    )
+                  : BorderSide.none,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: (thumb != null && thumb.isNotEmpty)
+                          ? Image.network(
+                              thumb,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(CupertinoIcons.photo),
+                            )
+                          : const Icon(CupertinoIcons.photo),
+                    ),
+                  ),
+                  if (_hasCachedComments)
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: CupertinoColors.systemBlue,
+                          shape: BoxShape.circle,
+                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: const Icon(CupertinoIcons.check_mark, color: CupertinoColors.white, size: 14),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                            fontSize: 15,
+                            fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
+                            color: _hasCachedComments ? CupertinoColors.systemBlue : null,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$commentsコメント • $time',
+                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                            fontSize: 13,
+                            color: CupertinoColors.secondaryLabel,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -245,9 +350,7 @@ class _NewListScreenState extends State<NewListScreen>
         _loading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('通信に失敗しました（キャッシュを使用）')),
-        );
+        PlatformHelper.showSnackBar(context, '通信に失敗しました（キャッシュを使用）');
       }
     }
   }
@@ -255,7 +358,26 @@ class _NewListScreenState extends State<NewListScreen>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: PlatformHelper.buildLoadingIndicator());
+    }
+
+    if (Platform.isMacOS) {
+      return CustomScrollView(
+        slivers: [
+          CupertinoSliverRefreshControl(
+            onRefresh: _fetchFromServer,
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                final t = _topics[i];
+                return _TopicTile(topic: t, controller: _controller);
+              },
+              childCount: _topics.length,
+            ),
+          ),
+        ],
+      );
     }
 
     return RefreshIndicator(

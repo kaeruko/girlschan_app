@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'dart:io';
 import 'new_list.dart';
 import 'topic_list.dart';
 import 'favorites_screen.dart';
@@ -31,6 +33,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // macOS の場合は CupertinoTabScaffold を使用
+    if (Platform.isMacOS) {
+      return CupertinoTabScaffold(
+        tabBar: CupertinoTabBar(
+          currentIndex: _currentIndex,
+          onTap: (i) => setState(() => _currentIndex = i),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(CupertinoIcons.doc), label: '新着'),
+            BottomNavigationBarItem(icon: Icon(CupertinoIcons.flame), label: '人気'),
+            BottomNavigationBarItem(icon: Icon(CupertinoIcons.bookmark), label: '履歴'),
+            BottomNavigationBarItem(icon: Icon(CupertinoIcons.heart), label: 'クリップ'),
+          ],
+        ),
+        tabBuilder: (context, index) {
+          return CupertinoTabView(
+            builder: (context) {
+              return CupertinoPageScaffold(
+                navigationBar: CupertinoNavigationBar(
+                  middle: Text(_titles[index]),
+                  trailing: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(CupertinoIcons.search),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        CupertinoPageRoute(
+                          builder: (context) => const SearchScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: _tabs[index],
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    // iOS/Android の場合は Material Design を使用
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_currentIndex]),

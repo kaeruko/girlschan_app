@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'dart:io';
 import '../services/api_service.dart';
+import '../utils/platform_helper.dart';
 import 'topic_detail.dart';
 
 class ClipsScreen extends StatefulWidget {
@@ -22,7 +25,6 @@ class _ClipsScreenState extends State<ClipsScreen> {
   Future<void> _loadClips() async {
     final clips = await getClippedComments();
     setState(() {
-      // 新しい順（clipDate 降順）でソート
       clips.sort((a, b) {
         final dateA = DateTime.parse(a['clipDate'] as String);
         final dateB = DateTime.parse(b['clipDate'] as String);
@@ -45,9 +47,7 @@ class _ClipsScreenState extends State<ClipsScreen> {
           (c) => c['topicId'] == topicId && c['no'] == commentNo,
         );
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('クリップを削除しました')),
-      );
+      PlatformHelper.showSnackBar(context, 'クリップを削除しました');
     }
   }
 
@@ -59,7 +59,7 @@ class _ClipsScreenState extends State<ClipsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: PlatformHelper.buildLoadingIndicator());
     }
 
     if (_clips.isEmpty) {
@@ -68,16 +68,18 @@ class _ClipsScreenState extends State<ClipsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.favorite_border,
+              Platform.isMacOS ? CupertinoIcons.heart : Icons.favorite_border,
               size: 64,
-              color: Colors.grey[400],
+              color: CupertinoColors.systemGrey,
             ),
             const SizedBox(height: 16),
             Text(
               'クリップはまだありません',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: Platform.isMacOS 
+                    ? CupertinoColors.secondaryLabel 
+                    : Colors.grey[600],
               ),
             ),
             const SizedBox(height: 8),
@@ -85,11 +87,32 @@ class _ClipsScreenState extends State<ClipsScreen> {
               'コメント右の❤️をタップして保存',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey[500],
+                color: Platform.isMacOS 
+                    ? CupertinoColors.tertiaryLabel 
+                    : Colors.grey[500],
               ),
             ),
           ],
         ),
+      );
+    }
+
+    if (Platform.isMacOS) {
+      return CustomScrollView(
+        slivers: [
+          CupertinoSliverRefreshControl(
+            onRefresh: _refreshClips,
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => _buildClipCard(context, _clips[i]),
+                childCount: _clips.length,
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -99,88 +122,164 @@ class _ClipsScreenState extends State<ClipsScreen> {
         child: ListView.builder(
           itemCount: _clips.length,
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemBuilder: (context, i) {
-            final clip = _clips[i];
-            final topicTitle = clip['topicTitle'] as String;
-            final commentBody = clip['body'] as String;
-            final commentNo = clip['no'] as int;
-            final time = clip['time'] as String;
-            final plus = clip['plus'] as int;
-            final minus = clip['minus'] as int;
-            final topicId = clip['topicId'] as int;
+          itemBuilder: (context, i) => _buildClipCard(context, _clips[i]),
+        ),
+      ),
+    );
+  }
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => TopicDetailScreen(
-                        topicId: topicId,
-                        title: topicTitle,
-                        commentCount: 0,
-                      ),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // トピックタイトル
-                      Text(
-                        topicTitle,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      // コメント本文
-                      Text(
-                        commentBody,
-                        style: const TextStyle(fontSize: 14),
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                    // 情報行（No・日時・評価）と削除ボタン
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'No.$commentNo • $time • ＋$plus −$minus',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.close,
-                            size: 18,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () => _removeClip(clip),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+  Widget _buildClipCard(BuildContext context, Map<String, dynamic> clip) {
+    final topicTitle = clip['topicTitle'] as String;
+    final commentBody = clip['body'] as String;
+    final commentNo = clip['no'] as int;
+    final time = clip['time'] as String;
+    final plus = clip['plus'] as int;
+    final minus = clip['minus'] as int;
+    final topicId = clip['topicId'] as int;
+
+    if (Platform.isMacOS) {
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (_) => TopicDetailScreen(
+                topicId: topicId,
+                title: topicTitle,
+                commentCount: 0,
               ),
             ),
           );
-          },
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CupertinoColors.white,
+            border: Border.all(
+              color: CupertinoColors.separator,
+              width: 0.5,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                topicTitle,
+                style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                  fontSize: 13,
+                  color: CupertinoColors.secondaryLabel,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                commentBody,
+                style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                  fontSize: 14,
+                ),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'No.$commentNo • $time • ＋$plus −$minus',
+                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                        fontSize: 12,
+                        color: CupertinoColors.secondaryLabel,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(4),
+                    onPressed: () => _removeClip(clip),
+                    child: const Icon(
+                      CupertinoIcons.xmark,
+                      size: 18,
+                      color: CupertinoColors.secondaryLabel,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TopicDetailScreen(
+                topicId: topicId,
+                title: topicTitle,
+                commentCount: 0,
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                topicTitle,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                commentBody,
+                style: const TextStyle(fontSize: 14),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'No.$commentNo • $time • ＋$plus −$minus',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () => _removeClip(clip),
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(4),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
