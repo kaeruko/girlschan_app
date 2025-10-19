@@ -1,6 +1,6 @@
 name: girlschan_app
 description: がるちゃんあぷり
-publish_to: "none" # 公開しない
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -8,24 +8,30 @@ environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
+  flutter:
+    sdk: flutter
+
   shared_preferences: ^2.2.3
   path_provider: ^2.1.3
   http: ^1.2.0
   csv: ^6.0.0
   flutter_inappwebview: ^6.0.0
-  flutter:
-    sdk: flutter
-
-  # Cupertinoスタイルのアイコン
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1  # ← ここ追加！
 
 flutter:
   uses-material-design: true
   assets:
     - assets/mock_data/topics.json
     - assets/mock_data/
+
+flutter_launcher_icons:
+  ios: true
+  image_path: "assets/icon.png"
+  remove_alpha_ios: true
+  android: true
