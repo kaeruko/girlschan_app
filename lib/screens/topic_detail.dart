@@ -436,10 +436,172 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  Widget _buildAnchorText(List<int> anchors) { /* ここは変更なし（略） */ 
-    // …元のまま…
-    // このメソッド内では _getCommentByNo / _showAnchorPreview を呼んでいるので対応済みです。
-    // （全文は質問文のものをそのまま使ってください）
+  // ===== アンカープレビュー =====
+  void _showAnchorPreview(int no) {
+    debugPrint('👀 アンカープレビュー: No.$no');
+    final comment = _getCommentByNo(no);
+    
+    if (comment.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('コメントが見つかりません')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          color: Colors.white,
+          child: Column(
+            children: [
+              // ヘッダー
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'No.${comment['no']}  ${comment['time'] ?? ''}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                    ),
+                  ],
+                ),
+              ),
+              // コメント内容
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // アンカー表示
+                        if ((comment['anchors'] as List?)?.isNotEmpty ?? false)
+                          _buildAnchorText(List<int>.from(comment['anchors'] ?? [])),
+                        if ((comment['reverse_anchors'] as List?)?.isNotEmpty ?? false)
+                          _buildReverseAnchorText(List<int>.from(comment['reverse_anchors'] ?? [])),
+                        // コメント本文
+                        Text(
+                          comment['body'] ?? '',
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                        // 画像
+                        if (comment['image_url'] != null) ...[
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => Dialog(
+                                  child: Image.network(
+                                    comment['image_url'],
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        const Icon(Icons.error),
+                                  ),
+                                ),
+                              );
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                comment['image_url'],
+                                height: 200,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const SizedBox(
+                                    height: 200,
+                                    child: Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const SizedBox(
+                                  height: 200,
+                                  child: Center(
+                                    child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        // プラス/マイナス/クリップ
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  '＋${comment['plus'] ?? 0}',
+                                  style: const TextStyle(color: Colors.redAccent),
+                                ),
+                                const SizedBox(width: 16),
+                                Text(
+                                  '−${comment['minus'] ?? 0}',
+                                  style: const TextStyle(color: Colors.blueGrey),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _clippedCommentNos.contains(comment['no'])
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _clippedCommentNos.contains(comment['no'])
+                                    ? Colors.pinkAccent
+                                    : null,
+                                size: 22,
+                              ),
+                              onPressed: () async {
+                                await _toggleClip(comment);
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.all(4),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnchorText(List<int> anchors) {
+    if (anchors.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Wrap(
@@ -475,27 +637,51 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-  void _showAnchorPreview(int no) { /* ここも内部で _getCommentByNo を使うのでそのまま */ 
-    // …元のまま…
-    final comment = _getCommentByNo(no);
-    if (comment.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('コメントが見つかりません')),
-      );
-      return;
-    }
-    // 以下は質問文の実装をそのまま貼り付けてください
-    // （長いため省略）
-  }
-
-  Widget _buildReverseAnchorText(List<int> reverseAnchors) { /* 元のまま */ 
-    // …省略（質問文の実装をそのまま）
+  Widget _buildReverseAnchorText(List<int> reverseAnchors) {
+    if (reverseAnchors.isEmpty) return const SizedBox.shrink();
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
         children: [
-          const Text('参照されている: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-          // …略…
+          const Text(
+            '参照されている: ',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          Expanded(
+            child: Wrap(
+              spacing: 4,
+              children: reverseAnchors.take(5).map((no) {
+                return GestureDetector(
+                  onTap: () => _showAnchorPreview(no),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      border: Border.all(
+                        color: Colors.orange.shade300,
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '<<$no',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          if (reverseAnchors.length > 5)
+            Text(
+              ' +${reverseAnchors.length - 5}件',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
         ],
       ),
     );
