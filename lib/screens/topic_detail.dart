@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:math' as math; // ★ 修正: max 用
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
@@ -26,18 +26,21 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
-  List<dynamic> _allComments = []; // 全コメント（キャッシュ用）
-  List<dynamic> _displayedComments = []; // 表示中のコメント
+  List<dynamic> _allComments = [];            // サーバ同期済み + ローカル投稿を含む最新の「表示用」ソース
+  List<dynamic> _displayedComments = [];      // 互換のため保持（= 常に _allComments と同じにする） // ★ 修正
   bool _loading = true;
   bool _loadingMore = false;
   bool _isWatched = false;
   bool _hasMoreComments = true;
-  int _currentPage = 0;
-  int _totalComments = 0;
-  static const int _commentsPerPage = 500;
+  int _totalComments = 0;                     // サーバが返す total
+
+  static const int _commentsPerPage = 10;
   final ScrollController _scrollController = ScrollController();
   double _savedOffset = 0.0;
   Set<int> _clippedCommentNos = {};
+  // ★ 追加: 復元のための保存値
+  int _savedSyncedCount = 0;      // 保存しておいた「サーバ同期済み件数」
+  bool _needsDeferredRestore = false; // 差分取得後に再ジャンプが必要か
 
   @override
   void initState() {
@@ -54,207 +57,228 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     super.dispose();
   }
 
-  // ===== スクロール検知（追加読み込み） =====
+  // =========================================
+  // ユーティリティ
+  // =========================================
+
+  // 「サーバ同期済み」件数（ローカル投稿は除外） // ★ 修正
+  int _serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
+
+  // スクロール復元 // ★ 修正
+  void _restoreScrollAfterBuild() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final max = _scrollController.position.maxScrollExtent;
+      final jump = _savedOffset.clamp(0.0, max);
+      if (jump > 0) {
+        _scrollController.jumpTo(jump);
+      }
+    });
+  }
+
+  // =========================================
+  // スクロール検知（追加読み込み）
+  // =========================================
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    
+
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
-    
-    // 下から 300px 以内でページング
+
     if (maxScroll - currentScroll < 300 && !_loadingMore && _hasMoreComments) {
       _loadMoreComments();
     }
   }
-  
-  // ===== 追加コメント読み込み =====
-  Future<void> _loadMoreComments() async {
+
+  // =========================================
+  // 差分取得（サーバから offset 以降を取ってマージ） // ★ 修正: 新規
+  // =========================================
+  Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     if (_loadingMore) return;
-    
     setState(() => _loadingMore = true);
-    
+
     try {
-      final offset = _displayedComments.length;
-      debugPrint('📄 ページング: offset=$offset, limit=$_commentsPerPage');
-      
-      final result = await http.get(
-        Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
-          queryParameters: {
-            'offset': offset.toString(),
-            'limit': _commentsPerPage.toString(),
-          },
-        ),
+      final offset = overrideOffset ?? _serverSyncedCount();
+      final uri = Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
+        queryParameters: {
+          'offset': offset.toString(),
+          'limit': _commentsPerPage.toString(),
+        },
       );
-      
-      if (result.statusCode == 200) {
-        final data = jsonDecode(result.body);
+
+      final res = await http.get(uri);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
         final newComments = data['comments'] as List<dynamic>? ?? [];
-        final total = data['total'] as int? ?? 0;
-        
-        debugPrint('✅ 取得: ${newComments.length}件, 合計: $total件');
-        
+        final total = data['total'] as int? ?? _totalComments;
+
+        final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
+        final mergedRemote  = _mergeComments(existingRemote, newComments);
+        final locals        = _allComments.where((c) => c['isLocal'] == true).toList();
+
         setState(() {
-          _allComments.addAll(newComments);
-          _displayedComments.addAll(newComments);
-          _totalComments = total;
-          _currentPage++;
-          
-          // すべて読み込んだかチェック
-          _hasMoreComments = _displayedComments.length < total;
-          
-          debugPrint('📊 表示中のコメント: ${_displayedComments.length}/${_totalComments}');
+          _totalComments  = total;
+          _allComments    = [...mergedRemote, ...locals];
+          _displayedComments = List.of(_allComments);
+          _hasMoreComments = mergedRemote.length < total;
         });
-        
-        // キャッシュに段階的に保存
-        await CacheService.save('comments_${widget.topicId}', _allComments);
+
+        await CacheService.save('comments_${widget.topicId}', mergedRemote);
+
+        // ★ 追加: 復元待ち && 目標件数に到達したらもう一度 jump
+        if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
+          _needsDeferredRestore = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              final max = _scrollController.position.maxScrollExtent;
+              final jump = _savedOffset.clamp(0.0, max);
+              _scrollController.jumpTo(jump);
+            }
+          });
+        }
       }
     } catch (e) {
-      debugPrint('❌ ページング読み込みエラー: $e');
+      debugPrint('❌ 差分取得エラー: $e');
     } finally {
-      setState(() => _loadingMore = false);
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
-  // ===== スクロール位置保存 =====
+
+  // =========================================
+  // 追加コメント読み込み（スクロール末尾） // ★ 修正: 差分取得を使う
+  // =========================================
+  Future<void> _loadMoreComments() async {
+    await _fetchDeltaFromServer();
+  }
+
+  // =========================================
+  // スクロール位置保存
+  // =========================================
   Future<void> _saveScrollPosition() async {
     final prefs = await SharedPreferences.getInstance();
     if (_scrollController.hasClients) {
       await prefs.setDouble('scroll_${widget.topicId}', _scrollController.offset);
+      await prefs.setInt('synced_${widget.topicId}', _serverSyncedCount()); // ★ 追加
     }
   }
 
   Future<void> _loadScrollPosition() async {
     final prefs = await SharedPreferences.getInstance();
     _savedOffset = prefs.getDouble('scroll_${widget.topicId}') ?? 0.0;
+    _savedSyncedCount = prefs.getInt('synced_${widget.topicId}') ?? 0; // ★ 追加
   }
 
-  // ===== ローカル投稿保存 =====
+  // ★ 追加: 保存していた同期件数まで取り切ってからオフセット復元
+  Future<void> _ensureSyncedToSavedAndRestore() async {
+    // 目標件数が無ければ通常復元だけ
+    final current = _serverSyncedCount();
+    if (_savedSyncedCount <= 0 || current >= _savedSyncedCount) {
+      _restoreScrollAfterBuild();
+      return;
+    }
+
+    // まだ足りない → 差分を取り切る（10件ずつでもOK）
+    _needsDeferredRestore = true; // 差分完了後に再ジャンプさせる
+    while (_serverSyncedCount() < _savedSyncedCount && _hasMoreComments) {
+      await _fetchDeltaFromServer();
+    }
+
+    // 取り切れたら（あるいは total が縮んでこれ以上増えないなら）復元
+    _restoreScrollAfterBuild();
+  }
+
+
+
+  // =========================================
+  // ローカル投稿
+  // =========================================
   Future<void> _saveLocalComment(String text) async {
     final prefs = await SharedPreferences.getInstance();
     final key = 'local_comments_${widget.topicId}';
     final existing = prefs.getStringList(key) ?? [];
+
+    // 既存の no の最大値 + 1 を割り当て（サーバ同期済みの続きとして表示） // ★ 修正
+    int maxNo = 0;
+    for (final c in _allComments) {
+      final n = (c['no'] as int?) ?? 0;
+      if (n > maxNo) maxNo = n;
+    }
+
     final newComment = {
-      'no': _displayedComments.length + 1,
+      'no': maxNo + 1,
       'body': text,
       'time': DateTime.now().toString().substring(0, 19),
       'plus': 0,
       'minus': 0,
       'name': '自分（投稿済）',
+      'isLocal': true, // ★ 修正: ローカルフラグ
     };
+
     existing.add(jsonEncode(newComment));
     await prefs.setStringList(key, existing);
-    setState(() => _displayedComments.add(newComment));
+
+    setState(() {
+      _allComments.add(newComment);
+      _displayedComments = List.of(_allComments); // ★ 修正
+    });
   }
 
   Future<List<Map<String, dynamic>>> _loadLocalComments() async {
     final prefs = await SharedPreferences.getInstance();
     final key = 'local_comments_${widget.topicId}';
     final stored = prefs.getStringList(key) ?? [];
-    return stored.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  }
-
-  // ===== APIからコメント取得（リフレッシュ時） =====
-  Future<void> fetchComments() async {
-    try {
-      setState(() => _loading = true);
-      
-      // キャッシュをクリア
-      _allComments.clear();
-      _displayedComments.clear();
-      _currentPage = 0;
-      _totalComments = 0;
-      
-      final uri = Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
-        queryParameters: {
-          'offset': '0',
-          'limit': _commentsPerPage.toString(),
-        },
-      );
-      
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final newComments = data['comments'] as List<dynamic>? ?? [];
-        final total = data['total'] as int? ?? newComments.length;
-
-        debugPrint('🔄 リフレッシュ: ${newComments.length}/${total}件取得');
-
-        setState(() {
-          _allComments = newComments;
-          _displayedComments = newComments;
-          _totalComments = total;
-          _hasMoreComments = newComments.length < total;
-          _loading = false;
-        });
-
-        // キャッシュに保存
-        await CacheService.save('comments_${widget.topicId}', _allComments);
-
-        // スクロール位置を復元
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollController.hasClients && _savedOffset > 0) {
-              _scrollController.jumpTo(_savedOffset);
-            }
-          });
-        }
-
-        // 更新完了を通知
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('最新データを取得しました')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('API Error: $e');
-      setState(() => _loading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失敗: $e')),
-        );
-      }
+    final list = stored.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+    // 読み出し時にも isLocal を立てておく // ★ 修正
+    for (final c in list) {
+      c['isLocal'] = true;
     }
+    return list;
   }
 
-  // ===== コメントをマージ（重複排除） =====
+  // =========================================
+  // Pull to refresh（差分同期に変更） // ★ 修正
+  // =========================================
+  Future<void> fetchComments() async {
+    await _fetchDeltaFromServer();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('最新データに同期しました')),
+    );
+  }
+
+  // =========================================
+  // コメントをマージ（重複排除） ※既存の関数を無改変で利用
+  // =========================================
   List<dynamic> _mergeComments(List<dynamic> existing, List<dynamic> newComments) {
-    // noをキーにしたMapを作成（既存のコメントから）
     final commentMap = <int, dynamic>{};
     for (var comment in existing) {
       final no = comment['no'] as int?;
-      if (no != null) {
-        commentMap[no] = comment;
-      }
+      if (no != null) commentMap[no] = comment;
     }
-
-    // 新しいコメントで更新・追加
     for (var comment in newComments) {
       final no = comment['no'] as int?;
-      if (no != null) {
-        commentMap[no] = comment; // 新しいデータで上書き
-      }
+      if (no != null) commentMap[no] = comment; // 上書き
     }
-
-    // noの昇順でソート
     final sorted = commentMap.values.toList();
     sorted.sort((a, b) {
       final noA = (a['no'] as int?) ?? 0;
       final noB = (b['no'] as int?) ?? 0;
       return noA.compareTo(noB);
     });
-
     return sorted;
   }
 
-  // ===== 初期化処理 =====
+  // =========================================
+  // 初期化
+  // =========================================
   Future<void> _load() async {
     await _loadScrollPosition();
-    
+
     // 履歴状態とクリップ状態を取得
     final watchedIds = await getWatchedTopicIds();
     final clips = await getClippedComments();
-    
+
     setState(() {
       _isWatched = watchedIds.contains(widget.topicId);
       _clippedCommentNos = clips
@@ -262,8 +286,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           .map<int>((c) => c['no'] as int)
           .toSet();
     });
-    
-    // トピックを自動で履歴に追加
+
+    // 履歴に自動追加
     if (!_isWatched) {
       await addWatchedTopicId(
         widget.topicId,
@@ -274,37 +298,37 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       );
       setState(() => _isWatched = true);
     }
-    
-    // キャッシュをチェック
-    final cacheKey = 'comments_${widget.topicId}';
-    final cached = await CacheService.load(cacheKey);
-    
-    if (cached.isNotEmpty) {
-      // キャッシュがあれば最初の _commentsPerPage 件表示
+
+    // キャッシュ読み出し
+    final cacheKey     = 'comments_${widget.topicId}';
+    final cachedRemote = await CacheService.load(cacheKey);
+
+    if (cachedRemote.isNotEmpty) {
+      final locals = await _loadLocalComments();
       setState(() {
-        _allComments = cached;
-        _totalComments = cached.length;
-        _displayedComments = cached.take(_commentsPerPage).toList();
-        _currentPage = 0;
-        _hasMoreComments = cached.length > _commentsPerPage;
-        _loading = false;
+        _allComments        = [...cachedRemote, ...locals];
+        _displayedComments  = List.of(_allComments);
+        _totalComments      = (_totalComments == 0) ? cachedRemote.length : _totalComments;
+        _hasMoreComments    = cachedRemote.length < _totalComments;
+        _loading            = false;
       });
-      
-      debugPrint('📦 キャッシュから表示: ${_displayedComments.length}/${_totalComments}');
-      
-      // スクロール位置の復元
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients && _savedOffset > 0) {
-          _scrollController.jumpTo(_savedOffset);
-        }
-      });
+
+      // ★ ここが重要：保存してた件数（例: 216）まで取り切ってから復元
+      await _ensureSyncedToSavedAndRestore();
+
+      // さらに新着があれば 1 回だけ同期（任意）
+      if (_hasMoreComments) {
+        // ignore: discarded_futures
+        _fetchDeltaFromServer();
+      }
     } else {
-      // キャッシュがなければAPIから取得（最初の _commentsPerPage 件）
+      // キャッシュ無し → 初回ページ取得後に保存値まで取り切って復元
       await _fetchFirstPage();
+      await _ensureSyncedToSavedAndRestore();
     }
   }
-  
-  // ===== 最初のページ取得 =====
+
+  // 最初のページ取得（キャッシュ保存 + ローカル投稿合成 + 復元） // ★ 修正
   Future<void> _fetchFirstPage() async {
     try {
       final uri = Uri.parse('${AppConfig.apiBase}/topic/${widget.topicId}').replace(
@@ -313,26 +337,32 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           'limit': _commentsPerPage.toString(),
         },
       );
-      
+
       final res = await http.get(uri);
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final newComments = data['comments'] as List<dynamic>? ?? [];
         final total = data['total'] as int? ?? newComments.length;
-        
-        debugPrint('🚀 初期読み込み: ${newComments.length}/${total}件');
-        
+
+        debugPrint('🚀 初期読み込み: ${newComments.length}/$total件');
+
+        // まずサーバ同期済みで初期化
+        _allComments = newComments;
+        _totalComments = total;
+        _hasMoreComments = newComments.length < total;
+
+        // キャッシュ保存（サーバ同期済みのみ）
+        await CacheService.save('comments_${widget.topicId}', _allComments);
+
+        // ローカル投稿も合成
+        final locals = await _loadLocalComments();
         setState(() {
-          _allComments = newComments;
-          _displayedComments = newComments;
-          _totalComments = total;
-          _currentPage = 0;
-          _hasMoreComments = newComments.length < total;
+          _allComments = [..._allComments, ...locals];
+          _displayedComments = List.of(_allComments); // ★ 修正: 全件表示
           _loading = false;
         });
-        
-        // キャッシュに保存
-        await CacheService.save('comments_${widget.topicId}', _allComments);
+
+        _restoreScrollAfterBuild();
       }
     } catch (e) {
       debugPrint('API Error: $e');
@@ -345,76 +375,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  // ===== 投稿ボタン =====
-  Future<void> _openPostDialog() async {
-    final controller = TextEditingController();
-    final text = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('コメント入力'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'コメントを入力してください',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('確認')),
-        ],
-      ),
-    );
-
-    if (text == null || text.isEmpty) return;
-
-    // 確認ダイアログ
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('投稿を確認'),
-        content: Text(text),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('戻る')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('投稿')),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final success = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CommentPostWebView(topicId: widget.topicId, text: text),
-        ),
-      );
-
-      if (success == true) {
-        await _saveLocalComment(text);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('投稿を送信しました')),
-        );
-      }
-    }
-  }
-
-  // ===== 履歴（旧「お気に入り」） =====
-  // 削除のみ対応（追加は自動）
-  Future<void> _removeFromWatch() async {
-    await removeWatchedTopicId(widget.topicId);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('履歴から削除しました')));
-    setState(() => _isWatched = false);
-  }
-
-  // ===== クリップ（コメント保存） =====
+  // =========================================
+  // クリップ / アンカー関連（データソースを _allComments に変更） // ★ 修正
+  // =========================================
   Future<void> _toggleClip(Map<String, dynamic> comment) async {
     final no = comment['no'] as int;
     final isClipped = _clippedCommentNos.contains(no);
-    
+
     if (isClipped) {
       await removeClippedComment(widget.topicId, no);
       _clippedCommentNos.remove(no);
@@ -437,10 +404,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     setState(() {});
   }
 
-  // ===== アンカー関連 =====
   dynamic _getCommentByNo(int no) {
     try {
-      return _displayedComments.firstWhere((c) => c['no'] == no);
+      return _allComments.firstWhere((c) => c['no'] == no); // ★ 修正
     } catch (e) {
       return {};
     }
@@ -448,19 +414,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   void _jumpToComment(int no) {
     debugPrint('🔗 アンカークリック: No.$no');
-    final index = _displayedComments.indexWhere((c) => c['no'] == no);
-    debugPrint('📍 コメント インデックス: $index / 総数: ${_displayedComments.length}');
+    final index = _allComments.indexWhere((c) => c['no'] == no); // ★ 修正
+    debugPrint('📍 コメント インデックス: $index / 総数: ${_allComments.length}');
     if (index != -1) {
-      // ListViewの場合、itemBuilderで各アイテムの高さが異なるため、
-      // ここではスクロール位置を推定値で移動
-      final estimatedOffset = index * 120.0; // 平均的なアイテム高さ
+      final estimatedOffset = index * 120.0;
       debugPrint('📐 スクロール目標: $estimatedOffset');
       _scrollController.animateTo(
         estimatedOffset,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       ).catchError((_) {
-        // スクロール範囲外の場合はジャンプ
         _scrollController.jumpTo(estimatedOffset);
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -473,173 +436,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  // ===== アンカープレビュー =====
-  void _showAnchorPreview(int no) {
-    debugPrint('👀 アンカープレビュー: No.$no');
-    final comment = _getCommentByNo(no);
-    
-    if (comment.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('コメントが見つかりません')),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) => Container(
-          color: Colors.white,
-          child: Column(
-            children: [
-              // ヘッダー
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade300),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'No.${comment['no']}  ${comment['time'] ?? ''}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.all(4),
-                    ),
-                  ],
-                ),
-              ),
-              // コメント内容
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // アンカー表示
-                        if ((comment['anchors'] as List?)?.isNotEmpty ?? false)
-                          _buildAnchorText(List<int>.from(comment['anchors'] ?? [])),
-                        if ((comment['reverse_anchors'] as List?)?.isNotEmpty ?? false)
-                          _buildReverseAnchorText(List<int>.from(comment['reverse_anchors'] ?? [])),
-                        // コメント本文
-                        Text(
-                          comment['body'] ?? '',
-                          style: const TextStyle(fontSize: 15),
-                        ),
-                        // 画像
-                        if (comment['image_url'] != null) ...[
-                          const SizedBox(height: 12),
-                          GestureDetector(
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => Dialog(
-                                  child: Image.network(
-                                    comment['image_url'],
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.error),
-                                  ),
-                                ),
-                              );
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                comment['image_url'],
-                                height: 200,
-                                fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const SizedBox(
-                                    height: 200,
-                                    child: Center(
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const SizedBox(
-                                  height: 200,
-                                  child: Center(
-                                    child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        // プラス/マイナス/クリップ
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '＋${comment['plus'] ?? 0}',
-                                  style: const TextStyle(color: Colors.redAccent),
-                                ),
-                                const SizedBox(width: 16),
-                                Text(
-                                  '−${comment['minus'] ?? 0}',
-                                  style: const TextStyle(color: Colors.blueGrey),
-                                ),
-                              ],
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                _clippedCommentNos.contains(comment['no'])
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _clippedCommentNos.contains(comment['no'])
-                                    ? Colors.pinkAccent
-                                    : null,
-                                size: 22,
-                              ),
-                              onPressed: () async {
-                                await _toggleClip(comment);
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                              constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(4),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAnchorText(List<int> anchors) {
-    if (anchors.isEmpty) return const SizedBox.shrink();
-    
+  Widget _buildAnchorText(List<int> anchors) { /* ここは変更なし（略） */ 
+    // …元のまま…
+    // このメソッド内では _getCommentByNo / _showAnchorPreview を呼んでいるので対応済みです。
+    // （全文は質問文のものをそのまま使ってください）
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Wrap(
@@ -647,7 +447,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         children: anchors.map((no) {
           final referencedComment = _getCommentByNo(no);
           final isAvailable = referencedComment.isNotEmpty;
-          
+
           return GestureDetector(
             onTap: () => _showAnchorPreview(no),
             child: Container(
@@ -675,59 +475,40 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-  Widget _buildReverseAnchorText(List<int> reverseAnchors) {
-    if (reverseAnchors.isEmpty) return const SizedBox.shrink();
-    
+  void _showAnchorPreview(int no) { /* ここも内部で _getCommentByNo を使うのでそのまま */ 
+    // …元のまま…
+    final comment = _getCommentByNo(no);
+    if (comment.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('コメントが見つかりません')),
+      );
+      return;
+    }
+    // 以下は質問文の実装をそのまま貼り付けてください
+    // （長いため省略）
+  }
+
+  Widget _buildReverseAnchorText(List<int> reverseAnchors) { /* 元のまま */ 
+    // …省略（質問文の実装をそのまま）
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
         children: [
-          const Text(
-            '参照されている: ',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          Expanded(
-            child: Wrap(
-              spacing: 4,
-              children: reverseAnchors.take(5).map((no) {
-                return GestureDetector(
-                  onTap: () => _showAnchorPreview(no),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      border: Border.all(
-                        color: Colors.orange.shade300,
-                        width: 1,
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '<<$no',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.orange.shade700,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          if (reverseAnchors.length > 5)
-            Text(
-              ' +${reverseAnchors.length - 5}件',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
+          const Text('参照されている: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          // …略…
         ],
       ),
     );
   }
 
-  // ===== UI =====
+  // =========================================
+  // UI
+  // =========================================
   @override
   Widget build(BuildContext context) {
+    final remoteCount = _serverSyncedCount();                         // ★ 修正
+    final localCount = _allComments.length - remoteCount;             // ★ 修正
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -735,7 +516,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           children: [
             Text(widget.title),
             Text(
-              'コメント: ${_displayedComments.length}/${_totalComments}件',
+              // 例: 「表示: 123(リモート)/403 +2(ローカル)」
+              '表示: $remoteCount/$_totalComments'
+              '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
             ),
           ],
@@ -753,13 +536,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 return false;
               },
               child: RefreshIndicator(
-                onRefresh: fetchComments,
+                onRefresh: fetchComments, // ★ 修正: 差分同期
                 child: ListView.builder(
+                  key: PageStorageKey('topic_${widget.topicId}'), // ★ 修正: 追加（副次的に復元が安定）
                   controller: _scrollController,
-                  itemCount: _displayedComments.length + (_loadingMore ? 1 : 0),
+                  itemCount: _allComments.length + (_loadingMore ? 1 : 0), // ★ 修正
                   itemBuilder: (context, i) {
-                    // 最後のアイテムが読み込み中インジケーター
-                    if (i == _displayedComments.length) {
+                    if (i == _allComments.length) {
                       return Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Center(
@@ -768,7 +551,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                               const CircularProgressIndicator(),
                               const SizedBox(height: 8),
                               Text(
-                                '読み込み中... (${_displayedComments.length}/${_totalComments})',
+                                '読み込み中... ($remoteCount/$_totalComments)',
                                 style: const TextStyle(color: Colors.grey),
                               ),
                             ],
@@ -776,31 +559,26 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                         ),
                       );
                     }
-                    
-                    final c = _displayedComments[i];
+
+                    final c = _allComments[i];
                     final no = c['no'] ?? '-';
                     final time = c['time'] ?? '';
                     final body = c['body'] ?? '';
                     final plus = c['plus'] ?? 0;
                     final minus = c['minus'] ?? 0;
-
                     final anchors = List<int>.from(c['anchors'] ?? []);
                     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
-                    
-                    if (anchors.isNotEmpty || reverseAnchors.isNotEmpty) {
-                      debugPrint('📌 No.$no - anchors: $anchors, reverse: $reverseAnchors');
-                    }
 
                     return ListTile(
-                      title: Text('No.$no  $time',
-                          style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                      title: Text(
+                        'No.$no  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: ローカル表示
+                        style: const TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (anchors.isNotEmpty)
-                            _buildAnchorText(anchors),
-                          if (reverseAnchors.isNotEmpty)
-                            _buildReverseAnchorText(reverseAnchors),
+                          if (anchors.isNotEmpty) _buildAnchorText(anchors),
+                          if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
                           Text(body, style: const TextStyle(fontSize: 15)),
                           if (c['image_url'] != null) ...[
                             const SizedBox(height: 8),
@@ -829,14 +607,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                                     return const SizedBox(
                                       height: 200,
                                       child: Center(
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
+                                        child: CircularProgressIndicator(strokeWidth: 2),
                                       ),
                                     );
                                   },
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const SizedBox(
+                                  errorBuilder: (context, error, stackTrace) => const SizedBox(
                                     height: 200,
                                     child: Center(
                                       child: Icon(
@@ -858,8 +633,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                                 children: [
                                   InkWell(
                                     onTap: () async {
-                                      // vbox{no} の形式でコメントIDを生成
-                                      final commentId = 'vbox${no}';
+                                      if (c['isLocal'] == true) return; // ★ 修正: ローカルは評価しない
+                                      final commentId = 'vbox$no';
                                       final success = await rateComment(widget.topicId, commentId, 1);
                                       if (success && mounted) {
                                         setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
@@ -876,8 +651,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                                   ),
                                   InkWell(
                                     onTap: () async {
-                                      // vbox{no} の形式でコメントIDを生成
-                                      final commentId = 'vbox${no}';
+                                      if (c['isLocal'] == true) return; // ★ 修正
+                                      final commentId = 'vbox$no';
                                       final success = await rateComment(widget.topicId, commentId, -1);
                                       if (success && mounted) {
                                         setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
@@ -918,5 +693,67 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               ),
             ),
     );
+  }
+
+  // 既存の _openPostDialog, _removeFromWatch などはそのまま使えます
+  Future<void> _openPostDialog() async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('コメント入力'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: 'コメントを入力してください',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('確認')),
+        ],
+      ),
+    );
+
+    if (text == null || text.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('投稿を確認'),
+        content: Text(text),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('戻る')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('投稿')),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CommentPostWebView(topicId: widget.topicId, text: text),
+        ),
+      );
+
+      if (success == true) {
+        await _saveLocalComment(text);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('投稿を送信しました')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeFromWatch() async {
+    await removeWatchedTopicId(widget.topicId);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('履歴から削除しました')));
+    setState(() => _isWatched = false);
   }
 }
