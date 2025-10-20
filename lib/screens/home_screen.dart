@@ -33,20 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(_labels[_currentIndex]),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.search),
-          onPressed: () {
-            Navigator.of(context).push(
-              CupertinoPageRoute(
-                builder: (context) => const SearchScreen(),
-              ),
-            );
-          },
-        ),
-      ),
+      navigationBar: null,
       child: SafeArea(
         child: Column(
           children: [
