@@ -5,7 +5,9 @@ import 'dart:io';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config/app_config.dart';
+import '../models/comment.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
@@ -589,7 +591,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                       // プラス/マイナス/クリップ
                       const SizedBox(height: 12),
@@ -719,6 +721,153 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
             ),
         ],
+      ),
+    );
+  }
+
+  // URL表示ウィジェット
+  Widget _buildUrlsWidget(List<dynamic> urls) {
+    if (urls.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        children: urls.map((urlData) {
+          String url = '';
+          String title = '';
+          String? description;
+          String? thumbnail;
+
+          // Map型とCommentUrl型の両方に対応
+          if (urlData is Map<String, dynamic>) {
+            url = urlData['url'] ?? '';
+            title = urlData['title'] ?? '';
+            description = urlData['description'];
+            thumbnail = urlData['thumbnail'];
+          } else if (urlData is CommentUrl) {
+            url = urlData.url;
+            title = urlData.title;
+            description = urlData.description;
+            thumbnail = urlData.thumbnail;
+          }
+
+          if (url.isEmpty) return const SizedBox.shrink();
+
+          return GestureDetector(
+            onTap: () async {
+              final Uri uri = Uri.parse(url);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8.0),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // サムネイル
+                  if (thumbnail != null && thumbnail.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomLeft: Radius.circular(8),
+                      ),
+                      child: Image.network(
+                        thumbnail,
+                        width: 100,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            width: 100,
+                            height: 80,
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 100,
+                          height: 80,
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: Icon(Icons.image_not_supported, size: 24, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 100,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          bottomLeft: Radius.circular(8),
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.link, size: 24, color: Colors.grey),
+                      ),
+                    ),
+                  // タイトルと説明
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (description != null && description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              description,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            url,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

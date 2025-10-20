@@ -1,3 +1,26 @@
+class CommentUrl {
+  final String url;
+  final String title;
+  final String? description;
+  final String? thumbnail;
+
+  CommentUrl({
+    required this.url,
+    required this.title,
+    this.description,
+    this.thumbnail,
+  });
+
+  factory CommentUrl.fromJson(Map<String, dynamic> json) {
+    return CommentUrl(
+      url: json['url'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'],
+      thumbnail: json['thumbnail'],
+    );
+  }
+}
+
 class Comment {
   final int id;
   final String time;
@@ -7,6 +30,7 @@ class Comment {
   final String? imageUrl;
   final List<int> anchors;
   final List<int> reverseAnchors;
+  final List<CommentUrl> urls;
 
   Comment({
     required this.id,
@@ -17,6 +41,7 @@ class Comment {
     this.imageUrl,
     this.anchors = const [],
     this.reverseAnchors = const [],
+    this.urls = const [],
   });
 
   factory Comment.fromCsv(List<String> row) {
@@ -40,6 +65,10 @@ class Comment {
       imageUrl: json['image_url'],
       anchors: List<int>.from(json['anchors'] ?? []),
       reverseAnchors: List<int>.from(json['reverse_anchors'] ?? []),
+      urls: (json['urls'] as List<dynamic>?)
+          ?.map((url) => CommentUrl.fromJson(url as Map<String, dynamic>))
+          .toList() ??
+          [],
     );
   }
 }
