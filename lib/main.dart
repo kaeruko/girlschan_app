@@ -4,8 +4,19 @@ import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 
 void main() async {
-  // Google Drive から API ベースURL を読み込み
-  await AppConfig.initializeApiBase();
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    print('🚀 AppConfig 初期化開始');
+    await AppConfig.initializeApiBase();
+    print('✅ AppConfig 初期化完了: ${AppConfig.apiBase}');
+  } catch (e, stackTrace) {
+    print('❌ AppConfig 初期化失敗: $e');
+    print('❌ スタックトレース: $stackTrace');
+    // ここでも強制的にフォールバック値を設定
+    AppConfig.apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
+  }
+  
   runApp(const GirlsChanApp());
 }
 

@@ -32,6 +32,7 @@ class AppConfig {
       print('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
       // フォールバック値を設定
       apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
+
     }
   }
   
