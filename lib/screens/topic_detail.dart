@@ -950,10 +950,14 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   }
 
   Future<void> _openPostDialog() async {
+    if (!mounted) return;
+    
     final controller = TextEditingController();
+    final dialogContext = context; // コンテキストをキャプチャ
+    
     final text = await showCupertinoDialog<String>(
-      context: context,
-      builder: (_) => CupertinoAlertDialog(
+      context: dialogContext,
+      builder: (dialogCtx) => CupertinoAlertDialog(
         title: const Text('コメント入力'),
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
@@ -964,40 +968,65 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           ),
         ),
         actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
           CupertinoDialogAction(
-              isDefaultAction: true,
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('確認')),
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('キャンセル'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
+            child: const Text('確認'),
+          ),
         ],
       ),
     );
 
-    if (text == null || text.isEmpty) return;
+    if (text == null || text.isEmpty) {
+      controller.dispose();
+      return;
+    }
+
+    if (!mounted) {
+      controller.dispose();
+      return;
+    }
 
     final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (_) => CupertinoAlertDialog(
+      context: dialogContext,
+      builder: (dialogCtx) => CupertinoAlertDialog(
         title: const Text('投稿を確認'),
         content: Text(text),
         actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(context, false), child: const Text('戻る')),
-          CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(context, true), child: const Text('投稿')),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('戻る'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('投稿'),
+          ),
         ],
       ),
     );
 
+    controller.dispose();
+
     if (confirmed == true) {
+      if (!mounted) return;
+      
       final success = await Navigator.push(
-        context,
+        dialogContext,
         CupertinoPageRoute(
           builder: (_) => CommentPostWebView(topicId: widget.topicId, text: text),
         ),
       );
 
-      if (success == true) {
+      if (success == true && mounted) {
         await _saveLocalComment(text);
-        PlatformHelper.showSnackBar(context, '投稿を送信しました');
+        if (mounted) {
+          PlatformHelper.showSnackBar(dialogContext, '投稿を送信しました');
+        }
       }
     }
   }
