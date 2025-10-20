@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:girlschan_app/config/app_config.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'dart:io';
 import 'screens/home_screen.dart';
+import 'screens/home_screen_macos.dart';
 import 'screens/search_screen.dart';
 
 void main() async {
@@ -32,6 +34,17 @@ void main() async {
   }
   
   runApp(const GirlsChanApp());
+
+  // bitsdojo_window の初期化（macOSでのウィンドウ制御）
+  if (Platform.isMacOS) {
+    doWhenWindowReady(() {
+      const initialSize = Size(1400, 900);
+      appWindow.minSize = const Size(1200, 800);
+      appWindow.size = initialSize;
+      appWindow.alignment = Alignment.center;
+      appWindow.show();
+    });
+  }
 }
 
 class GirlsChanApp extends StatelessWidget {
@@ -46,7 +59,7 @@ class GirlsChanApp extends StatelessWidget {
         primaryColor: CupertinoColors.systemPink,
         textTheme: CupertinoTextThemeData(),
       ),
-      home: const HomeScreen(),
+      home: Platform.isMacOS ? const HomeScreenMacOS() : const HomeScreen(),
       onGenerateRoute: (settings) {
         if (settings.name?.startsWith('/search') ?? false) {
           final uri = Uri.parse(settings.name!);

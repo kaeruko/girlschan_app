@@ -33,13 +33,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return CupertinoPageScaffold(
       navigationBar: null,
       child: SafeArea(
-        child: Column(
+        child: Row(
           children: [
-            // トップメニューバー
+            // サイドメニューバー
             Container(
-              height: 50,
+              width: 60,
               color: CupertinoColors.systemGrey6,
-              child: Row(
+              child: Column(
                 children: List.generate(
                   _tabs.length,
                   (index) => Expanded(
@@ -49,14 +49,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         setState(() => _currentIndex = index);
                       },
                       child: Container(
-                        height: double.infinity,
+                        width: double.infinity,
                         decoration: BoxDecoration(
                           color: _currentIndex == index
                               ? CupertinoColors.systemPink.withAlpha(50)
                               : CupertinoColors.transparent,
                           border: _currentIndex == index
                               ? const Border(
-                                  bottom: BorderSide(
+                                  right: BorderSide(
                                     color: CupertinoColors.systemPink,
                                     width: 3,
                                   ),

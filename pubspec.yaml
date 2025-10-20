@@ -19,6 +19,7 @@ dependencies:
   url_launcher: ^6.2.0
   cupertino_icons: ^1.0.8
   window_manager: ^0.3.7
+  bitsdojo_window: ^0.1.5
 
 dev_dependencies:
   flutter_test:
