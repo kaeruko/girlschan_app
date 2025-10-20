@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'dart:io';
+import 'package:flutter/material.dart';
 import 'new_list.dart';
 import 'topic_list.dart';
 import 'favorites_screen.dart';
@@ -23,52 +23,85 @@ class _HomeScreenState extends State<HomeScreen> {
     ClipsScreen(),
   ];
 
-  final _titles = const [
-    '新着トピック',
-    '人気トピック',
+  final _labels = const [
+    '新着',
+    '人気',
     '履歴',
     'クリップ',
   ];
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoTabScaffold(
-      tabBar: CupertinoTabBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(CupertinoIcons.doc), label: '新着'),
-          BottomNavigationBarItem(icon: Icon(CupertinoIcons.flame), label: '人気'),
-          BottomNavigationBarItem(icon: Icon(CupertinoIcons.bookmark), label: '履歴'),
-          BottomNavigationBarItem(icon: Icon(CupertinoIcons.heart), label: 'クリップ'),
-        ],
-      ),
-      tabBuilder: (context, index) {
-        return CupertinoTabView(
-          builder: (context) {
-            return CupertinoPageScaffold(
-              navigationBar: CupertinoNavigationBar(
-                middle: Text(_titles[index]),
-                trailing: CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  child: const Icon(CupertinoIcons.search),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      CupertinoPageRoute(
-                        builder: (context) => const SearchScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              child: SafeArea(
-                bottom: false,
-                child: _tabs[index],
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(_labels[_currentIndex]),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.search),
+          onPressed: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (context) => const SearchScreen(),
               ),
             );
           },
-        );
-      },
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // トップメニューバー
+            Container(
+              height: 50,
+              color: CupertinoColors.systemGrey6,
+              child: Row(
+                children: List.generate(
+                  _tabs.length,
+                  (index) => Expanded(
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        setState(() => _currentIndex = index);
+                      },
+                      child: Container(
+                        height: double.infinity,
+                        decoration: BoxDecoration(
+                          color: _currentIndex == index
+                              ? CupertinoColors.systemPink.withAlpha(50)
+                              : Colors.transparent,
+                          border: _currentIndex == index
+                              ? const Border(
+                                  bottom: BorderSide(
+                                    color: CupertinoColors.systemPink,
+                                    width: 3,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _labels[index],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _currentIndex == index
+                                  ? CupertinoColors.systemPink
+                                  : CupertinoColors.systemGrey,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // コンテンツエリア
+            Expanded(
+              child: _tabs[_currentIndex],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

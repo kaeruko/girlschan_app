@@ -1,10 +1,24 @@
 import 'package:flutter/cupertino.dart';
 import 'package:girlschan_app/config/app_config.dart';
+import 'package:window_manager/window_manager.dart';
+import 'dart:io';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // macOS/Windows/Linuxでウィンドウサイズを設定
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    await windowManager.ensureInitialized();
+    
+    windowManager.waitUntilReadyToShow().then((_) async {
+      await windowManager.setMinimumSize(const Size(1200, 800));
+      await windowManager.setSize(const Size(1400, 900));
+      await windowManager.center();
+      await windowManager.show();
+    });
+  }
   
   try {
     print('🚀 AppConfig 初期化開始');
