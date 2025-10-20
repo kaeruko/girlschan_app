@@ -5,7 +5,6 @@ import '../config/app_config.dart';
 import '../utils/log.dart';
 import 'cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart';
 
 final apiBase = AppConfig.apiBase;
 

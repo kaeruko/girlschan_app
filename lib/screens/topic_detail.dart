@@ -27,7 +27,6 @@ class TopicDetailScreen extends StatefulWidget {
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
   List<dynamic> _allComments = [];            // サーバ同期済み + ローカル投稿を含む最新の「表示用」ソース
-  List<dynamic> _displayedComments = [];      // 互換のため保持（= 常に _allComments と同じにする） // ★ 修正
   bool _loading = true;
   bool _loadingMore = false;
   bool _isWatched = false;
@@ -458,6 +457,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     }
   }
 
+  // ignore: unused_element
   void _jumpToComment(int no) {
     debugPrint('🔗 アンカークリック: No.$no');
     final index = _allComments.indexWhere((c) => c['no'] == no); // ★ 修正
@@ -721,6 +721,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   }
 
   // URL表示ウィジェット
+  // ignore: unused_element
   Widget _buildUrlsWidget(List<dynamic> urls) {
     if (urls.isEmpty) return const SizedBox.shrink();
 
@@ -1173,6 +1174,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     }
   }
 
+  // ignore: unused_element
   Future<void> _removeFromWatch() async {
     await removeWatchedTopicId(widget.topicId);
     PlatformHelper.showSnackBar(context, '履歴から削除しました');
@@ -1182,16 +1184,11 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   /// プラス・マイナスを表示する横長の棒グラフを作成
   Widget _buildPlusMinusGraph(int plus, int minus) {
     final total = plus + minus;
-    final maxWidth = 150.0;
 
     // 合計が0の場合は表示しない
     if (total == 0) {
       return const SizedBox.shrink();
     }
-
-    // プラス・マイナスの割合を計算
-    final plusRatio = plus / total;
-    final minusRatio = minus / total;
 
     return Row(
       children: [
