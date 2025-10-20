@@ -903,7 +903,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                   final success = await rateComment(widget.topicId, commentId, 1);
                   if (success && mounted) {
                     setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                    PlatformHelper.showSnackBar(context, 'プラスを送信しました');
                   }
                 },
                 child: Padding(
@@ -920,7 +919,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                   final success = await rateComment(widget.topicId, commentId, -1);
                   if (success && mounted) {
                     setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                    PlatformHelper.showSnackBar(context, 'マイナスを送信しました');
                   }
                 },
                 child: Padding(
