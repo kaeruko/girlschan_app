@@ -957,6 +957,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     final minus = c['minus'] ?? 0;
     final anchors = List<int>.from(c['anchors'] ?? []);
     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
+    final urls = (c['urls'] as List?) ?? [];
 
     return Container(
       decoration: BoxDecoration(
@@ -979,6 +980,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           if (anchors.isNotEmpty) _buildAnchorText(anchors),
           if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
           Text(body, style: const TextStyle(fontSize: 15)),
+          if (urls.isNotEmpty) _buildUrlsWidget(urls),
           if (c['image_url'] != null) ...[
             const SizedBox(height: 8),
             GestureDetector(
