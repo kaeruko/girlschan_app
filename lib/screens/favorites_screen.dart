@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:io';
 import '../services/api_service.dart';
@@ -84,10 +83,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      if (Platform.isMacOS) {
-        return const Center(child: CupertinoActivityIndicator());
-      }
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CupertinoActivityIndicator());
     }
 
     if (_watchedTopics.isEmpty) {
@@ -95,29 +91,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Platform.isMacOS ? CupertinoIcons.bookmark : Icons.bookmark_border,
+            const Icon(
+              CupertinoIcons.bookmark,
               size: 64,
               color: CupertinoColors.systemGrey,
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               '履歴に登録されたトピックはありません',
               style: TextStyle(
                 fontSize: 16,
-                color: Platform.isMacOS 
-                    ? CupertinoColors.secondaryLabel 
-                    : Colors.grey[600],
+                color: CupertinoColors.secondaryLabel,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'トピック詳細の📘をタップして登録',
               style: TextStyle(
                 fontSize: 13,
-                color: Platform.isMacOS 
-                    ? CupertinoColors.tertiaryLabel 
-                    : Colors.grey[500],
+                color: CupertinoColors.tertiaryLabel,
               ),
             ),
           ],
@@ -125,44 +117,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
       );
     }
 
-    if (Platform.isMacOS) {
-      return CustomScrollView(
-        slivers: [
-          CupertinoSliverRefreshControl(
-            onRefresh: _refreshWatched,
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final topic = _watchedTopics[i];
-                return _FavoritesTile(
-                  topic: topic,
-                  onRemove: _removeFromWatch,
-                  controller: _controller,
-                );
-              },
-              childCount: _watchedTopics.length,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _refreshWatched,
-      child: Scrollbar(
-        child: ListView.builder(
-          itemCount: _watchedTopics.length,
-          itemBuilder: (context, i) {
-            final topic = _watchedTopics[i];
-            return _FavoritesTile(
-              topic: topic,
-              onRemove: _removeFromWatch,
-              controller: _controller,
-            );
-          },
+    return CustomScrollView(
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: _refreshWatched,
         ),
-      ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              final topic = _watchedTopics[i];
+              return _FavoritesTile(
+                topic: topic,
+                onRemove: _removeFromWatch,
+                controller: _controller,
+              );
+            },
+            childCount: _watchedTopics.length,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -216,123 +189,73 @@ class _FavoritesTileState extends State<_FavoritesTile> {
     final comments = widget.topic['comments'] as int? ?? 0;
     final time = widget.topic['time'] as String? ?? '';
 
-    if (Platform.isMacOS) {
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            CupertinoPageRoute(
-              builder: (_) => TopicDetailScreen(
-                topicId: id,
-                title: title,
-                commentCount: comments,
-              ),
-            ),
-          );
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: _hasCachedComments 
-                ? CupertinoColors.systemBlue.withOpacity(0.1) 
-                : CupertinoColors.white,
-            border: Border(
-              bottom: BorderSide(
-                color: CupertinoColors.separator,
-                width: 0.5,
-              ),
-              left: _hasCachedComments
-                  ? BorderSide(
-                      color: CupertinoColors.systemBlue,
-                      width: 4,
-                    )
-                  : BorderSide.none,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (_) => TopicDetailScreen(
+              topicId: id,
+              title: title,
+              commentCount: comments,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                        fontSize: 14,
-                        fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-                        color: _hasCachedComments ? CupertinoColors.systemBlue : null,
-                      ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: _hasCachedComments 
+              ? CupertinoColors.systemBlue.withOpacity(0.1) 
+              : CupertinoColors.white,
+          border: Border(
+            bottom: BorderSide(
+              color: CupertinoColors.separator,
+              width: 0.5,
+            ),
+            left: _hasCachedComments
+                ? const BorderSide(
+                    color: CupertinoColors.systemBlue,
+                    width: 4,
+                  )
+                : BorderSide.none,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                      fontSize: 14,
+                      fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
+                      color: _hasCachedComments ? CupertinoColors.systemBlue : null,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'コメント: $comments件 $time',
-                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                        fontSize: 12,
-                        color: CupertinoColors.secondaryLabel,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'コメント: $comments件 $time',
+                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                      fontSize: 12,
+                      color: CupertinoColors.secondaryLabel,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              CupertinoButton(
-                padding: const EdgeInsets.all(8),
-                onPressed: () => widget.onRemove(id),
-                child: const Icon(CupertinoIcons.xmark, size: 18),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _hasCachedComments 
-            ? Colors.blue.withOpacity(0.05) 
-            : Colors.transparent,
-        border: _hasCachedComments
-            ? Border(
-                left: BorderSide(
-                  color: Colors.blue,
-                  width: 4,
-                ),
-              )
-            : null,
-      ),
-      child: ListTile(
-        title: Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-            color: _hasCachedComments ? Colors.blue[800] : null,
-          ),
-        ),
-        subtitle: Text(
-          'コメント: $comments件 $time',
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => widget.onRemove(id),
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TopicDetailScreen(
-                topicId: id,
-                title: title,
-                commentCount: comments,
+                  ),
+                ],
               ),
             ),
-          );
-        },
+            const SizedBox(width: 8),
+            CupertinoButton(
+              padding: const EdgeInsets.all(8),
+              onPressed: () => widget.onRemove(id),
+              child: const Icon(CupertinoIcons.xmark, size: 18),
+            ),
+          ],
+        ),
       ),
     );
   }

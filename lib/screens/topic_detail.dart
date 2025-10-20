@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:io';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -305,9 +304,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     await _fetchDeltaFromServer();
     logd('Pull-to-Refresh: done');
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('最新データに同期しました')),
-    );
+    PlatformHelper.showSnackBar(context, '最新データに同期しました');
   }
 
   // =========================================
@@ -423,9 +420,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       debugPrint('API Error: $e');
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('通信に失敗しました')),
-        );
+        PlatformHelper.showSnackBar(context, '通信に失敗しました');
       }
     }
   }
@@ -441,8 +436,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     if (isClipped) {
       await removeClippedComment(widget.topicId, no);
       _clippedCommentNos.remove(no);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('クリップを解除しました')));
+      PlatformHelper.showSnackBar(context, 'クリップを解除しました');
     } else {
       await addClippedComment(
         topicId: widget.topicId,
@@ -454,8 +448,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         minus: comment['minus'] ?? 0,
       );
       _clippedCommentNos.add(no);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('クリップに保存しました')));
+      PlatformHelper.showSnackBar(context, 'クリップに保存しました');
     }
     setState(() {});
   }
@@ -482,13 +475,9 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       ).catchError((_) {
         _scrollController.jumpTo(estimatedOffset);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No.$no へ移動しました')),
-      );
+      PlatformHelper.showSnackBar(context, 'No.$no へ移動しました');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('コメントが見つかりません')),
-      );
+      PlatformHelper.showSnackBar(context, 'コメントが見つかりません');
     }
   }
 
@@ -498,159 +487,154 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     final comment = _getCommentByNo(no);
     
     if (comment.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('コメントが見つかりません')),
-      );
+      PlatformHelper.showSnackBar(context, 'コメントが見つかりません');
       return;
     }
 
-    showModalBottomSheet(
+    showCupertinoModalPopup(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) => Container(
-          color: Colors.white,
-          child: Column(
-            children: [
-              // ヘッダー
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade300),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'No.${comment['no']}  ${comment['time'] ?? ''}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.all(4),
-                    ),
-                  ],
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        ),
+        child: Column(
+          children: [
+            // ヘッダー
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: CupertinoColors.separator),
                 ),
               ),
-              // コメント内容
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // アンカー表示
-                        if ((comment['anchors'] as List?)?.isNotEmpty ?? false)
-                          _buildAnchorText(List<int>.from(comment['anchors'] ?? [])),
-                        if ((comment['reverse_anchors'] as List?)?.isNotEmpty ?? false)
-                          _buildReverseAnchorText(List<int>.from(comment['reverse_anchors'] ?? [])),
-                        // コメント本文
-                        Text(
-                          comment['body'] ?? '',
-                          style: const TextStyle(fontSize: 15),
-                        ),
-                        // 画像
-                        if (comment['image_url'] != null) ...[
-                          const SizedBox(height: 12),
-                          GestureDetector(
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => Dialog(
-                                  child: Image.network(
-                                    comment['image_url'],
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.error),
-                                  ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'No.${comment['no']}  ${comment['time'] ?? ''}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: CupertinoColors.secondaryLabel,
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(4),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Icon(CupertinoIcons.xmark, size: 20),
+                  ),
+                ],
+              ),
+            ),
+            // コメント内容
+            Expanded(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // アンカー表示
+                      if ((comment['anchors'] as List?)?.isNotEmpty ?? false)
+                        _buildAnchorText(List<int>.from(comment['anchors'] ?? [])),
+                      if ((comment['reverse_anchors'] as List?)?.isNotEmpty ?? false)
+                        _buildReverseAnchorText(List<int>.from(comment['reverse_anchors'] ?? [])),
+                      // コメント本文
+                      Text(
+                        comment['body'] ?? '',
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                      // 画像
+                      if (comment['image_url'] != null) ...[
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () {
+                            showCupertinoDialog(
+                              context: context,
+                              builder: (context) => CupertinoAlertDialog(
+                                content: Image.network(
+                                  comment['image_url'],
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(CupertinoIcons.exclamationmark_circle),
                                 ),
-                              );
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                comment['image_url'],
-                                height: 200,
-                                fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const SizedBox(
-                                    height: 200,
-                                    child: Center(
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const SizedBox(
+                              ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              comment['image_url'],
+                              height: 200,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return SizedBox(
                                   height: 200,
                                   child: Center(
-                                    child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+                                    child: PlatformHelper.buildLoadingIndicator(),
                                   ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox(
+                                height: 200,
+                                child: Center(
+                                  child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.systemGrey),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                        // プラス/マイナス/クリップ
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '＋${comment['plus'] ?? 0}',
-                                  style: const TextStyle(color: Colors.redAccent),
-                                ),
-                                const SizedBox(width: 16),
-                                Text(
-                                  '−${comment['minus'] ?? 0}',
-                                  style: const TextStyle(color: Colors.blueGrey),
-                                ),
-                              ],
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                _clippedCommentNos.contains(comment['no'])
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _clippedCommentNos.contains(comment['no'])
-                                    ? Colors.pinkAccent
-                                    : null,
-                                size: 22,
-                              ),
-                              onPressed: () async {
-                                await _toggleClip(comment);
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                              constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(4),
-                            ),
-                          ],
                         ),
                       ],
-                    ),
+                      // プラス/マイナス/クリップ
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                '＋${comment['plus'] ?? 0}',
+                                style: const TextStyle(color: CupertinoColors.systemRed),
+                              ),
+                              const SizedBox(width: 16),
+                              Text(
+                                '−${comment['minus'] ?? 0}',
+                                style: const TextStyle(color: CupertinoColors.secondaryLabel),
+                              ),
+                            ],
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.all(4),
+                            onPressed: () async {
+                              await _toggleClip(comment);
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+                            },
+                            child: Icon(
+                              _clippedCommentNos.contains(comment['no'])
+                                  ? CupertinoIcons.heart_fill
+                                  : CupertinoIcons.heart,
+                              color: _clippedCommentNos.contains(comment['no'])
+                                  ? CupertinoColors.systemRed
+                                  : CupertinoColors.secondaryLabel,
+                              size: 22,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -671,9 +655,9 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isAvailable ? Colors.blue.shade100 : Colors.grey.shade200,
+                color: isAvailable ? CupertinoColors.systemBlue.withOpacity(0.1) : CupertinoColors.systemGrey.withOpacity(0.1),
                 border: Border.all(
-                  color: isAvailable ? Colors.blue.shade300 : Colors.grey.shade300,
+                  color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
                   width: 1,
                 ),
                 borderRadius: BorderRadius.circular(4),
@@ -682,7 +666,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                 '>>$no',
                 style: TextStyle(
                   fontSize: 12,
-                  color: isAvailable ? Colors.blue.shade700 : Colors.grey.shade600,
+                  color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -709,18 +693,18 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
+                      color: CupertinoColors.systemOrange.withOpacity(0.1),
                       border: Border.all(
-                        color: Colors.orange.shade300,
+                        color: CupertinoColors.systemOrange,
                         width: 1,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       '<<$no',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: Colors.orange.shade700,
+                        color: CupertinoColors.systemOrange,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -732,7 +716,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           if (reverseAnchors.length > 5)
             Text(
               ' +${reverseAnchors.length - 5}件',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
             ),
         ],
       ),
@@ -744,228 +728,245 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   // =========================================
   @override
   Widget build(BuildContext context) {
-    final remoteCount = _serverSyncedCount();                         // ★ 修正
-    final localCount = _allComments.length - remoteCount;             // ★ 修正
+    final remoteCount = _serverSyncedCount();
+    final localCount = _allComments.length - remoteCount;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(widget.title),
+            Text(widget.title, style: const TextStyle(fontSize: 16)),
             Text(
-              // 例: 「表示: 123(リモート)/403 +2(ローカル)」
               'コメント: $remoteCount/$_totalComments'
               '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              style: const TextStyle(fontSize: 11),
             ),
           ],
         ),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _openPostDialog,
+          child: const Icon(CupertinoIcons.add),
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openPostDialog,
-        child: const Icon(Icons.add_comment),
+      child: SafeArea(
+        bottom: false,
+        child: _buildCommentsList(context),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : NotificationListener<ScrollEndNotification>(
-              onNotification: (_) {
-                _saveScrollPosition();
-                // 最後のコメント到達後の下スワイプ検知
-                _onOverscrollBottom();
+    );
+  }
+
+  Widget _buildCommentsList(BuildContext context) {
+    return _loading
+        ? Center(child: PlatformHelper.buildLoadingIndicator())
+        : NotificationListener<ScrollEndNotification>(
+            onNotification: (_) {
+              _saveScrollPosition();
+              _onOverscrollBottom();
+              return false;
+            },
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is OverscrollNotification) {
+                  if (notification.overscroll > 0) {
+                    _onOverscrollBottom();
+                  }
+                }
                 return false;
               },
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  // オーバースクロール（過度なスクロール）検知
-                  if (notification is OverscrollNotification) {
-                    // 下方向へのオーバースクロール（direction > 0）
-                    if (notification.overscroll > 0) {
-                      _onOverscrollBottom();
-                    }
-                  }
-                  return false;
-                },
-                child: RefreshIndicator(
-                  onRefresh: fetchComments,
-                  child: Scrollbar(
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
+              child: _buildRefreshableList(context),
+            ),
+          );
+  }
+
+  Widget _buildRefreshableList(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: fetchComments,
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              if (i == _allComments.length) {
+                if (_loadingMore) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CupertinoActivityIndicator(),
+                  );
+                }
+                return const SizedBox.shrink();
+              }
+              return _buildCommentItem(context, _allComments[i], i);
+            },
+            childCount: _allComments.length + (_loadingMore ? 1 : 0),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
+    final no = c['no'] ?? '-';
+    final time = c['time'] ?? '';
+    final body = c['body'] ?? '';
+    final plus = c['plus'] ?? 0;
+    final minus = c['minus'] ?? 0;
+    final anchors = List<int>.from(c['anchors'] ?? []);
+    final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: CupertinoColors.separator,
+            width: 0.5,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'No.$no  $time${c['isLocal'] == true ? '（ローカル）' : ''}',
+            style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
+          ),
+          const SizedBox(height: 8),
+          if (anchors.isNotEmpty) _buildAnchorText(anchors),
+          if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
+          Text(body, style: const TextStyle(fontSize: 15)),
+          if (c['image_url'] != null) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () {
+                showCupertinoDialog(
+                  context: context,
+                  builder: (context) => CupertinoAlertDialog(
+                    content: Image.network(
+                      c['image_url'],
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(CupertinoIcons.exclamationmark_circle),
+                    ),
+                    actions: [
+                      CupertinoDialogAction(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('閉じる'),
                       ),
-                      key: PageStorageKey('topic_${widget.topicId}'),
-                      controller: _scrollController,
-                      itemCount: _allComments.length + (_loadingMore ? 1 : 0),
-                      itemBuilder: (context, i) {
-                        if (i == _allComments.length) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                const CircularProgressIndicator(),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '読み込み中... ($remoteCount/$_totalComments)',
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      final c = _allComments[i];
-                      final no = c['no'] ?? '-';
-                      final time = c['time'] ?? '';
-                      final body = c['body'] ?? '';
-                      final plus = c['plus'] ?? 0;
-                      final minus = c['minus'] ?? 0;
-                      final anchors = List<int>.from(c['anchors'] ?? []);
-                      final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
-
-                      return ListTile(
-                        title: Text(
-                          'No.$no  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: ローカル表示
-                          style: const TextStyle(fontSize: 13, color: Colors.grey),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (anchors.isNotEmpty) _buildAnchorText(anchors),
-                            if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
-                            Text(body, style: const TextStyle(fontSize: 15)),
-                            if (c['image_url'] != null) ...[
-                              const SizedBox(height: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => Dialog(
-                                      child: Image.network(
-                                        c['image_url'],
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                            const Icon(Icons.error),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    c['image_url'],
-                                    height: 200,
-                                    fit: BoxFit.cover,
-                                    loadingBuilder: (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return const SizedBox(
-                                        height: 200,
-                                        child: Center(
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        ),
-                                      );
-                                    },
-                                    errorBuilder: (context, error, stackTrace) => const SizedBox(
-                                      height: 200,
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.image_not_supported,
-                                          size: 40,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 6),
-                            _buildPlusMinusGraph(plus, minus),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                InkWell(
-                                  onTap: () async {
-                                    if (c['isLocal'] == true) return; // ★ 修正: ローカルは評価しない
-                                    final commentId = 'vbox$no';
-                                    final success = await rateComment(widget.topicId, commentId, 1);
-                                    if (success && mounted) {
-                                      setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('プラスを送信しました')),
-                                      );
-                                    }
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('＋$plus',
-                                        style: const TextStyle(color: Colors.redAccent)),
-                                  ),
-                                ),
-                                InkWell(
-                                  onTap: () async {
-                                    if (c['isLocal'] == true) return; // ★ 修正
-                                    final commentId = 'vbox$no';
-                                    final success = await rateComment(widget.topicId, commentId, -1);
-                                    if (success && mounted) {
-                                      setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('マイナスを送信しました')),
-                                      );
-                                    }
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('−$minus',
-                                        style: const TextStyle(color: Colors.blueGrey)),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    _clippedCommentNos.contains(no)
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: _clippedCommentNos.contains(no)
-                                        ? Colors.pinkAccent
-                                        : null,
-                                    size: 22,
-                                  ),
-                                  onPressed: () => _toggleClip(c),
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(4),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                      },
+                    ],
+                  ),
+                );
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  c['image_url'],
+                  height: 200,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: CupertinoActivityIndicator(),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => const SizedBox(
+                    height: 200,
+                    child: Center(
+                      child: Icon(
+                        CupertinoIcons.photo,
+                        size: 40,
+                        color: CupertinoColors.secondaryLabel,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
+          ],
+          const SizedBox(height: 6),
+          _buildPlusMinusGraph(plus, minus),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () async {
+                  if (c['isLocal'] == true) return;
+                  final commentId = 'vbox$no';
+                  final success = await rateComment(widget.topicId, commentId, 1);
+                  if (success && mounted) {
+                    setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
+                    PlatformHelper.showSnackBar(context, 'プラスを送信しました');
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text('＋$plus',
+                      style: const TextStyle(color: CupertinoColors.systemRed)),
+                ),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () async {
+                  if (c['isLocal'] == true) return;
+                  final commentId = 'vbox$no';
+                  final success = await rateComment(widget.topicId, commentId, -1);
+                  if (success && mounted) {
+                    setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
+                    PlatformHelper.showSnackBar(context, 'マイナスを送信しました');
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text('−$minus',
+                      style: const TextStyle(color: CupertinoColors.secondaryLabel)),
+                ),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => _toggleClip(c),
+                child: Icon(
+                  _clippedCommentNos.contains(no)
+                      ? CupertinoIcons.heart_fill
+                      : CupertinoIcons.heart,
+                  color: _clippedCommentNos.contains(no)
+                      ? CupertinoColors.systemRed
+                      : CupertinoColors.secondaryLabel,
+                  size: 22,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
-  }  // 既存の _openPostDialog, _removeFromWatch などはそのまま使えます
+  }
+
   Future<void> _openPostDialog() async {
     final controller = TextEditingController();
-    final text = await showDialog<String>(
+    final text = await showCupertinoDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => CupertinoAlertDialog(
         title: const Text('コメント入力'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'コメントを入力してください',
-            border: OutlineInputBorder(),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: CupertinoTextField(
+            controller: controller,
+            maxLines: 5,
+            placeholder: 'コメントを入力してください',
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
-          TextButton(
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
+          CupertinoDialogAction(
+              isDefaultAction: true,
               onPressed: () => Navigator.pop(context, controller.text.trim()),
               child: const Text('確認')),
         ],
@@ -974,14 +975,14 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
     if (text == null || text.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => CupertinoAlertDialog(
         title: const Text('投稿を確認'),
         content: Text(text),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('戻る')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('投稿')),
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context, false), child: const Text('戻る')),
+          CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(context, true), child: const Text('投稿')),
         ],
       ),
     );
@@ -989,24 +990,21 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     if (confirmed == true) {
       final success = await Navigator.push(
         context,
-        MaterialPageRoute(
+        CupertinoPageRoute(
           builder: (_) => CommentPostWebView(topicId: widget.topicId, text: text),
         ),
       );
 
       if (success == true) {
         await _saveLocalComment(text);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('投稿を送信しました')),
-        );
+        PlatformHelper.showSnackBar(context, '投稿を送信しました');
       }
     }
   }
 
   Future<void> _removeFromWatch() async {
     await removeWatchedTopicId(widget.topicId);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('履歴から削除しました')));
+    PlatformHelper.showSnackBar(context, '履歴から削除しました');
     setState(() => _isWatched = false);
   }
 
@@ -1032,7 +1030,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           child: Container(
             height: 20,
             decoration: BoxDecoration(
-              color: Colors.pink[300],
+              color: CupertinoColors.systemRed,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(plus > 0 ? 4 : 0),
                 bottomLeft: Radius.circular(plus > 0 ? 4 : 0),
@@ -1045,7 +1043,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: CupertinoColors.white,
                     ),
                   )
                 : null,
@@ -1057,7 +1055,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           child: Container(
             height: 20,
             decoration: BoxDecoration(
-              color: Colors.grey[400],
+              color: CupertinoColors.systemGrey3,
               borderRadius: BorderRadius.only(
                 topRight: Radius.circular(minus > 0 ? 4 : 0),
                 bottomRight: Radius.circular(minus > 0 ? 4 : 0),
@@ -1070,7 +1068,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: CupertinoColors.white,
                     ),
                   )
                 : null,

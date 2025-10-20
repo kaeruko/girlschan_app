@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:io';
 import '../models/topic.dart';
@@ -141,132 +140,62 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
-    // macOS の場合は CupertinoPageScaffold を使用
-    if (Platform.isMacOS) {
-      return CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(
-          middle: Text('検索'),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: CupertinoSearchTextField(
-                  controller: _searchController,
-                  placeholder: '検索キーワード',
-                  onChanged: (value) {
-                    setState(() {});
-                  },
-                  onSubmitted: (value) {
-                    _performSearch(value);
-                  },
-                  onSuffixTap: () {
-                    _searchController.clear();
-                    setState(() {
-                      _searchResults = [];
-                      _currentQuery = '';
-                    });
-                  },
-                ),
-              ),
-              if (_searchController.text.isNotEmpty && _currentQuery.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton.filled(
-                      onPressed: () {
-                        _performSearch(_searchController.text);
-                      },
-                      child: const Text('検索'),
-                    ),
-                  ),
-                ),
-              if (_currentQuery.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Text(
-                    '「$_currentQuery」の検索結果: $_totalCount件',
-                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                ),
-              Expanded(
-                child: _buildResultsList(),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // iOS/Android の場合は Material Design を使用
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('検索'),
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('検索'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '検索キーワード',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchResults = [];
-                            _currentQuery = '';
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: CupertinoSearchTextField(
+                controller: _searchController,
+                placeholder: '検索キーワード',
+                onChanged: (value) {
+                  setState(() {});
+                },
+                onSubmitted: (value) {
+                  _performSearch(value);
+                },
+                onSuffixTap: () {
+                  _searchController.clear();
+                  setState(() {
+                    _searchResults = [];
+                    _currentQuery = '';
+                  });
+                },
+              ),
+            ),
+            if (_searchController.text.isNotEmpty && _currentQuery.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: CupertinoButton.filled(
+                    onPressed: () {
+                      _performSearch(_searchController.text);
+                    },
+                    child: const Text('検索'),
+                  ),
                 ),
               ),
-              onChanged: (value) {
-                setState(() {});
-              },
-              onSubmitted: (value) {
-                _performSearch(value);
-              },
-            ),
-          ),
-          if (_searchController.text.isNotEmpty && _currentQuery.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _performSearch(_searchController.text);
-                  },
-                  icon: const Icon(Icons.search),
-                  label: const Text('検索'),
+            if (_currentQuery.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Text(
+                  '「$_currentQuery」の検索結果: $_totalCount件',
+                  style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                    fontSize: 12,
+                    color: CupertinoColors.secondaryLabel,
+                  ),
                 ),
               ),
+            Expanded(
+              child: _buildResultsList(),
             ),
-          if (_currentQuery.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Text(
-                '「$_currentQuery」の検索結果: $_totalCount件',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          Expanded(
-            child: _buildResultsList(),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -277,11 +206,11 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 64, color: Colors.grey[400]),
+            Icon(CupertinoIcons.search, size: 64, color: CupertinoColors.systemGrey),
             const SizedBox(height: 16),
             Text(
               'キーワードを入力して検索',
-              style: Theme.of(context).textTheme.bodyLarge,
+              style: CupertinoTheme.of(context).textTheme.textStyle,
             ),
           ],
         ),
@@ -289,7 +218,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     }
 
     if (_isLoading && _searchResults.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: PlatformHelper.buildLoadingIndicator());
     }
 
     if (_searchResults.isEmpty) {
@@ -298,26 +227,30 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
       );
     }
 
-    return Scrollbar(
-      child: ListView.builder(
-        itemCount: _searchResults.length + (_hasMore ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == _searchResults.length) {
-            // ローディングインジケータ（さらに読み込む）
-            if (_hasMore) {
-              _loadMore();
-              return const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(),
-              );
-            }
-            return const SizedBox.shrink();
-          }
+    return CustomScrollView(
+      slivers: [
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              if (index == _searchResults.length) {
+                // ローディングインジケータ（さらに読み込む）
+                if (_hasMore) {
+                  _loadMore();
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: PlatformHelper.buildLoadingIndicator(),
+                  );
+                }
+                return const SizedBox.shrink();
+              }
 
-          final topic = _searchResults[index];
-          return _buildTopicCard(context, topic);
-        },
-      ),
+              final topic = _searchResults[index];
+              return _buildTopicCard(context, topic);
+            },
+            childCount: _searchResults.length + (_hasMore ? 1 : 0),
+          ),
+        ),
+      ],
     );
   }
 
@@ -370,44 +303,45 @@ class _SearchTopicCardState extends State<_SearchTopicCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      color: _hasCachedComments 
-          ? Colors.blue.withOpacity(0.05) 
-          : null,
-      child: InkWell(
-        onTap: () {
-          if (widget.topic.id != null) {
-            print('📱 タップ: topicId=${widget.topic.id}');
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => TopicDetailScreen(
-                  topicId: widget.topic.id!,
-                  title: widget.topic.title,
-                  commentCount: widget.topic.comments,
-                ),
+    return GestureDetector(
+      onTap: () {
+        if (widget.topic.id != null) {
+          print('📱 タップ: topicId=${widget.topic.id}');
+          Navigator.of(context).push(
+            CupertinoPageRoute(
+              builder: (context) => TopicDetailScreen(
+                topicId: widget.topic.id!,
+                title: widget.topic.title,
+                commentCount: widget.topic.comments,
               ),
-            );
-          }
-        },
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+        decoration: BoxDecoration(
+          color: _hasCachedComments 
+              ? CupertinoColors.systemBlue.withOpacity(0.05) 
+              : CupertinoColors.systemBackground,
+          border: Border(
+            left: _hasCachedComments
+                ? BorderSide(color: CupertinoColors.systemBlue, width: 4)
+                : BorderSide.none,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 左ボーダー（キャッシュある場合）
-            if (_hasCachedComments)
-              Container(
-                width: 4,
-                height: 80,
-                color: Colors.blue,
-              ),
             // サムネイル画像
             if (widget.topic.thumb != null && widget.topic.thumb!.isNotEmpty)
               Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      bottomLeft: Radius.circular(4),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(_hasCachedComments ? 4 : 0),
+                      bottomLeft: Radius.circular(_hasCachedComments ? 4 : 0),
                     ),
                     child: Image.network(
                       widget.topic.thumb!,
@@ -418,8 +352,8 @@ class _SearchTopicCardState extends State<_SearchTopicCard> {
                         return Container(
                           width: 80,
                           height: 80,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.image_not_supported),
+                          color: CupertinoColors.systemGrey5,
+                          child: Icon(CupertinoIcons.photo, color: CupertinoColors.systemGrey3),
                         );
                       },
                       loadingBuilder: (context, child, loadingProgress) {
@@ -427,8 +361,8 @@ class _SearchTopicCardState extends State<_SearchTopicCard> {
                         return Container(
                           width: 80,
                           height: 80,
-                          color: Colors.grey[200],
-                          child: const Center(child: SizedBox.shrink()),
+                          color: CupertinoColors.systemGrey6,
+                          child: Center(child: PlatformHelper.buildLoadingIndicator()),
                         );
                       },
                     ),
@@ -438,14 +372,14 @@ class _SearchTopicCardState extends State<_SearchTopicCard> {
                       top: -8,
                       right: -8,
                       child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
+                        decoration: const BoxDecoration(
+                          color: CupertinoColors.systemBlue,
                           shape: BoxShape.circle,
                         ),
                         padding: const EdgeInsets.all(4),
                         child: const Icon(
-                          Icons.check,
-                          color: Colors.white,
+                          CupertinoIcons.check_mark,
+                          color: CupertinoColors.white,
                           size: 14,
                         ),
                       ),
@@ -456,8 +390,8 @@ class _SearchTopicCardState extends State<_SearchTopicCard> {
               Container(
                 width: 80,
                 height: 80,
-                color: Colors.grey[300],
-                child: Icon(Icons.image, color: Colors.grey[600]),
+                color: CupertinoColors.systemGrey5,
+                child: Icon(CupertinoIcons.photo, color: CupertinoColors.systemGrey3),
               ),
             // テキスト情報
             Expanded(
@@ -470,26 +404,27 @@ class _SearchTopicCardState extends State<_SearchTopicCard> {
                       widget.topic.title,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
                         fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-                        color: _hasCachedComments ? Colors.blue[800] : null,
+                        color: _hasCachedComments ? CupertinoColors.systemBlue : null,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.comment, size: 14, color: Colors.grey[600]),
+                        Icon(CupertinoIcons.bubble_left, size: 14, color: CupertinoColors.systemGrey),
                         const SizedBox(width: 4),
                         Text(
                           '${widget.topic.comments}',
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 12),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             widget.topic.time,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
+                            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                              fontSize: 12,
+                              color: CupertinoColors.secondaryLabel,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

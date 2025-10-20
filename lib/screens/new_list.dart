@@ -1,7 +1,6 @@
 // lib/screens/new_list.dart
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 
@@ -75,180 +74,103 @@ class _TopicTileState extends State<_TopicTile> {
     final time = widget.topic['time'] as String? ?? '';
     final thumb = widget.topic['thumb'] as String?;
 
-    if (Platform.isMacOS) {
-      return GestureDetector(
-        onTap: () async {
-          await Navigator.push(
-            context,
-            CupertinoPageRoute(
-              builder: (_) => TopicDetailScreen(
-                topicId: widget.topic['id'] as int,
-                title: title,
-                commentCount: comments is int ? comments : int.tryParse('$comments') ?? 0,
-              ),
-            ),
-          );
-          if (mounted) {
-            await refreshCacheState();
-            widget.controller.refreshAll();
-          }
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: _hasCachedComments ? CupertinoColors.systemBlue.withOpacity(0.1) : CupertinoColors.white,
-            border: Border(
-              bottom: BorderSide(
-                color: CupertinoColors.separator,
-                width: 0.5,
-              ),
-              left: _hasCachedComments
-                  ? BorderSide(
-                      color: CupertinoColors.systemBlue,
-                      width: 4,
-                    )
-                  : BorderSide.none,
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (_) => TopicDetailScreen(
+              topicId: widget.topic['id'] as int,
+              title: title,
+              commentCount: comments is int ? comments : int.tryParse('$comments') ?? 0,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: SizedBox(
-                      width: 64,
-                      height: 64,
-                      child: (thumb != null && thumb.isNotEmpty)
-                          ? Image.network(
-                              thumb,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(CupertinoIcons.photo),
-                            )
-                          : const Icon(CupertinoIcons.photo),
+        );
+        if (mounted) {
+          await refreshCacheState();
+          widget.controller.refreshAll();
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: _hasCachedComments ? CupertinoColors.systemBlue.withOpacity(0.1) : CupertinoColors.white,
+          border: Border(
+            bottom: BorderSide(
+              color: CupertinoColors.separator,
+              width: 0.5,
+            ),
+            left: _hasCachedComments
+                ? BorderSide(
+                    color: CupertinoColors.systemBlue,
+                    width: 4,
+                  )
+                : BorderSide.none,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: (thumb != null && thumb.isNotEmpty)
+                        ? Image.network(
+                            thumb,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(CupertinoIcons.photo),
+                          )
+                        : const Icon(CupertinoIcons.photo),
+                  ),
+                ),
+                if (_hasCachedComments)
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: CupertinoColors.systemBlue,
+                        shape: BoxShape.circle,
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: const Icon(CupertinoIcons.check_mark, color: CupertinoColors.white, size: 14),
                     ),
                   ),
-                  if (_hasCachedComments)
-                    Positioned(
-                      top: -6,
-                      right: -6,
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: CupertinoColors.systemBlue,
-                          shape: BoxShape.circle,
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                          fontSize: 15,
+                          fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
+                          color: _hasCachedComments ? CupertinoColors.systemBlue : null,
                         ),
-                        padding: const EdgeInsets.all(4),
-                        child: const Icon(CupertinoIcons.check_mark, color: CupertinoColors.white, size: 14),
-                      ),
-                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$commentsコメント • $time',
+                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                          fontSize: 13,
+                          color: CupertinoColors.secondaryLabel,
+                        ),
+                  ),
                 ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                            fontSize: 15,
-                            fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-                            color: _hasCachedComments ? CupertinoColors.systemBlue : null,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$commentsコメント • $time',
-                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                            fontSize: 13,
-                            color: CupertinoColors.secondaryLabel,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _hasCachedComments ? Colors.blue.withOpacity(0.05) : Colors.transparent,
-        border: _hasCachedComments
-            ? const Border(
-                left: BorderSide(
-                  color: Colors.blue,
-                  width: 4,
-                ),
-              )
-            : null,
-      ),
-      child: ListTile(
-        leading: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            SizedBox(
-              width: 64,
-              height: 64,
-              child: (thumb != null && thumb.isNotEmpty)
-                  ? Image.network(
-                      thumb,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
-                    )
-                  : const Icon(Icons.image_not_supported),
             ),
-            if (_hasCachedComments)
-              Positioned(
-                top: -6,
-                right: -6,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: const Icon(Icons.check, color: Colors.white, size: 16),
-                ),
-              ),
           ],
         ),
-        title: Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.normal,
-            color: _hasCachedComments ? Colors.blue[800] : null,
-          ),
-        ),
-        subtitle: Text('$commentsコメント • $time'),
-        onTap: () async {
-          // 詳細へ遷移
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TopicDetailScreen(
-                topicId: widget.topic['id'] as int,
-                title: title,
-                commentCount: comments is int ? comments : int.tryParse('$comments') ?? 0,
-              ),
-            ),
-          );
-          // 戻ってきた直後に、まず自分を更新
-          if (mounted) {
-            await refreshCacheState();
-            // 一覧全体にも更新要求（他タイルにも波及させる）
-            widget.controller.refreshAll();
-          }
-        },
       ),
     );
   }
@@ -361,39 +283,21 @@ class _NewListScreenState extends State<NewListScreen>
       return Center(child: PlatformHelper.buildLoadingIndicator());
     }
 
-    if (Platform.isMacOS) {
-      return CustomScrollView(
-        slivers: [
-          CupertinoSliverRefreshControl(
-            onRefresh: _fetchFromServer,
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final t = _topics[i];
-                return _TopicTile(topic: t, controller: _controller);
-              },
-              childCount: _topics.length,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _fetchFromServer,
-      child: Scrollbar(
-        child: ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          itemCount: _topics.length,
-          itemBuilder: (context, i) {
-            final t = _topics[i];
-            return _TopicTile(topic: t, controller: _controller);
-          },
+    return CustomScrollView(
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: _fetchFromServer,
         ),
-      ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              final t = _topics[i];
+              return _TopicTile(topic: t, controller: _controller);
+            },
+            childCount: _topics.length,
+          ),
+        ),
+      ],
     );
   }
 }
