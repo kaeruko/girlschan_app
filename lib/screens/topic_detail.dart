@@ -175,7 +175,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     setState(() {
       _totalComments  = total;
       _allComments    = [...mergedRemote, ...locals];
-      _displayedComments = List.of(_allComments);
       _hasMoreComments = mergedRemote.length < total;
     });
 
@@ -276,7 +275,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
     setState(() {
       _allComments.add(newComment);
-      _displayedComments = List.of(_allComments); // ★ 修正
     });
   }
 
@@ -363,7 +361,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       final locals = await _loadLocalComments();
       setState(() {
         _allComments        = [...cachedRemote, ...locals];
-        _displayedComments  = List.of(_allComments);
         _totalComments      = (_totalComments == 0) ? cachedRemote.length : _totalComments;
         _hasMoreComments    = cachedRemote.length < _totalComments;
         _loading            = false;
@@ -407,7 +404,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       final locals = await _loadLocalComments();
       setState(() {
         _allComments = [..._allComments, ...locals];
-        _displayedComments = List.of(_allComments);
         _loading = false;
       });
 
