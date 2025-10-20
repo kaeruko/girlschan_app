@@ -53,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         decoration: BoxDecoration(
                           color: _currentIndex == index
                               ? CupertinoColors.systemPink.withAlpha(50)
-                              : Colors.transparent,
+                              : CupertinoColors.transparent,
                           border: _currentIndex == index
                               ? const Border(
                                   bottom: BorderSide(
