@@ -591,7 +591,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                               ),
                             ),
                           ),
-                        ],
+                        ),
                       ],
                       // プラス/マイナス/クリップ
                       const SizedBox(height: 12),
@@ -763,7 +763,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
             child: Container(
               margin: const EdgeInsets.only(bottom: 8.0),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: CupertinoColors.separator),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -786,12 +786,12 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                           return Container(
                             width: 100,
                             height: 80,
-                            color: Colors.grey.shade200,
+                            color: CupertinoColors.systemGrey6,
                             child: const Center(
                               child: SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CupertinoActivityIndicator(),
                               ),
                             ),
                           );
@@ -799,9 +799,9 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 100,
                           height: 80,
-                          color: Colors.grey.shade200,
+                          color: CupertinoColors.systemGrey6,
                           child: const Center(
-                            child: Icon(Icons.image_not_supported, size: 24, color: Colors.grey),
+                            child: Icon(CupertinoIcons.photo, size: 24, color: CupertinoColors.systemGrey),
                           ),
                         ),
                       ),
@@ -811,14 +811,14 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                       width: 100,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
+                        color: CupertinoColors.systemGrey6,
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(8),
                           bottomLeft: Radius.circular(8),
                         ),
                       ),
                       child: const Center(
-                        child: Icon(Icons.link, size: 24, color: Colors.grey),
+                        child: Icon(CupertinoIcons.link, size: 24, color: CupertinoColors.systemGrey),
                       ),
                     ),
                   // タイトルと説明
@@ -845,7 +845,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey,
+                                color: CupertinoColors.secondaryLabel,
                               ),
                             ),
                           ],
@@ -856,7 +856,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 10,
-                              color: Colors.blue,
+                              color: CupertinoColors.systemBlue,
                             ),
                           ),
                         ],
