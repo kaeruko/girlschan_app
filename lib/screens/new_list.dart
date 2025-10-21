@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
-import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
 import 'topic_detail.dart';
@@ -196,14 +195,12 @@ class _NewListScreenState extends State<NewListScreen>
   }
 
   Future<void> _removeFromWatch(int topicId) async {
-    await removeWatchedTopicId(topicId);
-    setState(() {
-      _topics.removeWhere((topic) => topic['id'] == topicId);
-    });
+    // キャッシュだけを削除（トピック自体は削除しない）
+    await CacheService.clear('comments_$topicId');
     // 全タイルを再評価して表示を更新
     _controller.refreshAll();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('履歴を削除しました')),
+      const SnackBar(content: Text('キャッシュを削除しました')),
     );
   }
 
