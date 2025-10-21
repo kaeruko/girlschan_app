@@ -71,14 +71,24 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // 「サーバ同期済み」件数（ローカル投稿は除外） // ★ 修正
   int _serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
 
-  // スクロール復元 // ★ 修正
+  // スクロール復元 // ★ 修正: 複数フレーム待ってから復元（レイアウト完全確定まで待つ）
   void _restoreScrollAfterBuild() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       final max = _scrollController.position.maxScrollExtent;
       final jump = _savedOffset.clamp(0.0, max);
       if (jump > 0) {
-        _scrollController.jumpTo(jump);
+        // さらに1フレーム待ってから復元（ビルド完全終了まで待つ）
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            final max2 = _scrollController.position.maxScrollExtent;
+            final jump2 = _savedOffset.clamp(0.0, max2);
+            if (jump2 > 0) {
+              _scrollController.jumpTo(jump2);
+              logd('📍 スクロール復元完了: jump=$jump2 max=$max2');
+            }
+          }
+        });
       }
     });
   }
@@ -233,17 +243,21 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     // 目標件数が無ければ通常復元だけ
     final current = _serverSyncedCount();
     if (_savedSyncedCount <= 0 || current >= _savedSyncedCount) {
+      logd('📍 通常復元実行: savedSynced=$_savedSyncedCount current=$current');
       _restoreScrollAfterBuild();
       return;
     }
 
     // まだ足りない → 差分を取り切る（10件ずつでもOK）
+    logd('📍 差分取得開始: 目標$_savedSyncedCount件 現在$current件');
     _needsDeferredRestore = true; // 差分完了後に再ジャンプさせる
     while (_serverSyncedCount() < _savedSyncedCount && _hasMoreComments) {
+      logd('📍 差分取得中: ${_serverSyncedCount()}/${_savedSyncedCount}件');
       await _fetchDeltaFromServer();
     }
 
     // 取り切れたら（あるいは total が縮んでこれ以上増えないなら）復元
+    logd('📍 差分取得完了: ${_serverSyncedCount()}/${_savedSyncedCount}件 → スクロール復元');
     _restoreScrollAfterBuild();
   }
 
