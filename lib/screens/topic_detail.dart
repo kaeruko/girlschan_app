@@ -92,11 +92,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final max = _scrollController.position.maxScrollExtent;
     final cur = _scrollController.offset;
     final remain = max - cur;
-    logd('_onScroll: cur=$cur max=$max remain=$remain loadingMore=$_loadingMore hasMore=$_hasMoreComments');
+    // logd('_onScroll: cur=$cur max=$max remain=$remain loadingMore=$_loadingMore hasMore=$_hasMoreComments');
 
     // 通常ページネーション
     if (remain < 300 && !_loadingMore && _hasMoreComments) {
-      logd('_onScroll: near bottom → load more');
+      // logd('_onScroll: near bottom → load more');
       _loadMoreComments();
       return;
     }
@@ -107,7 +107,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       if (now.difference(_lastBottomCheck) >= _bottomCheckCooldown) {
         _lastBottomCheck = now;
         _bottomCheckInFlight = true;
-        logd('_onScroll: at end & no-more → delta check');
+        // logd('_onScroll: at end & no-more → delta check');
         _fetchDeltaFromServer().whenComplete(() {
           _bottomCheckInFlight = false;
         });
@@ -932,6 +932,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                 child: RefreshIndicator(
                   onRefresh: fetchComments,
                   child: Scrollbar(
+                    controller: _scrollController,
                     child: ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: BouncingScrollPhysics(),
