@@ -47,6 +47,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // ★ 追加: 復元のための保存値
   int _savedSyncedCount = 0;      // 保存しておいた「サーバ同期済み件数」
   bool _needsDeferredRestore = false; // 差分取得後に再ジャンプが必要か
+  bool _isRestoringScroll = false; // ★ 新規: スクロール復元中フラグ
 
   @override
   void initState() {
@@ -71,8 +72,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // 「サーバ同期済み」件数（ローカル投稿は除外） // ★ 修正
   int _serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
 
-  // スクロール復元 // ★ 修正: 複数フレーム待ってから復元（レイアウト完全確定まで待つ）
+    // スクロール復元 // ★ 修正: 複数フレーム待ってから復元（レイアウト完全確定まで待つ）
   void _restoreScrollAfterBuild() {
+    _isRestoringScroll = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       final max = _scrollController.position.maxScrollExtent;
@@ -87,8 +89,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               _scrollController.jumpTo(jump2);
               logd('📍 スクロール復元完了: jump=$jump2 max=$max2');
             }
+            // 復元処理終了後、フラグをリセット
+            _isRestoringScroll = false;
           }
         });
+      } else {
+        _isRestoringScroll = false;
       }
     });
   }
@@ -131,6 +137,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   void _onOverscrollBottom() {
     if (!_scrollController.hasClients) return;
+    if (_isRestoringScroll) {
+      logd('_onOverscrollBottom: スクロール復元中のため無視');
+      return;
+    }
 
     final maxScroll = _scrollController.position.maxScrollExtent;
     final current = _scrollController.offset;
