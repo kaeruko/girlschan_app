@@ -171,7 +171,7 @@ class TopicTileState extends State<_TopicTile> {
                 ],
               ),
             ),
-            if (widget.onRemove != null)
+            if (widget.onRemove != null && _hasCachedComments)
               CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 onPressed: () => widget.onRemove!(widget.topic['id'] as int),
