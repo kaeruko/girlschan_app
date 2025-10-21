@@ -11,10 +11,10 @@ import 'topic_detail.dart';
 
 /// タイルを一括で再評価するための簡易コントローラ
 class _TopicTileController {
-  final Set<_TopicTileState> _tiles = {};
+  final Set<TopicTileState> _tiles = {};
 
-  void register(_TopicTileState tile) => _tiles.add(tile);
-  void unregister(_TopicTileState tile) => _tiles.remove(tile);
+  void register(TopicTileState tile) => _tiles.add(tile);
+  void unregister(TopicTileState tile) => _tiles.remove(tile);
 
   Future<void> refreshAll() async {
     // イテレーション中の変更を避けるため、コピーを作成
@@ -37,10 +37,10 @@ class _TopicTile extends StatefulWidget {
   });
 
   @override
-  State<_TopicTile> createState() => _TopicTileState();
+  State<_TopicTile> createState() => TopicTileState();
 }
 
-class _TopicTileState extends State<_TopicTile> {
+class TopicTileState extends State<_TopicTile> {
   bool _hasCachedComments = false;
 
   @override
@@ -179,10 +179,10 @@ class NewListScreen extends StatefulWidget {
   const NewListScreen({super.key});
 
   @override
-  State<NewListScreen> createState() => _NewListScreenState();
+  State<NewListScreen> createState() => NewListScreenState();
 }
 
-class _NewListScreenState extends State<NewListScreen>
+class NewListScreenState extends State<NewListScreen>
     with WidgetsBindingObserver {
   static const String cacheKey = 'new_topics';
 
@@ -228,13 +228,13 @@ class _NewListScreenState extends State<NewListScreen>
       logd('✅ [NewList._load] Loaded ${_topics.length} topics from cache', name: 'NewList');
     } else {
       logd('⚠️ [NewList._load] No cached topics, fetching from server...', name: 'NewList');
-      await _fetchFromServer();
+      await fetchFromServer();
     }
   }
 
-  Future<void> _fetchFromServer() async {
+  Future<void> fetchFromServer() async {
     try {
-      logd('🌐 [NewList._fetchFromServer] Fetching new topics from server...', name: 'NewList');
+      logd('🌐 [NewList.fetchFromServer] Fetching new topics from server...', name: 'NewList');
       final uri = Uri.parse('${AppConfig.apiBase}/topics/new');
       final res = await http.get(uri);
       if (res.statusCode != 200) {
@@ -242,12 +242,12 @@ class _NewListScreenState extends State<NewListScreen>
       }
       final data = jsonDecode(res.body) as List<dynamic>;
       final list = data.cast<Map<String, dynamic>>();
-      logd('🌐 [NewList._fetchFromServer] Fetched ${list.length} topics from server', name: 'NewList');
+      logd('🌐 [NewList.fetchFromServer] Fetched ${list.length} topics from server', name: 'NewList');
       if (list.isNotEmpty) {
-        logd('🌐 [NewList._fetchFromServer] First topic from server - ID: ${list[0]['id']}, Title: ${list[0]['title']}', name: 'NewList');
+        logd('🌐 [NewList.fetchFromServer] First topic from server - ID: ${list[0]['id']}, Title: ${list[0]['title']}', name: 'NewList');
       }
       await CacheService.save(cacheKey, list);
-      logd('💾 [NewList._fetchFromServer] Saved ${list.length} topics to cache', name: 'NewList');
+      logd('💾 [NewList.fetchFromServer] Saved ${list.length} topics to cache', name: 'NewList');
 
       if (!mounted) return;
       setState(() {
@@ -255,14 +255,14 @@ class _NewListScreenState extends State<NewListScreen>
         _loading = false;
       });
 
-      logd('🔄 [NewList._fetchFromServer] Refreshing all tiles (${_topics.length} items)...', name: 'NewList');
+      logd('🔄 [NewList.fetchFromServer] Refreshing all tiles (${_topics.length} items)...', name: 'NewList');
       // 新しい一覧が来たので、各タイルのキャッシュ表示も再評価
       _controller.refreshAll();
     } catch (e) {
-      logd('❌ [NewList._fetchFromServer] Error fetching from server: $e', name: 'NewList');
+      logd('❌ [NewList.fetchFromServer] Error fetching from server: $e', name: 'NewList');
       // API失敗時はキャッシュでできる限り表示
       final cached = await CacheService.load(cacheKey);
-      logd('💾 [NewList._fetchFromServer] Falling back to cached topics: ${cached.length}', name: 'NewList');
+      logd('💾 [NewList.fetchFromServer] Falling back to cached topics: ${cached.length}', name: 'NewList');
       if (!mounted) return;
       setState(() {
         if (cached.isNotEmpty) {
@@ -285,7 +285,7 @@ class _NewListScreenState extends State<NewListScreen>
     return CustomScrollView(
       slivers: [
         CupertinoSliverRefreshControl(
-          onRefresh: _fetchFromServer,
+          onRefresh: fetchFromServer,
         ),
         SliverList(
           delegate: SliverChildBuilderDelegate(

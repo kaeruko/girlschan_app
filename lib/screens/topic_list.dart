@@ -8,10 +8,10 @@ import 'topic_detail.dart';
 
 /// タイルを一括で再評価するための簡易コントローラ
 class _TopicListTileController {
-  final Set<_TopicListTileState> _tiles = {};
+  final Set<TopicListTileState> _tiles = {};
 
-  void register(_TopicListTileState tile) => _tiles.add(tile);
-  void unregister(_TopicListTileState tile) => _tiles.remove(tile);
+  void register(TopicListTileState tile) => _tiles.add(tile);
+  void unregister(TopicListTileState tile) => _tiles.remove(tile);
 
   Future<void> refreshAll() async {
     // イテレーション中の変更を避けるため、コピーを作成
@@ -26,10 +26,10 @@ class TopicListScreen extends StatefulWidget {
   const TopicListScreen({super.key});
 
   @override
-  State<TopicListScreen> createState() => _TopicListScreenState();
+  State<TopicListScreen> createState() => TopicListScreenState();
 }
 
-class _TopicListScreenState extends State<TopicListScreen>
+class TopicListScreenState extends State<TopicListScreen>
     with WidgetsBindingObserver {
   static const String cacheKey = 'topics';
 
@@ -74,21 +74,21 @@ class _TopicListScreenState extends State<TopicListScreen>
       logd('✅ [_loadFromCache] Loaded ${_topics.length} topics from cache', name: 'TopicList');
     } else {
       logd('⚠️ [_loadFromCache] No cached topics, fetching from server...', name: 'TopicList');
-      await _fetchFromServer();
+      await fetchFromServer();
     }
   }
 
-  Future<void> _fetchFromServer() async {
+  Future<void> fetchFromServer() async {
     try {
-      logd('🌐 [_fetchFromServer] Fetching popular topics from server...', name: 'TopicList');
+      logd('🌐 [fetchFromServer] Fetching popular topics from server...', name: 'TopicList');
       final topics = await fetchPopularTopicsWithCache(); // API（api_service.dart）- 人気トピック用
       final list = topics.cast<Map<String, dynamic>>();
-      logd('🌐 [_fetchFromServer] Fetched ${list.length} topics from server', name: 'TopicList');
+      logd('🌐 [fetchFromServer] Fetched ${list.length} topics from server', name: 'TopicList');
       if (list.isNotEmpty) {
-        logd('🌐 [_fetchFromServer] First topic from server: ${list[0]}', name: 'TopicList');
+        logd('🌐 [fetchFromServer] First topic from server: ${list[0]}', name: 'TopicList');
       }
       await CacheService.save(cacheKey, list);
-      logd('💾 [_fetchFromServer] Saved ${list.length} topics to cache', name: 'TopicList');
+      logd('💾 [fetchFromServer] Saved ${list.length} topics to cache', name: 'TopicList');
 
       if (!mounted) return;
       setState(() {
@@ -96,13 +96,13 @@ class _TopicListScreenState extends State<TopicListScreen>
         _loading = false;
       });
 
-      logd('🔄 [_fetchFromServer] Refreshing all tiles...', name: 'TopicList');
+      logd('🔄 [fetchFromServer] Refreshing all tiles...', name: 'TopicList');
       _controller.refreshAll();
     } catch (e) {
-      logd('❌ [_fetchFromServer] Error fetching from server: $e', name: 'TopicList');
+      logd('❌ [fetchFromServer] Error fetching from server: $e', name: 'TopicList');
       // 失敗時でもキャッシュがあれば出す
       final cached = await CacheService.load(cacheKey);
-      logd('💾 [_fetchFromServer] Falling back to cached topics: ${cached.length}', name: 'TopicList');
+      logd('💾 [fetchFromServer] Falling back to cached topics: ${cached.length}', name: 'TopicList');
       if (!mounted) return;
       setState(() {
         if (cached.isNotEmpty) {
@@ -122,7 +122,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       child: CustomScrollView(
         slivers: [
           CupertinoSliverRefreshControl(
-            onRefresh: _fetchFromServer,
+            onRefresh: fetchFromServer,
           ),
           if (_loading)
             SliverToBoxAdapter(
@@ -160,10 +160,10 @@ class _TopicListTile extends StatefulWidget {
   });
 
   @override
-  State<_TopicListTile> createState() => _TopicListTileState();
+  State<_TopicListTile> createState() => TopicListTileState();
 }
 
-class _TopicListTileState extends State<_TopicListTile> {
+class TopicListTileState extends State<_TopicListTile> {
   bool _hasCachedComments = false;
 
   @override

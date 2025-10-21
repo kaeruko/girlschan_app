@@ -15,6 +15,7 @@ class HomeScreenMacOS extends StatefulWidget {
 class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
   int _currentIndex = 0;
   bool _showHistoryDropdown = false;
+  bool _isRefreshing = false;
   
   List<String> _historyItems = [
     'テスト履歴1',
@@ -25,12 +26,11 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
   ];
   String? _selectedHistory;
 
-  final _tabs = const [
-    NewListScreen(),
-    TopicListScreen(),
-    FavoritesScreen(),
-    ClipsScreen(),
-  ];
+  // 各タブの State にアクセスするための GlobalKey
+  final _newListKey = GlobalKey<NewListScreenState>();
+  final _topicListKey = GlobalKey<TopicListScreenState>();
+
+  late final List<Widget> _tabs;
 
   final _labels = const [
     '新着',
@@ -38,6 +38,17 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
     '履歴',
     'クリップ',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = [
+      NewListScreen(key: _newListKey),
+      TopicListScreen(key: _topicListKey),
+      const FavoritesScreen(),
+      const ClipsScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,10 +139,8 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
                                 _buildActionButton(
                                   icon: CupertinoIcons.arrow_clockwise,
                                   label: '更新',
-                                  onPressed: () {
-                                    // 更新処理
-                                    print('更新ボタンクリック');
-                                  },
+                                  isLoading: _isRefreshing,
+                                  onPressed: _isRefreshing ? null : _handleRefresh,
                                 ),
                                 _buildActionButton(
                                   icon: CupertinoIcons.search,
@@ -264,7 +273,8 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
   Widget _buildActionButton({
     required IconData icon,
     required String label,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
+    bool isLoading = false,
   }) {
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -273,7 +283,14 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: CupertinoColors.label),
+          if (isLoading && label == '更新')
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CupertinoActivityIndicator(radius: 7),
+            )
+          else
+            Icon(icon, size: 14, color: CupertinoColors.label),
           const SizedBox(width: 4),
           Text(
             label,
@@ -285,6 +302,48 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
         ],
       ),
     );
+  }
+
+  /// 更新ボタンのハンドラー
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+
+    setState(() => _isRefreshing = true);
+
+    try {
+      // 現在のタブに応じて異なるリフレッシュ処理を実行
+      switch (_currentIndex) {
+        case 0:
+          // 新着タブ: NewListScreenState から直接リフレッシュを呼び出し
+          final newListState = _newListKey.currentState;
+          if (newListState != null) {
+            await newListState.fetchFromServer();
+          }
+          break;
+        case 1:
+          // 人気タブ: TopicListScreenState から直接リフレッシュを呼び出し
+          final topicListState = _topicListKey.currentState;
+          if (topicListState != null) {
+            await topicListState.fetchFromServer();
+          }
+          break;
+        case 2:
+          // 履歴タブ: キャッシュなし、特に処理なし
+          break;
+        case 3:
+          // クリップタブ: キャッシュなし、特に処理なし
+          break;
+      }
+
+      // 短い遅延を追加して、ローディング状態を視覚的に確認できるようにする
+      await Future.delayed(const Duration(milliseconds: 500));
+    } catch (e) {
+      print('更新エラー: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
   }
 }
 
