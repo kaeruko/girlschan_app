@@ -154,7 +154,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   // 差分取得（サーバから offset 以降を取ってマージ） // ★ 修正: 新規
   // =========================================
-// 差分取得（サーバから offset 以降を取ってマージ）
 Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   if (_loadingMore) return;
   setState(() => _loadingMore = true);
@@ -526,7 +525,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'No.${comment['no']}  ${comment['time'] ?? ''}',
+                      'No.${comment['no']}  ${comment['name'] ?? ''}  ${comment['time'] ?? ''}', // ★ 修正: name 追加
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -977,7 +976,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
                       return ListTile(
                         title: Text(
-                          'No.$no  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: ローカル表示
+                          'No.$no  ${c['name'] ?? ''}  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: ローカル表示
                           style: const TextStyle(fontSize: 13, color: Colors.grey),
                         ),
                         subtitle: Column(
