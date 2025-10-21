@@ -45,7 +45,7 @@ class _ClipsScreenState extends State<ClipsScreen> {
           (c) => c['topicId'] == topicId && c['no'] == commentNo,
         );
       });
-      PlatformHelper.showSnackBar(context, 'クリップを削除しました');
+      // PlatformHelper.showSnackBar(context, 'クリップを削除しました');
     }
   }
 

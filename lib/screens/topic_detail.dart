@@ -298,7 +298,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     await _fetchDeltaFromServer();
     logd('Pull-to-Refresh: done');
     if (!mounted) return;
-    PlatformHelper.showSnackBar(context, '最新データに同期しました');
+    // PlatformHelper.showSnackBar(context, '最新データに同期しました');
   }
 
   // =========================================
@@ -428,7 +428,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     if (isClipped) {
       await removeClippedComment(widget.topicId, no);
       _clippedCommentNos.remove(no);
-      PlatformHelper.showSnackBar(context, 'クリップを解除しました');
+      // PlatformHelper.showSnackBar(context, 'クリップを解除しました');
     } else {
       await addClippedComment(
         topicId: widget.topicId,
@@ -440,7 +440,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         minus: comment['minus'] ?? 0,
       );
       _clippedCommentNos.add(no);
-      PlatformHelper.showSnackBar(context, 'クリップに保存しました');
+      // PlatformHelper.showSnackBar(context, 'クリップに保存しました');
     }
     setState(() {});
   }
@@ -468,7 +468,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       ).catchError((_) {
         _scrollController.jumpTo(estimatedOffset);
       });
-      PlatformHelper.showSnackBar(context, 'No.$no へ移動しました');
+      // PlatformHelper.showSnackBar(context, 'No.$no へ移動しました');
     } else {
       PlatformHelper.showSnackBar(context, 'コメントが見つかりません');
     }

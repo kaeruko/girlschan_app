@@ -225,7 +225,7 @@ class NewListScreenState extends State<NewListScreen>
     await CacheService.clear('comments_$topicId');
     // 全タイルを再評価して表示を更新
     _controller.refreshAll();
-    PlatformHelper.showSnackBar(context, 'キャッシュを削除しました');
+    // PlatformHelper.showSnackBar(context, 'キャッシュを削除しました');
   }
 
   Future<void> _load() async {
