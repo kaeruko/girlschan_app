@@ -40,7 +40,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   DateTime _lastBottomCheck = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _bottomCheckCooldown = Duration(seconds: 2);
 
-  static const int _commentsPerPage = 500;
+  static const int _commentsPerPage = 10;
   final ScrollController _scrollController = ScrollController();
   double _savedOffset = 0.0;
   Set<int> _clippedCommentNos = {};
@@ -369,19 +369,15 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       setState(() {
         _allComments        = [...cachedRemote, ...locals];
         _displayedComments  = List.of(_allComments);
-        _totalComments      = (_totalComments == 0) ? cachedRemote.length : _totalComments;
-        _hasMoreComments    = cachedRemote.length < _totalComments;
+        // ★ 修正: キャッシュの件数を一時的に表示する（あとで API 呼び出しで上書き）
+        _totalComments      = cachedRemote.length;
+        _hasMoreComments    = true; // 常に取得を試みる
         _loading            = false;
       });
 
-      // ★ ここが重要：保存してた件数（例: 216）まで取り切ってから復元
+      // ★ ここが重要：API から正確な total を取得してから保存値まで取り切って復元
+      await _fetchDeltaFromServer();
       await _ensureSyncedToSavedAndRestore();
-
-      // さらに新着があれば 1 回だけ同期（任意）
-      if (_hasMoreComments) {
-        // ignore: discarded_futures
-        _fetchDeltaFromServer();
-      }
     } else {
       // キャッシュ無し → 初回ページ取得後に保存値まで取り切って復元
       await _fetchFirstPage();
