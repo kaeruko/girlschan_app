@@ -30,32 +30,28 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _loading = true;
   bool _loadingMore = false;
   bool _isWatched = false;
-  bool _hasMoreComments = true;
   int _totalComments = 0;
-  bool _bottomCheckInFlight = false;
-  DateTime _lastBottomCheck = DateTime.fromMillisecondsSinceEpoch(0);
-  static const Duration _bottomCheckCooldown = Duration(seconds: 2);
 
   static const int _commentsPerPage = 500;
+  static const double _kItemExtent = 150.0; // 推定アイテム高さを統一
   final ScrollController _scrollController = ScrollController();
-  double _savedOffset = 0.0;
+  int _savedCommentNo = 0;        // ★ 修正: ピクセル位置→コメントNo
   Set<int> _clippedCommentNos = {};
   // ★ 追加: 復元のための保存値
   int _savedSyncedCount = 0;      // 保存しておいた「サーバ同期済み件数」
   bool _needsDeferredRestore = false; // 差分取得後に再ジャンプが必要か
+  bool _isRestoringScroll = false; // ★ 新規: スクロール復元中フラグ
 
   @override
   void initState() {
     super.initState();
     logd('initState: topicId=${widget.topicId}, title=${widget.title}');
-    _scrollController.addListener(_onScroll);
     _load();
   }
 
   @override
   void dispose() {
     _saveScrollPosition();
-    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
@@ -67,83 +63,54 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // 「サーバ同期済み」件数（ローカル投稿は除外） // ★ 修正
   int _serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
 
-  // スクロール復元 // ★ 修正
+  // スクロール復現 // ★ 修正: ピクセル位置→コメントNo
   void _restoreScrollAfterBuild() {
+    if (_savedCommentNo <= 0) {
+      logd('📍 スクロール復現: 保存位置なし');
+      _isRestoringScroll = false;
+      return;
+    }
+    
+    _isRestoringScroll = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      // 保存されたNoのコメントがリスト内のどのインデックスか探す
+      int targetIndex = -1;
+      for (int i = 0; i < _allComments.length; i++) {
+        if ((_allComments[i]['no'] as int?) == _savedCommentNo) {
+          targetIndex = i;
+          break;
+        }
+      }
+      
+      if (targetIndex < 0) {
+        logd('📍 スクロール復現: コメントNo($_savedCommentNo)が見つかりません');
+        _isRestoringScroll = false;
+        return;
+      }
+      
+      // ListView.builder内でのコメント位置を計算
+      // アイテム高さを _kItemExtent と仮定（ヘッダー等込み）
+      final estimatedOffset = targetIndex * _kItemExtent;
+      
+      if (!_scrollController.hasClients) {
+        _isRestoringScroll = false;
+        return;
+      }
+      
       final max = _scrollController.position.maxScrollExtent;
-      final jump = _savedOffset.clamp(0.0, max);
-      if (jump > 0) {
-        _scrollController.jumpTo(jump);
-      }
-    });
-  }
-
-  // =========================================
-  // スクロール検知（追加読み込み）
-  // =========================================
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-
-    final max = _scrollController.position.maxScrollExtent;
-    final cur = _scrollController.offset;
-    final remain = max - cur;
-    logd('_onScroll: cur=$cur max=$max remain=$remain loadingMore=$_loadingMore hasMore=$_hasMoreComments');
-
-    // 通常ページネーション
-    if (remain < 300 && !_loadingMore && _hasMoreComments) {
-      logd('_onScroll: near bottom → load more');
-      _loadMoreComments();
-      return;
-    }
-
-    // 末尾張り付きで hasMore=false の“つつき”（連打防止）
-    if (remain <= 0 && !_loadingMore && !_hasMoreComments && !_bottomCheckInFlight) {
-      final now = DateTime.now();
-      if (now.difference(_lastBottomCheck) >= _bottomCheckCooldown) {
-        _lastBottomCheck = now;
-        _bottomCheckInFlight = true;
-        logd('_onScroll: at end & no-more → delta check');
-        _fetchDeltaFromServer().whenComplete(() {
-          _bottomCheckInFlight = false;
-        });
-      }
-    }
-  }
-
-
-  // =========================================
-  // 最後のコメント到達後の下スワイプ検知
-  // =========================================
-  void _onOverscrollBottom() {
-    if (!_scrollController.hasClients) return;
-
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final current = _scrollController.offset;
-    final remain = maxScroll - current;
-
-    logd('_onOverscrollBottom: cur=$current max=$maxScroll remain=$remain loadingMore=$_loadingMore hasMore=$_hasMoreComments');
-
-    // Case A: 通常ページネーション
-    if (remain < 50 && !_loadingMore && _hasMoreComments) {
-      logd('_onOverscrollBottom: paginate → load more');
-      _loadMoreComments();
-      return;
-    }
-
-    // Case B: 末尾に張り付いていて hasMore=false → 新着確認だけ叩く（クールダウン付き）
-    if (remain <= 0 && !_loadingMore && !_hasMoreComments && !_bottomCheckInFlight) {
-      final now = DateTime.now();
-      if (now.difference(_lastBottomCheck) < _bottomCheckCooldown) {
-        return; // 連打防止
-      }
-      _lastBottomCheck = now;
-      _bottomCheckInFlight = true;
-      logd('_onOverscrollBottom: no-more but at end → delta check');
-      _fetchDeltaFromServer().whenComplete(() {
-        _bottomCheckInFlight = false;
+      final jump = estimatedOffset.clamp(0.0, max);
+      
+      // さらに1フレーム待ってから復元（ビルド完全終了まで待つ）
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          final max2 = _scrollController.position.maxScrollExtent;
+          final jump2 = estimatedOffset.clamp(0.0, max2);
+          _scrollController.jumpTo(jump2);
+          logd('📍 スクロール復現完了: commentNo=$_savedCommentNo index=$targetIndex offset=$jump2 max=$max2');
+          _isRestoringScroll = false;
+        }
       });
-    }
+    });
   }
 
 
@@ -175,7 +142,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     setState(() {
       _totalComments  = total;
       _allComments    = [...mergedRemote, ...locals];
-      _hasMoreComments = mergedRemote.length < total;
     });
 
     await CacheService.save('comments_${widget.topicId}', mergedRemote);
@@ -183,13 +149,8 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     // 復元待ち && 目標件数に到達したらもう一度 jump
     if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
       _needsDeferredRestore = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          final max = _scrollController.position.maxScrollExtent;
-          final jump = _savedOffset.clamp(0.0, max);
-          _scrollController.jumpTo(jump);
-        }
-      });
+      logd('📍 差分取得後のスクロール復現: ${_serverSyncedCount()}/${_savedSyncedCount}件');
+      _restoreScrollAfterBuild();
     }
   } catch (e) {
     debugPrint('❌ 差分取得エラー: $e');
@@ -201,48 +162,37 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
 
   // =========================================
-  // 追加コメント読み込み（スクロール末尾） // ★ 修正: 差分取得を使う
-  // =========================================
-  Future<void> _loadMoreComments() async {
-    await _fetchDeltaFromServer();
-  }
-
-  // =========================================
   // スクロール位置保存
   // =========================================
   Future<void> _saveScrollPosition() async {
     final prefs = await SharedPreferences.getInstance();
     if (_scrollController.hasClients) {
-      await prefs.setDouble('scroll_${widget.topicId}', _scrollController.offset);
-      await prefs.setInt('synced_${widget.topicId}', _serverSyncedCount()); // ★ 追加
+      // 現在のスクロール位置に最も近いコメントのNoを取得
+      int commentNo = 0;
+      final current = _scrollController.offset;
+      
+      // シンプルな推定: (offset / 平均アイテム高さ) でアイテムインデックスを推定
+      // ただしここでは、_allComments内のコメントのNoを保存する
+      if (_allComments.isNotEmpty && current > 0) {
+        // 表示中のコメント一覧から、現在位置に近いNoを推定
+        final estimatedIndex = (current / _kItemExtent).floor().clamp(0, _allComments.length - 1);
+        if (estimatedIndex < _allComments.length) {
+          commentNo = _allComments[estimatedIndex]['no'] as int? ?? 0;
+        }
+      }
+      
+      await prefs.setInt('scroll_${widget.topicId}', commentNo);
+      await prefs.setInt('synced_${widget.topicId}', _serverSyncedCount());
+      logd('💾 スクロール位置保存: commentNo=$commentNo synced=${_serverSyncedCount()}');
     }
   }
 
   Future<void> _loadScrollPosition() async {
     final prefs = await SharedPreferences.getInstance();
-    _savedOffset = prefs.getDouble('scroll_${widget.topicId}') ?? 0.0;
-    _savedSyncedCount = prefs.getInt('synced_${widget.topicId}') ?? 0; // ★ 追加
+    _savedCommentNo = prefs.getInt('scroll_${widget.topicId}') ?? 0;
+    _savedSyncedCount = prefs.getInt('synced_${widget.topicId}') ?? 0;
+    logd('📖 スクロール位置読み込み: commentNo=$_savedCommentNo synced=$_savedSyncedCount');
   }
-
-  // ★ 追加: 保存していた同期件数まで取り切ってからオフセット復元
-  Future<void> _ensureSyncedToSavedAndRestore() async {
-    // 目標件数が無ければ通常復元だけ
-    final current = _serverSyncedCount();
-    if (_savedSyncedCount <= 0 || current >= _savedSyncedCount) {
-      _restoreScrollAfterBuild();
-      return;
-    }
-
-    // まだ足りない → 差分を取り切る（10件ずつでもOK）
-    _needsDeferredRestore = true; // 差分完了後に再ジャンプさせる
-    while (_serverSyncedCount() < _savedSyncedCount && _hasMoreComments) {
-      await _fetchDeltaFromServer();
-    }
-
-    // 取り切れたら（あるいは total が縮んでこれ以上増えないなら）復元
-    _restoreScrollAfterBuild();
-  }
-
 
 
   // =========================================
@@ -361,23 +311,17 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       final locals = await _loadLocalComments();
       setState(() {
         _allComments        = [...cachedRemote, ...locals];
-        _totalComments      = (_totalComments == 0) ? cachedRemote.length : _totalComments;
-        _hasMoreComments    = cachedRemote.length < _totalComments;
+        // ★ 修正: キャッシュの件数を一時的に表示する（あとで API 呼び出しで上書き）
+        _totalComments      = cachedRemote.length;
         _loading            = false;
       });
 
-      // ★ ここが重要：保存してた件数（例: 216）まで取り切ってから復元
-      await _ensureSyncedToSavedAndRestore();
-
-      // さらに新着があれば 1 回だけ同期（任意）
-      if (_hasMoreComments) {
-        // ignore: discarded_futures
-        _fetchDeltaFromServer();
-      }
+      _restoreScrollAfterBuild();
+      return;
     } else {
       // キャッシュ無し → 初回ページ取得後に保存値まで取り切って復元
       await _fetchFirstPage();
-      await _ensureSyncedToSavedAndRestore();
+      _restoreScrollAfterBuild();
     }
   }
 
@@ -397,7 +341,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
       _allComments = newComments;
       _totalComments = total;
-      _hasMoreComments = newComments.length < total;
 
       await CacheService.save('comments_${widget.topicId}', _allComments);
 
@@ -459,7 +402,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     final index = _allComments.indexWhere((c) => c['no'] == no); // ★ 修正
     debugPrint('📍 コメント インデックス: $index / 総数: ${_allComments.length}');
     if (index != -1) {
-      final estimatedOffset = index * 120.0;
+      final estimatedOffset = index * _kItemExtent;
       debugPrint('📐 スクロール目標: $estimatedOffset');
       _scrollController.animateTo(
         estimatedOffset,
@@ -905,25 +848,16 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         : NotificationListener<ScrollEndNotification>(
             onNotification: (_) {
               _saveScrollPosition();
-              _onOverscrollBottom();
               return false;
             },
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification is OverscrollNotification) {
-                  if (notification.overscroll > 0) {
-                    _onOverscrollBottom();
-                  }
-                }
-                return false;
-              },
-              child: _buildRefreshableList(context),
-            ),
+            child: _buildRefreshableList(context),
           );
   }
 
   Widget _buildRefreshableList(BuildContext context) {
     return CustomScrollView(
+      controller: _scrollController,
+      primary: false,
       slivers: [
         CupertinoSliverRefreshControl(
           onRefresh: fetchComments,

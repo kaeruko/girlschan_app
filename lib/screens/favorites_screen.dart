@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/platform_helper.dart';
@@ -77,7 +78,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
     });
     // 全タイルを再評価して表示を更新
     _controller.refreshAll();
-    // PlatformHelper.showSnackBar(context, '履歴を削除しました');
   }
 
   @override
@@ -158,6 +158,8 @@ class _FavoritesTile extends StatefulWidget {
 
 class _FavoritesTileState extends State<_FavoritesTile> {
   bool _hasCachedComments = false;
+  int _cachedCommentCount = 0;
+  int _savedCommentNo = 0;  // 復元対象のコメント番号
 
   @override
   void initState() {
@@ -175,9 +177,21 @@ class _FavoritesTileState extends State<_FavoritesTile> {
   Future<void> _checkCache() async {
     final id = widget.topic['id'] as int;
     final hasCached = await CacheService.exists('comments_$id');
+    
+    // SharedPreferencesからキャッシュされたコメント数と保存位置を取得
+    int cachedCount = 0;
+    int savedCommentNo = 0;
+    if (hasCached) {
+      final prefs = await SharedPreferences.getInstance();
+      cachedCount = prefs.getInt('synced_$id') ?? 0;
+      savedCommentNo = prefs.getInt('scroll_$id') ?? 0;
+    }
+    
     if (mounted) {
       setState(() {
         _hasCachedComments = hasCached;
+        _cachedCommentCount = cachedCount;
+        _savedCommentNo = savedCommentNo;
       });
     }
   }
@@ -188,7 +202,9 @@ class _FavoritesTileState extends State<_FavoritesTile> {
     final title = widget.topic['title'] as String? ?? 'タイトル不明';
     final comments = widget.topic['comments'] as int? ?? 0;
     final time = widget.topic['time'] as String? ?? '';
-
+    final commentDisplay = _hasCachedComments 
+        ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments件'
+        : '$comments件';
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -239,7 +255,7 @@ class _FavoritesTileState extends State<_FavoritesTile> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'コメント: $comments件 $time',
+                    'コメント: $commentDisplay $time',
                     style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
                       fontSize: 12,
                       color: CupertinoColors.secondaryLabel,
