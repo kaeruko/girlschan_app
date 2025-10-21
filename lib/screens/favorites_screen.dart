@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../config/app_config.dart';
@@ -153,6 +154,7 @@ class _FavoritesTile extends StatefulWidget {
 
 class _FavoritesTileState extends State<_FavoritesTile> {
   bool _hasCachedComments = false;
+  int _cachedCommentCount = 0;
 
   @override
   void initState() {
@@ -170,9 +172,18 @@ class _FavoritesTileState extends State<_FavoritesTile> {
   Future<void> _checkCache() async {
     final id = widget.topic['id'] as int;
     final hasCached = await CacheService.exists('comments_$id');
+    
+    // SharedPreferencesからキャッシュされたコメント数を取得
+    int cachedCount = 0;
+    if (hasCached) {
+      final prefs = await SharedPreferences.getInstance();
+      cachedCount = prefs.getInt('synced_$id') ?? 0;
+    }
+    
     if (mounted) {
       setState(() {
         _hasCachedComments = hasCached;
+        _cachedCommentCount = cachedCount;
       });
     }
   }
@@ -183,6 +194,11 @@ class _FavoritesTileState extends State<_FavoritesTile> {
     final title = widget.topic['title'] as String? ?? 'タイトル不明';
     final comments = widget.topic['comments'] as int? ?? 0;
     final time = widget.topic['time'] as String? ?? '';
+
+    // キャッシュ数/総数形式でコメント数を表示
+    final commentDisplay = _hasCachedComments 
+        ? '$_cachedCommentCount/$comments件'
+        : '$comments件';
 
     return Container(
       decoration: BoxDecoration(
@@ -210,7 +226,7 @@ class _FavoritesTileState extends State<_FavoritesTile> {
           ),
         ),
         subtitle: Text(
-          'コメント: $comments件 $time',
+          'コメント: $commentDisplay $time',
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
         trailing: IconButton(
