@@ -42,7 +42,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   static const int _commentsPerPage = 10;
   final ScrollController _scrollController = ScrollController();
-  double _savedOffset = 0.0;
+  int _savedCommentNo = 0;        // ★ 修正: ピクセル位置→コメントNo
   Set<int> _clippedCommentNos = {};
   // ★ 追加: 復元のための保存値
   int _savedSyncedCount = 0;      // 保存しておいた「サーバ同期済み件数」
@@ -72,30 +72,53 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // 「サーバ同期済み」件数（ローカル投稿は除外） // ★ 修正
   int _serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
 
-    // スクロール復元 // ★ 修正: 複数フレーム待ってから復元（レイアウト完全確定まで待つ）
+  // スクロール復元 // ★ 修正: ピクセル位置→コメントNo
   void _restoreScrollAfterBuild() {
+    if (_savedCommentNo <= 0) {
+      logd('📍 スクロール復元: 保存位置なし');
+      _isRestoringScroll = false;
+      return;
+    }
+    
     _isRestoringScroll = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      final max = _scrollController.position.maxScrollExtent;
-      final jump = _savedOffset.clamp(0.0, max);
-      if (jump > 0) {
-        // さらに1フレーム待ってから復元（ビルド完全終了まで待つ）
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            final max2 = _scrollController.position.maxScrollExtent;
-            final jump2 = _savedOffset.clamp(0.0, max2);
-            if (jump2 > 0) {
-              _scrollController.jumpTo(jump2);
-              logd('📍 スクロール復元完了: jump=$jump2 max=$max2');
-            }
-            // 復元処理終了後、フラグをリセット
-            _isRestoringScroll = false;
-          }
-        });
-      } else {
-        _isRestoringScroll = false;
+      // 保存されたNoのコメントがリスト内のどのインデックスか探す
+      int targetIndex = -1;
+      for (int i = 0; i < _allComments.length; i++) {
+        if ((_allComments[i]['no'] as int?) == _savedCommentNo) {
+          targetIndex = i;
+          break;
+        }
       }
+      
+      if (targetIndex < 0) {
+        logd('📍 スクロール復元: コメントNo($_savedCommentNo)が見つかりません');
+        _isRestoringScroll = false;
+        return;
+      }
+      
+      // ListView.builder内でのコメント位置を計算
+      // アイテム高さを150pxと仮定（ヘッダー等込み）
+      final estimatedOffset = targetIndex * 150.0;
+      
+      if (!_scrollController.hasClients) {
+        _isRestoringScroll = false;
+        return;
+      }
+      
+      final max = _scrollController.position.maxScrollExtent;
+      final jump = estimatedOffset.clamp(0.0, max);
+      
+      // さらに1フレーム待ってから復元（ビルド完全終了まで待つ）
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          final max2 = _scrollController.position.maxScrollExtent;
+          final jump2 = estimatedOffset.clamp(0.0, max2);
+          _scrollController.jumpTo(jump2);
+          logd('📍 スクロール復元完了: commentNo=$_savedCommentNo index=$targetIndex offset=$jump2 max=$max2');
+          _isRestoringScroll = false;
+        }
+      });
     });
   }
 
@@ -138,7 +161,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void _onOverscrollBottom() {
     if (!_scrollController.hasClients) return;
     if (_isRestoringScroll) {
-      logd('_onOverscrollBottom: スクロール復元中のため無視');
+      logd('_onOverscrollBottom: スクロール復元中のため無視 $_savedSyncedCount');
       return;
     }
 
@@ -237,15 +260,31 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   Future<void> _saveScrollPosition() async {
     final prefs = await SharedPreferences.getInstance();
     if (_scrollController.hasClients) {
-      await prefs.setDouble('scroll_${widget.topicId}', _scrollController.offset);
-      await prefs.setInt('synced_${widget.topicId}', _serverSyncedCount()); // ★ 追加
+      // 現在のスクロール位置に最も近いコメントのNoを取得
+      int commentNo = 0;
+      final current = _scrollController.offset;
+      
+      // シンプルな推定: (offset / 平均アイテム高さ) でアイテムインデックスを推定
+      // ただしここでは、_allComments内のコメントのNoを保存する
+      if (_allComments.isNotEmpty && current > 0) {
+        // 表示中のコメント一覧から、現在位置に近いNoを推定
+        final estimatedIndex = (current / 150).toInt().clamp(0, _allComments.length - 1);
+        if (estimatedIndex < _allComments.length) {
+          commentNo = _allComments[estimatedIndex]['no'] as int? ?? 0;
+        }
+      }
+      
+      await prefs.setInt('scroll_${widget.topicId}', commentNo);
+      await prefs.setInt('synced_${widget.topicId}', _serverSyncedCount());
+      logd('💾 スクロール位置保存: commentNo=$commentNo synced=${_serverSyncedCount()}');
     }
   }
 
   Future<void> _loadScrollPosition() async {
     final prefs = await SharedPreferences.getInstance();
-    _savedOffset = prefs.getDouble('scroll_${widget.topicId}') ?? 0.0;
-    _savedSyncedCount = prefs.getInt('synced_${widget.topicId}') ?? 0; // ★ 追加
+    _savedCommentNo = prefs.getInt('scroll_${widget.topicId}') ?? 0;
+    _savedSyncedCount = prefs.getInt('synced_${widget.topicId}') ?? 0;
+    logd('📖 スクロール位置読み込み: commentNo=$_savedCommentNo synced=$_savedSyncedCount');
   }
 
   // ★ 追加: 保存していた同期件数まで取り切ってからオフセット復元
