@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
 import '../utils/platform_helper.dart';
@@ -30,10 +31,12 @@ class _TopicTileController {
 class _TopicTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final _TopicTileController controller;
+  final Function(int)? onRemove;
 
   const _TopicTile({
     required this.topic,
     required this.controller,
+    this.onRemove,
   });
 
   @override
@@ -168,6 +171,12 @@ class TopicTileState extends State<_TopicTile> {
                 ],
               ),
             ),
+            if (widget.onRemove != null)
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                onPressed: () => widget.onRemove!(widget.topic['id'] as int),
+                child: const Icon(CupertinoIcons.xmark, color: CupertinoColors.destructiveRed),
+              ),
           ],
         ),
       ),
@@ -210,6 +219,16 @@ class NewListScreenState extends State<NewListScreen>
     if (state == AppLifecycleState.resumed) {
       _controller.refreshAll();
     }
+  }
+
+  Future<void> _removeFromWatch(int topicId) async {
+    await removeWatchedTopicId(topicId);
+    setState(() {
+      _topics.removeWhere((topic) => topic['id'] == topicId);
+    });
+    // 全タイルを再評価して表示を更新
+    _controller.refreshAll();
+    PlatformHelper.showSnackBar(context, '履歴を削除しました');
   }
 
   Future<void> _load() async {
@@ -291,7 +310,11 @@ class NewListScreenState extends State<NewListScreen>
           delegate: SliverChildBuilderDelegate(
             (context, i) {
               final t = _topics[i];
-              return _TopicTile(topic: t, controller: _controller);
+              return _TopicTile(
+                topic: t,
+                controller: _controller,
+                onRemove: _removeFromWatch,
+              );
             },
             childCount: _topics.length,
           ),

@@ -78,6 +78,16 @@ class TopicListScreenState extends State<TopicListScreen>
     }
   }
 
+  Future<void> _removeFromWatch(int topicId) async {
+    await removeWatchedTopicId(topicId);
+    setState(() {
+      _topics.removeWhere((topic) => topic['id'] == topicId);
+    });
+    // 全タイルを再評価して表示を更新
+    _controller.refreshAll();
+    PlatformHelper.showSnackBar(context, '履歴を削除しました');
+  }
+
   Future<void> fetchFromServer() async {
     try {
       logd('🌐 [fetchFromServer] Fetching popular topics from server...', name: 'TopicList');
@@ -138,7 +148,11 @@ class TopicListScreenState extends State<TopicListScreen>
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final topic = _topics[index];
-                  return _TopicListTile(topic: topic, controller: _controller);
+                  return _TopicListTile(
+                    topic: topic,
+                    controller: _controller,
+                    onRemove: _removeFromWatch,
+                  );
                 },
                 childCount: _topics.length,
               ),
@@ -153,10 +167,12 @@ class TopicListScreenState extends State<TopicListScreen>
 class _TopicListTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final _TopicListTileController controller;
+  final Function(int)? onRemove;
 
   const _TopicListTile({
     required this.topic,
     required this.controller,
+    this.onRemove,
   });
 
   @override
@@ -291,6 +307,12 @@ class TopicListTileState extends State<_TopicListTile> {
                 ],
               ),
             ),
+            if (widget.onRemove != null)
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                onPressed: () => widget.onRemove!(id),
+                child: const Icon(CupertinoIcons.xmark, color: CupertinoColors.destructiveRed),
+              ),
           ],
         ),
       ),

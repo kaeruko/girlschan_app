@@ -75,6 +75,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
     setState(() {
       _watchedTopics.removeWhere((topic) => topic['id'] == topicId);
     });
+    // 全タイルを再評価して表示を更新
+    _controller.refreshAll();
     PlatformHelper.showSnackBar(context, '履歴を削除しました');
   }
 
