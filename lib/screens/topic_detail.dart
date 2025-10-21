@@ -508,7 +508,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'No.${comment['no']}  ${comment['time'] ?? ''}',
+                    'No.${comment['no']}  ${comment['name'] ?? ''}  ${comment['time'] ?? ''}', // ★ 修正: name 追加
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -973,7 +973,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'No.$no  $time${c['isLocal'] == true ? '（ローカル）' : ''}',
+            'No.$no  ${c['name'] ?? ''}  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: name 追加
             style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
           ),
           const SizedBox(height: 8),
