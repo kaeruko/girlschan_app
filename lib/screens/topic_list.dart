@@ -1,6 +1,7 @@
 // lib/screens/topic_list.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
 import 'topic_detail.dart';
@@ -82,9 +83,6 @@ class _TopicListScreenState extends State<TopicListScreen>
     await CacheService.clear('comments_$topicId');
     // 全タイルを再評価して表示を更新
     _controller.refreshAll();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('キャッシュを削除しました')),
-    );
   }
 
   Future<void> _fetchFromServer() async {

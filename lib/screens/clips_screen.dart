@@ -45,9 +45,6 @@ class _ClipsScreenState extends State<ClipsScreen> {
           (c) => c['topicId'] == topicId && c['no'] == commentNo,
         );
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('クリップを削除しました')),
-      );
     }
   }
 

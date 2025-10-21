@@ -439,8 +439,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     if (isClipped) {
       await removeClippedComment(widget.topicId, no);
       _clippedCommentNos.remove(no);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('クリップを解除しました')));
     } else {
       await addClippedComment(
         topicId: widget.topicId,
@@ -452,8 +450,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         minus: comment['minus'] ?? 0,
       );
       _clippedCommentNos.add(no);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('クリップに保存しました')));
     }
     setState(() {});
   }
@@ -480,9 +476,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       ).catchError((_) {
         _scrollController.jumpTo(estimatedOffset);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No.$no へ移動しました')),
-      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('コメントが見つかりません')),
@@ -1045,9 +1038,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                                     final success = await rateComment(widget.topicId, commentId, 1);
                                     if (success && mounted) {
                                       setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('プラスを送信しました')),
-                                      );
                                     }
                                   },
                                   child: Padding(
@@ -1063,9 +1053,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                                     final success = await rateComment(widget.topicId, commentId, -1);
                                     if (success && mounted) {
                                       setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('マイナスを送信しました')),
-                                      );
                                     }
                                   },
                                   child: Padding(
@@ -1157,8 +1144,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
   Future<void> _removeFromWatch() async {
     await removeWatchedTopicId(widget.topicId);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('履歴から削除しました')));
     setState(() => _isWatched = false);
   }
 
