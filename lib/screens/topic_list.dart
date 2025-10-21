@@ -79,13 +79,11 @@ class TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _removeFromWatch(int topicId) async {
-    await removeWatchedTopicId(topicId);
-    setState(() {
-      _topics.removeWhere((topic) => topic['id'] == topicId);
-    });
+    // キャッシュだけを削除（トピック自体は削除しない）
+    await CacheService.clear('comments_$topicId');
     // 全タイルを再評価して表示を更新
     _controller.refreshAll();
-    PlatformHelper.showSnackBar(context, '履歴を削除しました');
+    PlatformHelper.showSnackBar(context, 'キャッシュを削除しました');
   }
 
   Future<void> fetchFromServer() async {
