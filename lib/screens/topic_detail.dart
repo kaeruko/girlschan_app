@@ -230,13 +230,8 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     // 復元待ち && 目標件数に到達したらもう一度 jump
     if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
       _needsDeferredRestore = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          final max = _scrollController.position.maxScrollExtent;
-          final jump = _savedOffset.clamp(0.0, max);
-          _scrollController.jumpTo(jump);
-        }
-      });
+      logd('📍 差分取得後のスクロール復元: ${_serverSyncedCount()}/${_savedSyncedCount}件');
+      _restoreScrollAfterBuild();
     }
   } catch (e) {
     debugPrint('❌ 差分取得エラー: $e');
