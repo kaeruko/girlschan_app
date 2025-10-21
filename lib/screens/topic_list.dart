@@ -258,10 +258,12 @@ class _TopicListTileState extends State<_TopicListTile> {
           ),
         ),
         subtitle: Text('$commentsコメント • $time'),
-        trailing: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => widget.onRemove(id),
-        ),
+        trailing: _hasCachedComments
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => widget.onRemove(id),
+              )
+            : null,
         onTap: () async {
           // 詳細へ遷移 → 戻りで即再評価（自分＋全体）
           await Navigator.push(

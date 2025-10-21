@@ -128,10 +128,12 @@ class _TopicTileState extends State<_TopicTile> {
           ),
         ),
         subtitle: Text('$commentsコメント • $time'),
-        trailing: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => widget.onRemove(widget.topic['id'] as int),
-        ),
+        trailing: _hasCachedComments
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => widget.onRemove(widget.topic['id'] as int),
+              )
+            : null,
         onTap: () async {
           // 詳細へ遷移
           await Navigator.push(
