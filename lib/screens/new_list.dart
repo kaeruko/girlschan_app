@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
 import 'topic_detail.dart';
@@ -29,10 +30,12 @@ class _TopicTileController {
 class _TopicTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final _TopicTileController controller;
+  final Function(int) onRemove;
 
   const _TopicTile({
     required this.topic,
     required this.controller,
+    required this.onRemove,
   });
 
   @override
@@ -125,6 +128,10 @@ class _TopicTileState extends State<_TopicTile> {
           ),
         ),
         subtitle: Text('$commentsコメント • $time'),
+        trailing: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => widget.onRemove(widget.topic['id'] as int),
+        ),
         onTap: () async {
           // 詳細へ遷移
           await Navigator.push(
@@ -184,6 +191,18 @@ class _NewListScreenState extends State<NewListScreen>
     if (state == AppLifecycleState.resumed) {
       _controller.refreshAll();
     }
+  }
+
+  Future<void> _removeFromWatch(int topicId) async {
+    await removeWatchedTopicId(topicId);
+    setState(() {
+      _topics.removeWhere((topic) => topic['id'] == topicId);
+    });
+    // 全タイルを再評価して表示を更新
+    _controller.refreshAll();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('履歴を削除しました')),
+    );
   }
 
   Future<void> _load() async {
@@ -268,7 +287,11 @@ class _NewListScreenState extends State<NewListScreen>
           itemCount: _topics.length,
           itemBuilder: (context, i) {
             final t = _topics[i];
-            return _TopicTile(topic: t, controller: _controller);
+            return _TopicTile(
+              topic: t,
+              controller: _controller,
+              onRemove: _removeFromWatch,
+            );
           },
         ),
       ),

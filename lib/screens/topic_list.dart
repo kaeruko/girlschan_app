@@ -78,6 +78,18 @@ class _TopicListScreenState extends State<TopicListScreen>
     }
   }
 
+  Future<void> _removeFromWatch(int topicId) async {
+    await removeWatchedTopicId(topicId);
+    setState(() {
+      _topics.removeWhere((topic) => topic['id'] == topicId);
+    });
+    // 全タイルを再評価して表示を更新
+    _controller.refreshAll();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('履歴を削除しました')),
+    );
+  }
+
   Future<void> _fetchFromServer() async {
     try {
       logd('🌐 [_fetchFromServer] Fetching popular topics from server...', name: 'TopicList');
@@ -133,7 +145,11 @@ class _TopicListScreenState extends State<TopicListScreen>
                   itemCount: _topics.length,
                   itemBuilder: (context, index) {
                     final topic = _topics[index];
-                    return _TopicListTile(topic: topic, controller: _controller);
+                    return _TopicListTile(
+                      topic: topic,
+                      controller: _controller,
+                      onRemove: _removeFromWatch,
+                    );
                   },
                 ),
               ),
@@ -146,10 +162,12 @@ class _TopicListScreenState extends State<TopicListScreen>
 class _TopicListTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final _TopicListTileController controller;
+  final Function(int) onRemove;
 
   const _TopicListTile({
     required this.topic,
     required this.controller,
+    required this.onRemove,
   });
 
   @override
@@ -240,6 +258,10 @@ class _TopicListTileState extends State<_TopicListTile> {
           ),
         ),
         subtitle: Text('$commentsコメント • $time'),
+        trailing: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => widget.onRemove(id),
+        ),
         onTap: () async {
           // 詳細へ遷移 → 戻りで即再評価（自分＋全体）
           await Navigator.push(
