@@ -5,6 +5,7 @@ import '../utils/log.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
+import '../widgets/common/app_toast.dart';
 
 class TopicListScreen extends StatefulWidget {
   const TopicListScreen({super.key});
@@ -79,9 +80,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       });
       await _controller.refreshAll();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('データの更新に失敗しました（キャッシュを使用）')),
-        );
+        await AppToast.show(context, 'データの更新に失敗しました（キャッシュを使用）');
       }
     }
   }

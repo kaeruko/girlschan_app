@@ -11,6 +11,7 @@ import '../utils/log.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
+import '../widgets/common/app_toast.dart';
 
 class NewListScreen extends StatefulWidget {
   const NewListScreen({super.key});
@@ -105,9 +106,7 @@ class _NewListScreenState extends State<NewListScreen>
       });
       await _controller.refreshAll();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('通信に失敗しました（キャッシュを使用）')),
-        );
+        await AppToast.show(context, '通信に失敗しました（キャッシュを使用）');
       }
     }
   }

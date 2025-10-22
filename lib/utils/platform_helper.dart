@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../widgets/common/app_toast.dart';
 
 /// macOS専用ヘルパークラス
 class PlatformHelper {
@@ -44,24 +45,9 @@ class PlatformHelper {
     );
   }
 
-  /// macOS用ダイアログでメッセージを表示
-  static void showSnackBar(BuildContext context, String message) {
-    if (!context.mounted) return;
-    showCupertinoDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return CupertinoAlertDialog(
-          content: Text(message),
-          actions: [
-            CupertinoDialogAction(
-              isDefaultAction: true,
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
+  /// 画面下部にトースト通知を表示（AppToast で置換）
+  static Future<void> showSnackBar(BuildContext context, String message) {
+    return AppToast.show(context, message);
   }
 
   /// CupertinoActivityIndicator を返す

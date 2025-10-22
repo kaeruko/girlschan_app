@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
 import '../widgets/common/app_spinner.dart';
+import '../widgets/common/app_toast.dart';
 
 // 共通タイル
 import '../widgets/topic_tile.dart';
@@ -108,9 +109,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
       logd('❌ Search error: $e', name: 'Search');
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('検索に失敗しました: $e')),
-        );
+        await AppToast.show(context, '検索に失敗しました: $e');
       }
     }
   }
