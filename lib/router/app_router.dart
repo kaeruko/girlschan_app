@@ -74,9 +74,9 @@ class AppRouter {
 
       return CupertinoPageRoute(
         builder: (_) => TopicDetailScreen(
-          topicId: detailArgs.topicId,
+          topicId: int.tryParse(detailArgs.topicId) ?? 0,
           title: detailArgs.title,
-          comments: detailArgs.comments,
+          commentCount: 0, // Will be fetched from API
         ),
         settings: settings,
       );
@@ -109,17 +109,8 @@ class AppRouter {
     // New List
     if (name == AppRoutes.newList || 
         (pathSegments.contains('list') && pathSegments.contains('new'))) {
-      
-      NewListArgs newListArgs;
-      
-      if (args is NewListArgs) {
-        newListArgs = args;
-      } else {
-        newListArgs = NewListArgs.fromUri(uri);
-      }
-
       return CupertinoPageRoute(
-        builder: (_) => NewListScreen(sortOrder: newListArgs.sortOrder),
+        builder: (_) => const NewListScreen(),
         settings: settings,
       );
     }
@@ -188,20 +179,14 @@ class AppRouter {
     );
   }
 
-  /// Navigate to NewList with optional sort order.
+  /// Navigate to NewList screen.
   /// 
   /// Example:
   /// ```dart
-  /// AppRouter.pushNewList(context, sortOrder: 'latest');
+  /// AppRouter.pushNewList(context);
   /// ```
-  static Future<T?> pushNewList<T>(
-    BuildContext context, {
-    String? sortOrder,
-  }) {
-    return Navigator.of(context).pushNamed<T>(
-      AppRoutes.newList,
-      arguments: NewListArgs(sortOrder: sortOrder),
-    );
+  static Future<T?> pushNewList<T>(BuildContext context) {
+    return Navigator.of(context).pushNamed<T>(AppRoutes.newList);
   }
 
   /// Navigate to Search screen.
@@ -229,14 +214,13 @@ class AppRouter {
     BuildContext context, {
     required String topicId,
     String? title,
-    String? comments,
   }) {
     return Navigator.of(context).pushReplacementNamed<T, T>(
       AppRoutes.topicDetail,
       arguments: TopicDetailArgs(
         topicId: topicId,
         title: title,
-        comments: comments,
+        comments: null,
       ),
     );
   }
