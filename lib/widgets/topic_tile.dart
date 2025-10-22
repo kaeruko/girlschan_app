@@ -1,5 +1,3 @@
-// topic_tile.dart (Cupertino版)
-
 import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,7 +6,7 @@ import '../utils/log.dart';
 import '../screens/topic_detail.dart';
 import 'topic_tile_controller.dart';
 
-/// 共通トピックタイル（Cupertino）
+/// 共通トピックタイル（Material 依存ナシ）
 class TopicTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final TopicTileController controller;
@@ -90,102 +88,20 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
         ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments件'
         : '$comments件';
 
-    final theme = CupertinoTheme.of(context);
-    final titleStyle = theme.textTheme.textStyle.copyWith(
-      fontSize: 14,
-      fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-      color: _hasCachedComments
-          ? CupertinoColors.activeBlue.resolveFrom(context)
-          : theme.textTheme.textStyle.color,
-    );
-    final subStyle = theme.textTheme.textStyle.copyWith(
-      fontSize: 12,
-      color: CupertinoColors.systemGrey.resolveFrom(context),
-    );
+    final blue = CupertinoColors.systemBlue;
+    final grey = CupertinoColors.systemGrey;
 
     return Container(
       decoration: BoxDecoration(
-        color: _hasCachedComments
-            ? CupertinoColors.activeBlue.resolveFrom(context).withOpacity(0.05)
-            : CupertinoColors.transparent,
+        color: _hasCachedComments ? blue.withOpacity(0.05) : CupertinoColors.transparent,
         border: _hasCachedComments
-            ? Border(
-                left: BorderSide(
-                  color: CupertinoColors.activeBlue.resolveFrom(context),
-                  width: 4,
-                ),
-              )
+            ? Border(left: BorderSide(color: blue, width: 4))
             : null,
       ),
-      child: _CupertinoTile(
-        leading: widget.showThumb
-            ? Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: (thumb != null && thumb.isNotEmpty)
-                        ? Image.network(
-                            thumb,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(
-                              CupertinoIcons.photo,
-                              size: 28,
-                              color: CupertinoColors.systemGrey.resolveFrom(context),
-                            ),
-                          )
-                        : Icon(
-                            CupertinoIcons.photo,
-                            size: 28,
-                            color: CupertinoColors.systemGrey.resolveFrom(context),
-                          ),
-                  ),
-                  if (_hasCachedComments)
-                    Positioned(
-                      top: -8,
-                      right: -8,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.activeBlue.resolveFrom(context),
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(4),
-                        child: const Icon(
-                          CupertinoIcons.check_mark_circled_solid,
-                          color: CupertinoColors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                ],
-              )
-            : null,
-        title: Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: titleStyle,
-        ),
-        subtitle: Text(
-          'コメント: $commentDisplay $time',
-          style: subStyle,
-        ),
-        trailing: (_hasCachedComments && widget.onRemoveIfCached != null)
-            ? CupertinoButton(
-                padding: EdgeInsets.zero,
-                minSize: 28,
-                onPressed: () async {
-                  await widget.onRemoveIfCached!(id);
-                  if (mounted) await refreshCacheState();   // 自分の再評価
-                  await widget.controller.refreshAll();      // 全体再評価
-                },
-                child: const Icon(CupertinoIcons.xmark_circle_fill, size: 20),
-              )
-            : null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () async {
-          await Navigator.push(
-            context,
+          await Navigator.of(context).push(
             CupertinoPageRoute(
               builder: (_) => TopicDetailScreen(
                 topicId: id,
@@ -194,70 +110,102 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
               ),
             ),
           );
-          // 外側フック → 自分更新 → 全体更新（順に実施）
+          // 外側フック → 自分更新 → 全体更新（順）
           widget.onAfterPop?.call();
           if (mounted) await refreshCacheState();
           await widget.controller.refreshAll();
         },
-      ),
-    );
-  }
-}
-
-/// シンプルなCupertino版タイル（ListTile代替）
-class _CupertinoTile extends StatelessWidget {
-  final Widget? leading;
-  final Widget title;
-  final Widget? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-
-  const _CupertinoTile({
-    required this.title,
-    this.leading,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dividerColor = CupertinoColors.systemGrey4.resolveFrom(context);
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: dividerColor, width: 0.5),
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (leading != null) ...[
-              leading!,
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  title,
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 4),
-                    subtitle!,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (widget.showThumb)
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: (thumb != null && thumb.isNotEmpty)
+                            ? Image.network(
+                                thumb,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  CupertinoIcons.photo,
+                                  size: 28,
+                                  color: CupertinoColors.systemGrey,
+                                ),
+                              )
+                            : const Icon(
+                                CupertinoIcons.photo,
+                                size: 28,
+                                color: CupertinoColors.systemGrey,
+                              ),
+                      ),
+                    ),
+                    if (_hasCachedComments)
+                      Positioned(
+                        top: -8,
+                        right: -8,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: CupertinoColors.activeBlue,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(
+                            CupertinoIcons.check_mark,
+                            color: CupertinoColors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
                   ],
-                ],
+                ),
+              if (widget.showThumb) const SizedBox(width: 12),
+              // タイトル + サブ
+              Expanded(
+                child: DefaultTextStyle(
+                  style: CupertinoTheme.of(context).textTheme.textStyle,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
+                          color: _hasCachedComments ? CupertinoColors.activeBlue : null,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'コメント: $commentDisplay $time',
+                        style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            if (trailing != null) ...[
-              const SizedBox(width: 8),
-              trailing!,
+              // 右端 × ボタン（キャッシュあり時だけ）
+              if (_hasCachedComments && widget.onRemoveIfCached != null)
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minSize: 28,
+                  onPressed: () async {
+                    await widget.onRemoveIfCached!(id);
+                    if (mounted) await refreshCacheState();
+                    await widget.controller.refreshAll();
+                  },
+                  child: const Icon(CupertinoIcons.xmark, size: 20),
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );
