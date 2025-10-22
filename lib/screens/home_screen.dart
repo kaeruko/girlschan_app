@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'new_list.dart';
-import 'topic_list.dart';
-import 'favorites_screen.dart';
-import 'clips_screen.dart';
+import '../app/app_tabs.dart';
 import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -15,25 +12,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final _tabs = const [
-    NewListScreen(),
-    TopicListScreen(),
-    FavoritesScreen(),
-    ClipsScreen(),
-  ];
-
-  final _titles = const [
-    '新着トピック',
-    '人気トピック',
-    '履歴',
-    'クリップ',
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final currentTab = kAppTabs[_currentIndex];
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_currentIndex]),
+        title: Text(currentTab.title),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -47,17 +32,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _tabs[_currentIndex],
+      body: currentTab.widget,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: Colors.pinkAccent,
         type: BottomNavigationBarType.fixed,
         onTap: (i) => setState(() => _currentIndex = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.fiber_new), label: '新着'),
-          BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: '人気'),
-          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: '履歴'),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'クリップ'),
+        items: [
+          for (final tab in kAppTabs)
+            BottomNavigationBarItem(
+              icon: Icon(tab.icon),
+              label: tab.label,
+            ),
         ],
       ),
     );
