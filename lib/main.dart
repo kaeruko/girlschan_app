@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:girlschan_app/config/app_config.dart';
+import 'app/app_tabs.dart';
+import 'shell/ios_shell.dart';
 import 'screens/home_screen.dart';
-import 'screens/search_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,23 +27,25 @@ class GirlsChanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final tabs = kAppTabs;
+
+    return CupertinoApp(
+      debugShowCheckedModeBanner: false,
       title: 'がるちゃんあぷり',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
-        useMaterial3: true,
+      theme: const CupertinoThemeData(
+        brightness: Brightness.light,
+        primaryColor: CupertinoColors.systemPink,
+        textTheme: CupertinoTextThemeData(),
       ),
-      home: const HomeScreen(),
-      onGenerateRoute: (settings) {
-        if (settings.name?.startsWith('/search') ?? false) {
-          final uri = Uri.parse(settings.name!);
-          final query = uri.queryParameters['q'] ?? '';
-          return MaterialPageRoute(
-            builder: (context) => SearchScreen(initialQuery: query),
-          );
-        }
-        return null;
-      },
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        DefaultCupertinoLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const <Locale>[
+        Locale('ja'),
+        Locale('en'),
+      ],
+      home: IOSShell(tabs: tabs),
     );
   }
 }
