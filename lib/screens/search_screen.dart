@@ -1,27 +1,15 @@
+// lib/screens/search_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
+
 import '../models/topic.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
-import 'topic_detail.dart';
+import '../utils/log.dart';
 
-// グローバルキー管理用クラス
-class _SearchTopicCardController {
-  final Set<_SearchTopicCardState> _cards = {};
-
-  void register(_SearchTopicCardState card) {
-    _cards.add(card);
-  }
-
-  void unregister(_SearchTopicCardState card) {
-    _cards.remove(card);
-  }
-
-  void refreshAll() {
-    for (var card in _cards) {
-      card._checkCache();
-    }
-  }
-}
+// 共通タイル
+import '../widgets/topic_tile.dart';
+import '../widgets/topic_tile_controller.dart';
 
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
@@ -34,18 +22,19 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver {
   late TextEditingController _searchController;
+  final _controller = TopicTileController();
+
+  // 検索状態
   List<Topic> _searchResults = [];
   bool _isLoading = false;
   String _currentQuery = '';
   int _currentPage = 1;
   int _totalCount = 0;
   bool _hasMore = true;
-  late _SearchTopicCardController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = _SearchTopicCardController();
     WidgetsBinding.instance.addObserver(this);
     _searchController = TextEditingController(text: widget.initialQuery ?? '');
     if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
@@ -63,7 +52,6 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // アプリがフォアグラウンドに戻ったときに全カードを再チェック
       _controller.refreshAll();
     }
   }
@@ -74,6 +62,8 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
         _searchResults = [];
         _currentQuery = '';
         _currentPage = 1;
+        _totalCount = 0;
+        _hasMore = false;
       });
       return;
     }
@@ -87,42 +77,35 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     });
 
     try {
-      print('🔍 検索開始: query=$query, page=$_currentPage');
-      
+      logd('🔍 検索開始: query=$query, page=$_currentPage', name: 'Search');
+
       final result = await searchTopics(
         query: query,
         page: _currentPage,
         count: 50,
       );
 
-      print('✅ API応答: ${result.keys}');
-      
-      final topics = (result['topics'] as List<dynamic>?)?.map((t) {
-        print('📌 Topic JSON: $t');
-        return Topic.fromJson(t as Map<String, dynamic>);
-      }).toList() ?? [];
-      
-      print('📊 取得したトピック数: ${topics.length}');
-      topics.forEach((t) => print('  - ${t.title}'));
-      
+      final topics = (result['topics'] as List<dynamic>? ?? [])
+          .map((t) => Topic.fromJson(t as Map<String, dynamic>))
+          .toList();
+
       setState(() {
         _currentQuery = query;
         _totalCount = result['count'] ?? 0;
-        
         if (loadMore) {
           _searchResults.addAll(topics);
         } else {
           _searchResults = topics;
         }
-        
         _hasMore = _searchResults.length < _totalCount;
         _isLoading = false;
       });
+
+      // 表示直後に各タイルのキャッシュ状態を反映
+      await _controller.refreshAll();
     } catch (e) {
-      print('❌ Search error: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      logd('❌ Search error: $e', name: 'Search');
+      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('検索に失敗しました: $e')),
@@ -138,14 +121,42 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     }
   }
 
+  // Topic -> Map 変換（TopicTile へのアダプタ）
+  Map<String, dynamic> _topicToMap(Topic t) => {
+        'id': t.id,
+        'title': t.title,
+        'comments': t.comments,
+        'time': t.time,
+        'thumb': t.thumb,
+      };
+
+  // 検索結果リストの1行を共通タイルで描画
+  Widget _buildTile(Topic t) {
+    return TopicTile(
+      topic: _topicToMap(t),
+      controller: _controller,
+      showThumb: true,                 // 検索結果はサムネ表示
+      // 検索画面の「×」はコメントキャッシュ削除にしておく（任意）
+      onRemoveIfCached: (id) async {
+        await CacheService.clear('comments_$id');
+        await _controller.refreshAll();
+      },
+      // 詳細から戻った直後のフック（必要なら何かする）
+      onAfterPop: () {
+        // 例: 検索結果の再フェッチ等、今は何もしない
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final canSubmit = _searchController.text.isNotEmpty;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('検索'),
-      ),
+      appBar: AppBar(title: const Text('検索')),
       body: Column(
         children: [
+          // 検索入力
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -161,36 +172,32 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
                           setState(() {
                             _searchResults = [];
                             _currentQuery = '';
+                            _totalCount = 0;
+                            _hasMore = false;
                           });
                         },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onChanged: (value) {
-                setState(() {});
-              },
-              onSubmitted: (value) {
-                _performSearch(value);
-              },
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (v) => _performSearch(v),
             ),
           ),
-          if (_searchController.text.isNotEmpty && _currentQuery.isEmpty)
+
+          if (canSubmit && _currentQuery.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    _performSearch(_searchController.text);
-                  },
+                  onPressed: () => _performSearch(_searchController.text),
                   icon: const Icon(Icons.search),
                   label: const Text('検索'),
                 ),
               ),
             ),
+
           if (_currentQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -199,9 +206,9 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-          Expanded(
-            child: _buildResultsList(),
-          ),
+
+          // 結果リスト
+          Expanded(child: _buildResultsList()),
         ],
       ),
     );
@@ -215,10 +222,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
           children: [
             Icon(Icons.search, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
-              'キーワードを入力して検索',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+            Text('キーワードを入力して検索', style: Theme.of(context).textTheme.bodyLarge),
           ],
         ),
       );
@@ -229,9 +233,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     }
 
     if (_searchResults.isEmpty) {
-      return Center(
-        child: Text('「$_currentQuery」に該当するトピックがありません'),
-      );
+      return Center(child: Text('「$_currentQuery」に該当するトピックがありません'));
     }
 
     return Scrollbar(
@@ -239,206 +241,16 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
         itemCount: _searchResults.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == _searchResults.length) {
-            // ローディングインジケータ（さらに読み込む）
-            if (_hasMore) {
-              _loadMore();
-              return const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(),
-              );
-            }
-            return const SizedBox.shrink();
-          }
-
-          final topic = _searchResults[index];
-          return _buildTopicCard(context, topic);
-        },
-      ),
-    );
-  }
-
-  Widget _buildTopicCard(BuildContext context, Topic topic) {
-    print('🎨 カード描画: id=${topic.id}, title=${topic.title}, thumb=${topic.thumb}');
-    
-    return _SearchTopicCard(topic: topic, controller: _controller);
-  }
-}
-
-class _SearchTopicCard extends StatefulWidget {
-  final Topic topic;
-  final _SearchTopicCardController controller;
-
-  const _SearchTopicCard({
-    required this.topic,
-    required this.controller,
-  });
-
-  @override
-  State<_SearchTopicCard> createState() => _SearchTopicCardState();
-}
-
-class _SearchTopicCardState extends State<_SearchTopicCard> {
-  bool _hasCachedComments = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.register(this);
-    _checkCache();
-  }
-
-  @override
-  void dispose() {
-    widget.controller.unregister(this);
-    super.dispose();
-  }
-
-  Future<void> _checkCache() async {
-    if (widget.topic.id != null) {
-      final hasCached = await CacheService.exists('comments_${widget.topic.id}');
-      if (mounted) {
-        setState(() {
-          _hasCachedComments = hasCached;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      color: _hasCachedComments 
-          ? Colors.blue.withOpacity(0.05) 
-          : null,
-      child: InkWell(
-        onTap: () {
-          if (widget.topic.id != null) {
-            print('📱 タップ: topicId=${widget.topic.id}');
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => TopicDetailScreen(
-                  topicId: widget.topic.id!,
-                  title: widget.topic.title,
-                  commentCount: widget.topic.comments,
-                ),
-              ),
+            // ページングのローディング行
+            _loadMore();
+            return const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
             );
           }
+          final topic = _searchResults[index];
+          return _buildTile(topic);
         },
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 左ボーダー（キャッシュある場合）
-            if (_hasCachedComments)
-              Container(
-                width: 4,
-                height: 80,
-                color: Colors.blue,
-              ),
-            // サムネイル画像
-            if (widget.topic.thumb != null && widget.topic.thumb!.isNotEmpty)
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      bottomLeft: Radius.circular(4),
-                    ),
-                    child: Image.network(
-                      widget.topic.thumb!,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 80,
-                          height: 80,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.image_not_supported),
-                        );
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          width: 80,
-                          height: 80,
-                          color: Colors.grey[200],
-                          child: const Center(child: SizedBox.shrink()),
-                        );
-                      },
-                    ),
-                  ),
-                  if (_hasCachedComments)
-                    Positioned(
-                      top: -8,
-                      right: -8,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(4),
-                        child: const Icon(
-                          Icons.check,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                    ),
-                ],
-              )
-            else
-              Container(
-                width: 80,
-                height: 80,
-                color: Colors.grey[300],
-                child: Icon(Icons.image, color: Colors.grey[600]),
-              ),
-            // テキスト情報
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.topic.title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-                        color: _hasCachedComments ? Colors.blue[800] : null,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.comment, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${widget.topic.comments}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            widget.topic.time,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
