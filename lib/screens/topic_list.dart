@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
@@ -9,10 +9,10 @@ class TopicListScreen extends StatefulWidget {
   const TopicListScreen({super.key});
 
   @override
-  State<TopicListScreen> createState() => _TopicListScreenState();
+  State<TopicListScreen> createState() => TopicListScreenState();
 }
 
-class _TopicListScreenState extends State<TopicListScreen>
+class TopicListScreenState extends State<TopicListScreen>
     with WidgetsBindingObserver {
   static const String cacheKey = 'topics';
 
@@ -51,11 +51,11 @@ class _TopicListScreenState extends State<TopicListScreen>
       });
       await _controller.refreshAll();
     } else {
-      await _fetchFromServer();
+      await fetchFromServer();
     }
   }
 
-  Future<void> _fetchFromServer() async {
+  Future<void> fetchFromServer() async {
     try {
       final topics = await fetchPopularTopicsWithCache();
       final list = topics.cast<Map<String, dynamic>>();
@@ -67,7 +67,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       });
       await _controller.refreshAll();
     } catch (e) {
-      logd('❌ [_fetchFromServer] $e', name: 'TopicList');
+      logd('❌ [fetchFromServer] $e', name: 'TopicList');
       final cached = await CacheService.load(cacheKey);
       if (!mounted) return;
       setState(() {
@@ -93,29 +93,36 @@ class _TopicListScreenState extends State<TopicListScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _fetchFromServer,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : Scrollbar(
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  itemCount: _topics.length,
-                  itemBuilder: (context, index) {
-                    final topic = _topics[index];
-                    return TopicTile(
-                      topic: topic,
-                      controller: _controller,
-                      showThumb: true,                      // 一覧はサムネ表示
-                      onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
-                    );
-                  },
-                ),
+    return CustomScrollView(
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: fetchFromServer,
+        ),
+        if (_loading)
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height / 2,
+              child: const Center(
+                child: CupertinoActivityIndicator(),
               ),
-      ),
+            ),
+          )
+        else
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final topic = _topics[index];
+                return TopicTile(
+                  topic: topic,
+                  controller: _controller,
+                  showThumb: true,                      // 一覧はサムネ表示
+                  onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
+                );
+              },
+              childCount: _topics.length,
+            ),
+          ),
+      ],
     );
   }
 }

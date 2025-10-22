@@ -1,6 +1,6 @@
 // lib/screens/new_list.dart
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -15,10 +15,10 @@ class NewListScreen extends StatefulWidget {
   const NewListScreen({super.key});
 
   @override
-  State<NewListScreen> createState() => _NewListScreenState();
+  State<NewListScreen> createState() => NewListScreenState();
 }
 
-class _NewListScreenState extends State<NewListScreen>
+class NewListScreenState extends State<NewListScreen>
     with WidgetsBindingObserver {
   static const String cacheKey = 'new_topics';
 
@@ -67,13 +67,13 @@ class _NewListScreenState extends State<NewListScreen>
       });
       await _controller.refreshAll();
     } else {
-      await _fetchFromServer();
+      await fetchFromServer();
     }
   }
 
-  Future<void> _fetchFromServer() async {
+  Future<void> fetchFromServer() async {
     try {
-      logd('🌐 [NewList._fetchFromServer] GET /topics/new', name: 'NewList');
+      logd('🌐 [NewList.fetchFromServer] GET /topics/new', name: 'NewList');
       final uri = Uri.parse('${AppConfig.apiBase}/topics/new');
       final res = await http.get(uri);
       if (res.statusCode != 200) {
@@ -93,7 +93,7 @@ class _NewListScreenState extends State<NewListScreen>
 
       await _controller.refreshAll();
     } catch (e) {
-      logd('❌ [NewList._fetchFromServer] $e', name: 'NewList');
+      logd('❌ [NewList.fetchFromServer] $e', name: 'NewList');
       final cached = await CacheService.load(cacheKey);
       if (!mounted) return;
       setState(() {
@@ -114,29 +114,29 @@ class _NewListScreenState extends State<NewListScreen>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CupertinoActivityIndicator());
     }
 
-    return RefreshIndicator(
-      onRefresh: _fetchFromServer,
-      child: Scrollbar(
-        child: ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          itemCount: _topics.length,
-          itemBuilder: (context, i) {
-            final t = _topics[i];
-            return TopicTile(
-              topic: t,
-              controller: _controller,
-              showThumb: true,                 // 新着はサムネ表示
-              onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
-              // onAfterPop: 何か必要なら渡せる
-            );
-          },
+    return CustomScrollView(
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: fetchFromServer,
         ),
-      ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              final t = _topics[i];
+              return TopicTile(
+                topic: t,
+                controller: _controller,
+                showThumb: true,                 // 新着はサムネ表示
+                onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
+              );
+            },
+            childCount: _topics.length,
+          ),
+        ),
+      ],
     );
   }
 }
