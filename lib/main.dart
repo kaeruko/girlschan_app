@@ -1,28 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:girlschan_app/config/app_config.dart';
-import 'package:window_manager/window_manager.dart';
-import 'package:bitsdojo_window/bitsdojo_window.dart';
-import 'dart:io';
+import 'config/app_config.dart';
 import 'app/app_tabs.dart';
-import 'shell/ios_shell.dart';
-import 'shell/macos_shell.dart';
+import 'shell/adaptive_shell.dart';
+import 'desktop/desktop_window.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // macOS/Windows/Linuxでウィンドウサイズを設定
-  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-    await windowManager.ensureInitialized();
-    
-    windowManager.waitUntilReadyToShow().then((_) async {
-      await windowManager.setMinimumSize(const Size(1200, 800));
-      await windowManager.setSize(const Size(1400, 900));
-      await windowManager.center();
-      await windowManager.show();
-    });
-  }
-  
+
+  // デスクトップ系の事前初期化（iOSはノーオペ）
+  await DesktopWindow.preRunInit();
+
   try {
     print('🚀 AppConfig 初期化開始');
     await AppConfig.initializeApiBase();
@@ -33,19 +21,11 @@ void main() async {
     // ここでも強制的にフォールバック値を設定
     AppConfig.apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
   }
-  
+
   runApp(const GirlsChanApp());
 
-  // bitsdojo_window の初期化（macOSでのウィンドウ制御）
-  if (Platform.isMacOS) {
-    doWhenWindowReady(() {
-      const initialSize = Size(1400, 900);
-      appWindow.minSize = const Size(1200, 800);
-      appWindow.size = initialSize;
-      appWindow.alignment = Alignment.center;
-      appWindow.show();
-    });
-  }
+  // ラン後フック（bitsdojoの doWhenWindowReady など）
+  DesktopWindow.postRunInit(); // await しない
 }
 
 class GirlsChanApp extends StatelessWidget {
@@ -53,9 +33,6 @@ class GirlsChanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // フェーズ1の kAppTabs を使う
-    final tabs = kAppTabs;
-
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
       title: 'がるちゃんあぷり',
@@ -65,15 +42,15 @@ class GirlsChanApp extends StatelessWidget {
         textTheme: CupertinoTextThemeData(),
       ),
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
+        DefaultCupertinoLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
       ],
       supportedLocales: const <Locale>[
         Locale('ja'),
         Locale('en'),
       ],
-      // プラットフォーム分岐
-      home: Platform.isMacOS ? MacShell(tabs: tabs) : IOSShell(tabs: tabs),
+      // プラットフォーム依存を AdaptiveShell に隠す
+      home: AdaptiveShell(tabs: kAppTabs),
     );
   }
 }
