@@ -1,13 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:girlschan_app/config/app_config.dart';
+import 'config/app_config.dart';
 import 'app/app_tabs.dart';
-import 'shell/ios_shell.dart';
-import 'screens/home_screen.dart';
+import 'shell/adaptive_shell.dart';
+import 'desktop/desktop_window.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // デスクトップ系の事前初期化（iOSはノーオペ）
+  await DesktopWindow.preRunInit();
+
   try {
     print('🚀 AppConfig 初期化開始');
     await AppConfig.initializeApiBase();
@@ -18,8 +21,11 @@ void main() async {
     // ここでも強制的にフォールバック値を設定
     AppConfig.apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
   }
-  
+
   runApp(const GirlsChanApp());
+
+  // ラン後フック（bitsdojoの doWhenWindowReady など）
+  DesktopWindow.postRunInit(); // await しない
 }
 
 class GirlsChanApp extends StatelessWidget {
@@ -27,8 +33,6 @@ class GirlsChanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = kAppTabs;
-
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
       title: 'がるちゃんあぷり',
@@ -45,7 +49,8 @@ class GirlsChanApp extends StatelessWidget {
         Locale('ja'),
         Locale('en'),
       ],
-      home: IOSShell(tabs: tabs),
+      // プラットフォーム依存を AdaptiveShell に隠す
+      home: AdaptiveShell(tabs: kAppTabs),
     );
   }
 }
