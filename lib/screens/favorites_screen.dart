@@ -1,28 +1,11 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
-import '../utils/platform_helper.dart';
-import 'topic_detail.dart';
-
-// グローバルキー管理用クラス
-class _FavoritesTileController {
-  final Set<_FavoritesTileState> _tiles = {};
-
-  void register(_FavoritesTileState tile) {
-    _tiles.add(tile);
-  }
-
-  void unregister(_FavoritesTileState tile) {
-    _tiles.remove(tile);
-  }
-
-  void refreshAll() {
-    for (var tile in _tiles) {
-      tile._checkCache();
-    }
-  }
-}
+import '../config/app_config.dart';
+import '../utils/log.dart';
+import '../widgets/topic_tile.dart';
+import '../widgets/topic_tile_controller.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -32,14 +15,13 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingObserver {
+  final _controller = TopicTileController();
   List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
-  late _FavoritesTileController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = _FavoritesTileController();
     WidgetsBinding.instance.addObserver(this);
     _loadWatchedTopics();
   }
@@ -53,15 +35,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // アプリがフォアグラウンドに戻ったときに全タイルを再チェック
       _controller.refreshAll();
     }
   }
 
   Future<void> _loadWatchedTopics() async {
     final topics = await getWatchedTopics();
+    // 「保存順の逆」にしたいならここで反転
+    final reversed = topics.reversed.toList();
     setState(() {
-      _watchedTopics = topics;
+      _watchedTopics = reversed;
       _loading = false;
     });
   }
@@ -74,203 +57,54 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
   Future<void> _removeFromWatch(int topicId) async {
     await removeWatchedTopicId(topicId);
     setState(() {
-      _watchedTopics.removeWhere((topic) => topic['id'] == topicId);
+      _watchedTopics.removeWhere((t) => t['id'] == topicId);
     });
-    // 全タイルを再評価して表示を更新
-    _controller.refreshAll();
+    await _controller.refreshAll();
+  }
+
+  void _onDetailReturned() {
+    // ここで何かしたければ（例：履歴リストの再読込など）
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CupertinoActivityIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
-
     if (_watchedTopics.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              CupertinoIcons.bookmark,
-              size: 64,
-              color: CupertinoColors.systemGrey,
-            ),
+            Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            const Text(
-              '履歴に登録されたトピックはありません',
-              style: TextStyle(
-                fontSize: 16,
-                color: CupertinoColors.secondaryLabel,
-              ),
-            ),
+            Text('履歴に登録されたトピックはありません',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600])),
             const SizedBox(height: 8),
-            const Text(
-              'トピック詳細の📘をタップして登録',
-              style: TextStyle(
-                fontSize: 13,
-                color: CupertinoColors.tertiaryLabel,
-              ),
-            ),
+            Text('トピック詳細の📘をタップして登録',
+                style: TextStyle(fontSize: 13, color: Colors.grey[500])),
           ],
         ),
       );
     }
 
-    return CustomScrollView(
-      slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: _refreshWatched,
-        ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, i) {
-              final topic = _watchedTopics[i];
-              return _FavoritesTile(
-                topic: topic,
-                onRemove: _removeFromWatch,
-                controller: _controller,
-              );
-            },
-            childCount: _watchedTopics.length,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// キャッシュがあるトピックを表示するカスタムタイル
-class _FavoritesTile extends StatefulWidget {
-  final Map<String, dynamic> topic;
-  final Function(int) onRemove;
-  final _FavoritesTileController controller;
-
-  const _FavoritesTile({
-    required this.topic,
-    required this.onRemove,
-    required this.controller,
-  });
-
-  @override
-  State<_FavoritesTile> createState() => _FavoritesTileState();
-}
-
-class _FavoritesTileState extends State<_FavoritesTile> {
-  bool _hasCachedComments = false;
-  int _cachedCommentCount = 0;
-  int _savedCommentNo = 0;  // 復元対象のコメント番号
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.register(this);
-    _checkCache();
-  }
-
-  @override
-  void dispose() {
-    widget.controller.unregister(this);
-    super.dispose();
-  }
-
-  Future<void> _checkCache() async {
-    final id = widget.topic['id'] as int;
-    final hasCached = await CacheService.exists('comments_$id');
-    
-    // SharedPreferencesからキャッシュされたコメント数と保存位置を取得
-    int cachedCount = 0;
-    int savedCommentNo = 0;
-    if (hasCached) {
-      final prefs = await SharedPreferences.getInstance();
-      cachedCount = prefs.getInt('synced_$id') ?? 0;
-      savedCommentNo = prefs.getInt('scroll_$id') ?? 0;
-    }
-    
-    if (mounted) {
-      setState(() {
-        _hasCachedComments = hasCached;
-        _cachedCommentCount = cachedCount;
-        _savedCommentNo = savedCommentNo;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final id = widget.topic['id'] as int;
-    final title = widget.topic['title'] as String? ?? 'タイトル不明';
-    final comments = widget.topic['comments'] as int? ?? 0;
-    final time = widget.topic['time'] as String? ?? '';
-    final commentDisplay = _hasCachedComments 
-        ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments件'
-        : '$comments件';
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          CupertinoPageRoute(
-            builder: (_) => TopicDetailScreen(
-              topicId: id,
-              title: title,
-              commentCount: comments,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: _hasCachedComments 
-              ? CupertinoColors.systemBlue.withOpacity(0.1) 
-              : CupertinoColors.white,
-          border: Border(
-            bottom: BorderSide(
-              color: CupertinoColors.separator,
-              width: 0.5,
-            ),
-            left: _hasCachedComments
-                ? const BorderSide(
-                    color: CupertinoColors.systemBlue,
-                    width: 4,
-                  )
-                : BorderSide.none,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                      fontSize: 14,
-                      fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-                      color: _hasCachedComments ? CupertinoColors.systemBlue : null,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'コメント: $commentDisplay $time',
-                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            CupertinoButton(
-              padding: const EdgeInsets.all(8),
-              onPressed: () => widget.onRemove(id),
-              child: const Icon(CupertinoIcons.xmark, size: 18),
-            ),
-          ],
+    return RefreshIndicator(
+      onRefresh: _refreshWatched,
+      child: Scrollbar(
+        child: ListView.builder(
+          itemCount: _watchedTopics.length,
+          itemBuilder: (context, i) {
+            final topic = _watchedTopics[i];
+            return TopicTile(
+              topic: topic,
+              controller: _controller,
+              showThumb: false,                   // 履歴はサムネ無しで軽量に
+              onRemoveIfCached: (id) async {      // ×で「履歴から外す」
+                await _removeFromWatch(id);
+              },
+              onAfterPop: _onDetailReturned,      // 詳細から戻ったフック
+            );
+          },
         ),
       ),
     );
