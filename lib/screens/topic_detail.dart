@@ -13,12 +13,18 @@ class TopicDetailScreen extends StatefulWidget {
   final int topicId;
   final String title;
   final int commentCount;
+  final bool enableRefresh;
+  final bool testingBypassInit;
+  final List<Map<String, dynamic>>? testingInitialComments;
 
   const TopicDetailScreen({
     super.key,
     required this.topicId,
     required this.title,
     required this.commentCount,
+    this.enableRefresh = true,
+    this.testingBypassInit = false,
+    this.testingInitialComments,
   });
 
   @override
@@ -46,12 +52,26 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void initState() {
     super.initState();
     logd('initState: topicId=${widget.topicId}, title=${widget.title}');
+    
+    // テスト用: 初期ロードをバイパス
+    if (widget.testingBypassInit) {
+      if (widget.testingInitialComments != null) {
+        _allComments = widget.testingInitialComments!;
+        _totalComments = widget.commentCount;
+      }
+      _loading = false;
+      return;
+    }
+    
     _load();
   }
 
   @override
   void dispose() {
-    _saveScrollPosition();
+    // テスト中はスクロール位置の保存をスキップ
+    if (!widget.testingBypassInit) {
+      _saveScrollPosition();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -859,9 +879,10 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       controller: _scrollController,
       primary: false,
       slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: fetchComments,
-        ),
+        if (widget.enableRefresh)
+          CupertinoSliverRefreshControl(
+            onRefresh: fetchComments,
+          ),
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, i) {
