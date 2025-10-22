@@ -6,8 +6,7 @@ import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
-
-// 共通コンポーネント
+import '../widgets/inline_notice.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 
@@ -26,6 +25,8 @@ class NewListScreenState extends State<NewListScreen>
 
   List<Map<String, dynamic>> _topics = [];
   bool _loading = true;
+  String? _notice;
+  bool _noticeIsError = false;
 
   @override
   void initState() {
@@ -89,6 +90,7 @@ class NewListScreenState extends State<NewListScreen>
       setState(() {
         _topics = list;
         _loading = false;
+        _notice = null;
       });
 
       await _controller.refreshAll();
@@ -101,13 +103,10 @@ class NewListScreenState extends State<NewListScreen>
           _topics = cached.cast<Map<String, dynamic>>();
         }
         _loading = false;
+        _notice = '通信に失敗しました（キャッシュを使用）';
+        _noticeIsError = true;
       });
       await _controller.refreshAll();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('通信に失敗しました（キャッシュを使用）')),
-        );
-      }
     }
   }
 
@@ -118,23 +117,32 @@ class NewListScreenState extends State<NewListScreen>
     }
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
       slivers: [
         CupertinoSliverRefreshControl(
           onRefresh: fetchFromServer,
         ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, i) {
-              final t = _topics[i];
-              return TopicTile(
-                topic: t,
-                controller: _controller,
-                showThumb: true,                 // 新着はサムネ表示
-                onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
-              );
-            },
-            childCount: _topics.length,
+        if (_notice != null)
+          SliverToBoxAdapter(
+            child: InlineNotice(
+              text: _notice!,
+              isError: _noticeIsError,
+              onClose: () => setState(() => _notice = null),
+            ),
           ),
+        SliverList.builder(
+          itemBuilder: (context, i) {
+            final t = _topics[i];
+            return TopicTile(
+              topic: t,
+              controller: _controller,
+              showThumb: true,
+              onRemoveIfCached: _removeCommentsCache,
+            );
+          },
+          itemCount: _topics.length,
         ),
       ],
     );

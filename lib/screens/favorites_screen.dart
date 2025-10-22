@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../config/app_config.dart';
 import '../utils/log.dart';
+import '../widgets/inline_notice.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 
@@ -18,6 +19,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
   final _controller = TopicTileController();
   List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
+  String? _notice;
+  bool _noticeIsError = false;
 
   @override
   void initState() {
@@ -69,44 +72,65 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CupertinoActivityIndicator());
     }
     if (_watchedTopics.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
+            const Icon(
+              CupertinoIcons.bookmark,
+              size: 64,
+              color: CupertinoColors.systemGrey3,
+            ),
             const SizedBox(height: 16),
-            Text('履歴に登録されたトピックはありません',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+            const Text(
+              '履歴に登録されたトピックはありません',
+              style: TextStyle(fontSize: 16, color: CupertinoColors.systemGrey),
+            ),
             const SizedBox(height: 8),
-            Text('トピック詳細の📘をタップして登録',
-                style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+            const Text(
+              'トピック詳細の📘をタップして登録',
+              style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey2),
+            ),
           ],
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _refreshWatched,
-      child: Scrollbar(
-        child: ListView.builder(
-          itemCount: _watchedTopics.length,
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: _refreshWatched,
+        ),
+        if (_notice != null)
+          SliverToBoxAdapter(
+            child: InlineNotice(
+              text: _notice!,
+              isError: _noticeIsError,
+              onClose: () => setState(() => _notice = null),
+            ),
+          ),
+        SliverList.builder(
           itemBuilder: (context, i) {
             final topic = _watchedTopics[i];
             return TopicTile(
               topic: topic,
               controller: _controller,
-              showThumb: false,                   // 履歴はサムネ無しで軽量に
-              onRemoveIfCached: (id) async {      // ×で「履歴から外す」
+              showThumb: false,
+              onRemoveIfCached: (id) async {
                 await _removeFromWatch(id);
               },
-              onAfterPop: _onDetailReturned,      // 詳細から戻ったフック
+              onAfterPop: _onDetailReturned,
             );
           },
+          itemCount: _watchedTopics.length,
         ),
-      ),
+      ],
     );
   }
 }

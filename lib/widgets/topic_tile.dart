@@ -1,12 +1,14 @@
-import 'topic_tile_controller.dart';
-import 'package:flutter/material.dart';
+// topic_tile.dart (Cupertino版)
+
+import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/cache_service.dart';
 import '../utils/log.dart';
 import '../screens/topic_detail.dart';
 import 'topic_tile_controller.dart';
 
-/// 共通トピックタイル
+/// 共通トピックタイル（Cupertino）
 class TopicTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final TopicTileController controller;
@@ -88,38 +90,72 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
         ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments件'
         : '$comments件';
 
+    final theme = CupertinoTheme.of(context);
+    final titleStyle = theme.textTheme.textStyle.copyWith(
+      fontSize: 14,
+      fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
+      color: _hasCachedComments
+          ? CupertinoColors.activeBlue.resolveFrom(context)
+          : theme.textTheme.textStyle.color,
+    );
+    final subStyle = theme.textTheme.textStyle.copyWith(
+      fontSize: 12,
+      color: CupertinoColors.systemGrey.resolveFrom(context),
+    );
+
     return Container(
       decoration: BoxDecoration(
-        color: _hasCachedComments ? Colors.blue.withOpacity(0.05) : Colors.transparent,
+        color: _hasCachedComments
+            ? CupertinoColors.activeBlue.resolveFrom(context).withOpacity(0.05)
+            : CupertinoColors.transparent,
         border: _hasCachedComments
-            ? const Border(
-                left: BorderSide(color: Colors.blue, width: 4),
+            ? Border(
+                left: BorderSide(
+                  color: CupertinoColors.activeBlue.resolveFrom(context),
+                  width: 4,
+                ),
               )
             : null,
       ),
-      child: ListTile(
+      child: _CupertinoTile(
         leading: widget.showThumb
             ? Stack(
                 clipBehavior: Clip.none,
                 children: [
                   SizedBox(
-                    width: 60, height: 60,
+                    width: 60,
+                    height: 60,
                     child: (thumb != null && thumb.isNotEmpty)
                         ? Image.network(
                             thumb,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.image_not_supported, size: 30, color: Colors.grey),
+                            errorBuilder: (_, __, ___) => Icon(
+                              CupertinoIcons.photo,
+                              size: 28,
+                              color: CupertinoColors.systemGrey.resolveFrom(context),
+                            ),
                           )
-                        : const Icon(Icons.image_not_supported, size: 30, color: Colors.grey),
+                        : Icon(
+                            CupertinoIcons.photo,
+                            size: 28,
+                            color: CupertinoColors.systemGrey.resolveFrom(context),
+                          ),
                   ),
                   if (_hasCachedComments)
                     Positioned(
-                      top: -8, right: -8,
+                      top: -8,
+                      right: -8,
                       child: Container(
-                        decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.activeBlue.resolveFrom(context),
+                          shape: BoxShape.circle,
+                        ),
                         padding: const EdgeInsets.all(4),
-                        child: const Icon(Icons.check, color: Colors.white, size: 16),
+                        child: const Icon(
+                          CupertinoIcons.check_mark_circled_solid,
+                          color: CupertinoColors.white,
+                          size: 16,
+                        ),
                       ),
                     ),
                 ],
@@ -129,31 +165,28 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
           title,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
-            color: _hasCachedComments ? Colors.blue[800] : null,
-          ),
+          style: titleStyle,
         ),
         subtitle: Text(
           'コメント: $commentDisplay $time',
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          style: subStyle,
         ),
         trailing: (_hasCachedComments && widget.onRemoveIfCached != null)
-            ? IconButton(
-                icon: const Icon(Icons.close),
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                minSize: 28,
                 onPressed: () async {
                   await widget.onRemoveIfCached!(id);
-                  // 外側でキャッシュ削除したので自分＆全体の再評価
-                  if (mounted) await refreshCacheState();
-                  await widget.controller.refreshAll();
+                  if (mounted) await refreshCacheState();   // 自分の再評価
+                  await widget.controller.refreshAll();      // 全体再評価
                 },
+                child: const Icon(CupertinoIcons.xmark_circle_fill, size: 20),
               )
             : null,
         onTap: () async {
           await Navigator.push(
             context,
-            MaterialPageRoute(
+            CupertinoPageRoute(
               builder: (_) => TopicDetailScreen(
                 topicId: id,
                 title: title,
@@ -166,6 +199,66 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
           if (mounted) await refreshCacheState();
           await widget.controller.refreshAll();
         },
+      ),
+    );
+  }
+}
+
+/// シンプルなCupertino版タイル（ListTile代替）
+class _CupertinoTile extends StatelessWidget {
+  final Widget? leading;
+  final Widget title;
+  final Widget? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _CupertinoTile({
+    required this.title,
+    this.leading,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dividerColor = CupertinoColors.systemGrey4.resolveFrom(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: dividerColor, width: 0.5),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  title,
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    subtitle!,
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 8),
+              trailing!,
+            ],
+          ],
+        ),
       ),
     );
   }

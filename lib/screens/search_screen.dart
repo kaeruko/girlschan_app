@@ -1,13 +1,12 @@
 // lib/screens/search_screen.dart
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../models/topic.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
-
-// 共通タイル
+import '../widgets/inline_notice.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 
@@ -31,6 +30,8 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
   int _currentPage = 1;
   int _totalCount = 0;
   bool _hasMore = true;
+  String? _notice;
+  bool _noticeIsError = false;
 
   @override
   void initState() {
@@ -105,12 +106,11 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
       await _controller.refreshAll();
     } catch (e) {
       logd('❌ Search error: $e', name: 'Search');
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('検索に失敗しました: $e')),
-        );
-      }
+      setState(() {
+        _isLoading = false;
+        _notice = '検索に失敗しました: $e';
+        _noticeIsError = true;
+      });
     }
   }
 
@@ -152,64 +152,58 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final canSubmit = _searchController.text.isNotEmpty;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('検索')),
-      body: Column(
-        children: [
-          // 検索入力
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '検索キーワード',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchResults = [];
-                            _currentQuery = '';
-                            _totalCount = 0;
-                            _hasMore = false;
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (v) => _performSearch(v),
-            ),
-          ),
-
-          if (canSubmit && _currentQuery.isEmpty)
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('検索'),
+        previousPageTitle: '戻る',
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // 検索入力
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _performSearch(_searchController.text),
-                  icon: const Icon(Icons.search),
-                  label: const Text('検索'),
+              padding: const EdgeInsets.all(16.0),
+              child: CupertinoSearchTextField(
+                controller: _searchController,
+                placeholder: '検索キーワード',
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (v) => _performSearch(v),
+              ),
+            ),
+
+            if (canSubmit && _currentQuery.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: CupertinoButton.filled(
+                    onPressed: () => _performSearch(_searchController.text),
+                    child: const Text('検索'),
+                  ),
                 ),
               ),
-            ),
 
-          if (_currentQuery.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Text(
-                '「$_currentQuery」の検索結果: $_totalCount件',
-                style: Theme.of(context).textTheme.bodySmall,
+            if (_currentQuery.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Text(
+                  '「$_currentQuery」の検索結果: $_totalCount件',
+                  style: const TextStyle(fontSize: 13, color: CupertinoColors.systemGrey),
+                ),
               ),
-            ),
 
-          // 結果リスト
-          Expanded(child: _buildResultsList()),
-        ],
+            if (_notice != null)
+              InlineNotice(
+                text: _notice!,
+                isError: _noticeIsError,
+                onClose: () => setState(() => _notice = null),
+              ),
+
+            // 結果リスト
+            Expanded(child: _buildResultsList()),
+          ],
+        ),
       ),
     );
   }
@@ -220,23 +214,28 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 64, color: Colors.grey[400]),
+            const Icon(CupertinoIcons.search, size: 64, color: CupertinoColors.systemGrey3),
             const SizedBox(height: 16),
-            Text('キーワードを入力して検索', style: Theme.of(context).textTheme.bodyLarge),
+            const Text(
+              'キーワードを入力して検索',
+              style: TextStyle(color: CupertinoColors.systemGrey),
+            ),
           ],
         ),
       );
     }
 
     if (_isLoading && _searchResults.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CupertinoActivityIndicator());
     }
 
     if (_searchResults.isEmpty) {
-      return Center(child: Text('「$_currentQuery」に該当するトピックがありません'));
+      return Center(
+        child: Text('「$_currentQuery」に該当するトピックがありません'),
+      );
     }
 
-    return Scrollbar(
+    return CupertinoScrollbar(
       child: ListView.builder(
         itemCount: _searchResults.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
@@ -245,7 +244,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
             _loadMore();
             return const Padding(
               padding: EdgeInsets.all(16.0),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: CupertinoActivityIndicator()),
             );
           }
           final topic = _searchResults[index];

@@ -160,7 +160,7 @@ class CacheService {
     try {
       final file = await _file(name);
       final exists = await file.exists();
-      print('💾 [CacheService.exists] Checking: $name -> exists: $exists (path: ${file.path})');
+      // print('💾 [CacheService.exists] Checking: $name -> exists: $exists (path: ${file.path})');
       return exists;
     } catch (e) {
       print('❌ Cache exists check error: $e');

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
+import '../widgets/inline_notice.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 
@@ -20,6 +21,8 @@ class TopicListScreenState extends State<TopicListScreen>
 
   List<Map<String, dynamic>> _topics = [];
   bool _loading = true;
+  String? _notice;
+  bool _noticeIsError = false;
 
   @override
   void initState() {
@@ -64,6 +67,7 @@ class TopicListScreenState extends State<TopicListScreen>
       setState(() {
         _topics = list;
         _loading = false;
+        _notice = null;
       });
       await _controller.refreshAll();
     } catch (e) {
@@ -75,13 +79,10 @@ class TopicListScreenState extends State<TopicListScreen>
           _topics = cached.cast<Map<String, dynamic>>();
         }
         _loading = false;
+        _notice = 'データの更新に失敗しました（キャッシュを使用）';
+        _noticeIsError = true;
       });
       await _controller.refreshAll();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('データの更新に失敗しました（キャッシュを使用）')),
-        );
-      }
     }
   }
 
@@ -91,13 +92,24 @@ class TopicListScreenState extends State<TopicListScreen>
     await _controller.refreshAll();
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
       slivers: [
         CupertinoSliverRefreshControl(
           onRefresh: fetchFromServer,
         ),
+        if (_notice != null)
+          SliverToBoxAdapter(
+            child: InlineNotice(
+              text: _notice!,
+              isError: _noticeIsError,
+              onClose: () => setState(() => _notice = null),
+            ),
+          ),
         if (_loading)
           SliverToBoxAdapter(
             child: SizedBox(
@@ -108,19 +120,17 @@ class TopicListScreenState extends State<TopicListScreen>
             ),
           )
         else
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final topic = _topics[index];
-                return TopicTile(
-                  topic: topic,
-                  controller: _controller,
-                  showThumb: true,                      // 一覧はサムネ表示
-                  onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
-                );
-              },
-              childCount: _topics.length,
-            ),
+          SliverList.builder(
+            itemBuilder: (context, index) {
+              final topic = _topics[index];
+              return TopicTile(
+                topic: topic,
+                controller: _controller,
+                showThumb: true,
+                onRemoveIfCached: _removeCommentsCache,
+              );
+            },
+            itemCount: _topics.length,
           ),
       ],
     );

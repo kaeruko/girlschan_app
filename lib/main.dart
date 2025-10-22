@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:girlschan_app/config/app_config.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
@@ -52,24 +53,23 @@ class GirlsChanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoApp(
+    return const CupertinoApp(
+      debugShowCheckedModeBanner: false,
       title: 'がるちゃんあぷり',
-      theme: const CupertinoThemeData(
+      theme: CupertinoThemeData(
         brightness: Brightness.light,
         primaryColor: CupertinoColors.systemPink,
         textTheme: CupertinoTextThemeData(),
       ),
-      home: Platform.isMacOS ? const HomeScreenMacOS() : const HomeScreen(),
-      onGenerateRoute: (settings) {
-        if (settings.name?.startsWith('/search') ?? false) {
-          final uri = Uri.parse(settings.name!);
-          final query = uri.queryParameters['q'] ?? '';
-          return CupertinoPageRoute(
-            builder: (context) => SearchScreen(initialQuery: query),
-          );
-        }
-        return null;
-      },
+      localizationsDelegates: <LocalizationsDelegate<dynamic>>[
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: <Locale>[
+        Locale('ja'),
+        Locale('en'),
+      ],
+      home: HomeScreenMacOS(),
     );
   }
 }
