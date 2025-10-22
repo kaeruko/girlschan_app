@@ -1,140 +1,74 @@
-# girlschan_app - クイックスタートガイド
+# がるちゃんアプリ - インストール方法
 
-Apple Developer アカウントなしで、macOS にインストール・実行できます。
+## 📥 ダウンロード
 
-## 🚀 最も簡単な方法（推奨）
+Google Drive から `girlschan_app.dmg` をダウンロードしてください。
 
-### 方法A：DMG ファイルを使用（最も推奨）
+## 💻 インストール手順（3ステップで完了）
 
-1. **DMG ファイルをダウンロード**
-   - リリースページから `girlschan_app.dmg` をダウンロード
+### ステップ 1：DMG ファイルを開く
+ダウンロードした `girlschan_app.dmg` をダブルクリックしてください。
 
-2. **インストール**
-   - ダウンロードした `girlschan_app.dmg` をダブルクリック
-   - 開いたウィンドウで `girlschan_app.app` を Applications フォルダにドラッグ
+### ステップ 2：アプリをコピー
+インストールウィンドウが開いたら、`girlschan_app` を **Applications フォルダにドラッグ**してください。
 
-3. **起動**
-   - Launchpad または Applications フォルダから起動
+![インストール画像]
 
-### 方法B：.app ファイルを直接実行
+### ステップ 3：起動
+Applications フォルダから `がるちゃんアプリ` をダブルクリックすれば、アプリが起動します。
 
-1. **ZIP ファイルをダウンロード**
-   - リリースページから `girlschan_app.app.zip` をダウンロード
-   - ZIP を解凍
+Launchpad（Mac のアプリケーションメニュー）からも起動できます。
 
-2. **初回実行時の対処**
-   ```bash
-   # ターミナルを開いて実行
-   xattr -rd com.apple.quarantine ~/Downloads/girlschan_app.app
-   open ~/Downloads/girlschan_app.app
-   ```
+## ⚠️ 初回起動時に「ファイルが破損している可能性があります」と表示される場合
 
-3. **永続的にインストール（オプション）**
-   ```bash
-   # Applications フォルダにコピー
-   cp -r ~/Downloads/girlschan_app.app /Applications/
-   ```
+macOS のセキュリティ機能によるメッセージです。以下の手順で解決できます。
 
-## ⚠️ セキュリティ警告が出た場合
+### 対処方法
 
-Apple Developer アカウントなしでビルドしているため、初回起動時に警告が表示される場合があります。
+1. **Applications フォルダで、アプリを右クリック**
+2. **「このまま開く」をクリック**
+3. **「開く」ボタンをクリック**
 
-### 対処方法1：Finder から開く
+これで起動します。2回目以降は警告が出ません。
 
-1. アプリケーションを **右クリック**
-2. 「情報を見る」をクリック
-3. 「このまま開く」ボタンをクリック
+## �️ 必要な環境
 
-### 対処方法2：ターミナルから実行
+- **Mac（macOS 10.11 以上）**
+- **メモリ：2GB 以上**
+- **空き容量：100MB 以上**
 
-```bash
-# セキュリティ属性をクリア
-xattr -rd com.apple.quarantine /Applications/girlschan_app.app
+新しい Mac であれば、ほぼすべてのモデルで動作します。
 
-# 起動
-open /Applications/girlschan_app.app
-```
+## 🚀 その他の起動方法
 
-### 対処方法3：ターミナルから直接起動
+### Spotlight 検索から起動
+1. `Command + Space` を押す
+2. 「がるちゃん」と入力
+3. Enter キーを押す
 
-```bash
-/Applications/girlschan_app.app/Contents/MacOS/girlschan_app
-```
+### Dock に追加
+- Applications フォルダから Dock にドラッグして、よく使うアプリとして登録できます
 
-## 📋 システム要件
+## ❓ よくある質問
 
-- **OS**: macOS 10.11（El Capitan）以上
-- **推奨**: macOS 12.0（Monterey）以上
-- **CPU**: Intel または Apple Silicon（M1/M2 など）
-- **メモリ**: 2GB 以上
-- **ディスク**: 100MB 以上の空き容量
-
-## 🔧 自分でビルドする場合
-
-### 要件
-- Xcode Command Line Tools
-- Flutter SDK（3.0 以上）
-
-### ビルド手順
-
-```bash
-# リポジトリをクローン
-git clone https://github.com/kaeruko/girlschan_app.git
-cd girlschan_app
-
-# 依存関係をインストール
-flutter pub get
-
-# ビルド
-flutter build macos --release
-
-# アプリが完成
-ls -lh build/macos/Build/Products/Release/girlschan_app.app
-```
-
-### インストールスクリプトを使用
-
-```bash
-# スクリプトから選択
-bash scripts/install.sh
-```
-
-## 📦 DMG ファイルの作成（開発者向け）
-
-ビルド後、DMG ファイルを作成できます：
-
-```bash
-bash scripts/create_dmg.sh
-```
-
-## 🐛 トラブルシューティング
-
-### Q: 「ファイルが破損している可能性があります」と表示される
-
-**A:** 以下のコマンドで解決します：
-```bash
-xattr -rd com.apple.quarantine /Applications/girlschan_app.app
-```
+### Q: インストールしたのに見つからない
+**A:** Applications フォルダを確認してください。見つからない場合は、DMG から再度ドラッグしてください。
 
 ### Q: アプリが起動しない
+**A:** 右クリックから「このまま開く」を選択してください。ファイアウォールやセキュリティソフトが原因の場合もあります。
 
-**A:** ターミナルから直接実行してエラーを確認：
-```bash
-/Applications/girlschan_app.app/Contents/MacOS/girlschan_app
-```
+### Q: アップデートはどうする？
+**A:** 新しいバージョンが公開されたら、Google Drive から新しい DMG をダウンロードしてインストールしてください。古いバージョンを削除してから、新しいものをインストールします。
 
-### Q: M1/M2 Mac で動作しない
+### Q: アンインストール方法は？
+**A:** Applications フォルダから `がるちゃんアプリ` をゴミ箱にドラッグするだけです。
 
-**A:** このアプリは Intel および Apple Silicon の両方に対応しています。ターミナルから実行してエラーを確認してください。
+## 🆘 問題が解決しない場合
 
-## 📝 詳細情報
-
-より詳しい情報は `README.md` を参照してください。
-
-## 🤝 サポート
-
-問題が発生した場合は、GitHub Issues で報告してください。
+以下の情報を確認してから、サポートに連絡してください：
+- Mac のバージョン（Apple メニュー → このマックについて）
+- エラーメッセージの内容
 
 ---
 
-**Apple Developer アカウントがなくても、これで macOS アプリとして配布・使用できます！**
+**インストール完了後は、アプリをお楽しみください！** 🎉

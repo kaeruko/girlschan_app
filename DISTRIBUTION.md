@@ -1,194 +1,125 @@
-# 配布ガイド
-
-Apple Developer アカウントなしで macOS アプリを配布・インストールする完全ガイドです。
+# Google Drive でのアプリ配布ガイド
 
 ## 📦 配布ファイル
 
-### ユーザー向け
+**`girlschan_app.dmg`** - ユーザーにダウンロードしてもらうファイル（約 56MB）
 
-- **`girlschan_app.dmg`** - 推奨配布形式
-  - 標準的な macOS インストール形式
-  - ドラッグ&ドロップで簡単にインストール可能
-  - ファイルサイズ: 約 56MB
+その他のファイル：
+- `README.md` - アプリの説明
+- `INSTALL.md` - インストール方法（ユーザーに共有）
 
-- **`girlschan_app.app`** - 直接実行版
-  - ビルドディレクトリ: `build/macos/Build/Products/Release/girlschan_app.app`
-  - ファイルサイズ: 約 44MB
-  - ZIP にしても配布可能
+## 📤 Google Drive にアップロード
 
-### 開発者向け
+### 手順
 
-- **`INSTALL.md`** - ユーザー向けインストールガイド
-- **`README.md`** - 詳細なドキュメント
-- **`scripts/install.sh`** - インストール/実行補助スクリプト
-- **`scripts/create_dmg.sh`** - DMG ファイル生成スクリプト
+1. **Google Drive にログイン**
+   - https://drive.google.com
 
-## 🚀 配布方法
+2. **ファイルをアップロード**
+   - 「新規」→「ファイルのアップロード」
+   - `girlschan_app.dmg` を選択
 
-### 方法1：GitHub Releases で配布（推奨）
+3. **フォルダを作成（推奨）**
+   - 「新規」→「フォルダ」
+   - フォルダ名：「がるちゃんアプリ」
+   - `girlschan_app.dmg` と `INSTALL.md` を入れる
 
-1. **GitHub リポジトリに移動**
-   ```bash
-   cd /Users/yokina/work/girlschan_app
-   git remote -v
-   ```
+4. **共有設定**
+   - フォルダを右クリック → 「共有」
+   - 「リンクをコピー」をクリック
+   - 「リンク共有を有効」に変更
+   - リンクをユーザーに配布
 
-2. **新しいリリースを作成**
-   - GitHub のリポジトリページで「Releases」をクリック
-   - 「New release」をクリック
-   - タグバージョンを入力（例: `v1.0.0`）
-   - リリースタイトルと説明を入力
-   - 以下のファイルをアップロード：
-     - `girlschan_app.dmg`
-     - `INSTALL.md`
+## 🔗 共有リンクの設定
 
-3. **ユーザーがダウンロード**
-   - Releases ページから DMG ファイルをダウンロード
-   - ダブルクリックでインストール
+### リンクの権限設定
+- 「閲覧者」に設定（ダウンロードのみ可能）
+- パスワード保護も可能（オプション）
 
-### 方法2：ウェブサイトで配布
+### リンク共有のコピー例
+```
+https://drive.google.com/drive/folders/xxxxxxxxxxxxx?usp=sharing
+```
 
-1. **サーバーにアップロード**
-   ```bash
-   # 例: SCP でアップロード
-   scp girlschan_app.dmg user@server:/var/www/html/downloads/
-   ```
+## 📋 ユーザーへの配布方法
 
-2. **ダウンロードリンクを提供**
-   ```html
-   <a href="https://example.com/downloads/girlschan_app.dmg">
-     Download girlschan_app
-   </a>
-   ```
+### メール、SNS、Web サイトでのリンク共有
 
-3. **INSTALL.md の内容をページに表示**
+以下の文面を参考に配布してください：
 
-### 方法3：クラウドストレージで配布
+```
+🎉 がるちゃんアプリをリリースしました！
 
-- **Google Drive**
-  - ファイルをアップロード
-  - 共有リンクを取得
-  - ユーザーに共有リンクを配布
+Google Drive からダウンロードしてください：
+[リンク]
 
-- **Dropbox**
-  - ファイルをアップロード
-  - 公開リンクを生成
-  - ユーザーに配布
-
-- **OneDrive**
-  - ファイルをアップロード
-  - 共有リンクを生成
-  - ユーザーに配布
-
-## 📋 ユーザーへのインストール説明
-
-### シンプル版（推奨）
-
-```markdown
-## インストール方法
-
-1. `girlschan_app.dmg` をダウンロード
+� インストール方法：
+1. DMG ファイルをダウンロード
 2. ダブルクリックで開く
-3. `girlschan_app.app` を Applications フォルダにドラッグ
-4. Launchpad または Applications から起動
+3. アプリを Applications フォルダにドラッグ
+4. 起動したら完了！
+
+詳しい手順は INSTALL.md をご覧ください。
 ```
 
-### セキュリティ警告が出た場合
+## 🔄 アプリの更新
 
-```markdown
-## ファイルが破損していると言われる場合
+### 新バージョンを公開する場合
 
-以下の **いずれか** の方法で解決できます：
+1. **新しい DMG ファイルを作成**
+   ```bash
+   bash scripts/create_dmg.sh
+   ```
 
-### 方法1（簡単）
-1. アプリを右クリック
-2. 「情報を見る」をクリック
-3. 「このまま開く」をクリック
+2. **Google Drive の古いファイルを削除**
+   - 古い `girlschan_app.dmg` を削除
 
-### 方法2（ターミナル）
-```bash
-xattr -rd com.apple.quarantine /Applications/girlschan_app.app
-open /Applications/girlschan_app.app
+3. **新しい DMG ファイルをアップロード**
+   - 新しい `girlschan_app.dmg` をアップロード
+
+4. **ユーザーに通知**
+   - 新バージョンが利用可能なことをお知らせ
+
+### ユーザーのアップデート方法
+
 ```
+新しいバージョンをリリースしました。
+以下の手順でアップデートしてください：
+
+1. Google Drive から新しい DMG をダウンロード
+2. 新しいアプリをインストール
+3. 古いアプリを削除（オプション）
 ```
-
-## 🔄 更新方法
-
-### 新バージョンのリリース手順
-
-```bash
-# 1. アプリを修正・改善
-# (コード変更など)
-
-# 2. バージョン番号を更新
-# pubspec.yaml の version フィールドを更新
-
-# 3. 再ビルド
-flutter build macos --release
-
-# 4. 新しい DMG を作成
-bash scripts/create_dmg.sh
-
-# 5. Git にコミット・プッシュ
-git add .
-git commit -m "Release v1.1.0"
-git push origin main
-
-# 6. GitHub Release を作成
-# （手動で GitHub ウェブサイトから）
-```
-
-## 📊 配布統計情報の追跡
-
-### 簡易的な方法
-
-- **Google Analytics** - ウェブサイトのダウンロードリンクにスクリプトを追加
-- **GitHub Release Downloads** - GitHub Releases のダウンロード数を確認
-- **Dropbox/Google Drive** - 共有リンクのアクセス統計
 
 ## ✅ チェックリスト
 
 配布前に確認：
 
-- [ ] アプリが正常に起動するか確認
-- [ ] macOS 互換性をテスト（複数バージョンで）
-- [ ] Intel Mac と Apple Silicon Mac の両方でテスト
-- [ ] セキュリティ警告の対処方法をドキュメント化
-- [ ] INSTALL.md が最新か確認
-- [ ] README.md が最新か確認
-- [ ] ビルドが成功しているか確認
+- [ ] `girlschan_app.dmg` が正常に作成されたか確認
+- [ ] DMG ファイルをダウンロードしてテスト
+- [ ] Google Drive にアップロード完了
+- [ ] 共有リンクが正常に動作するか確認
+- [ ] INSTALL.md の内容を確認
+- [ ] README.md の内容を確認
+- [ ] ユーザーへの配布文面を確認
 
-## 🆚 配布形式の比較
+## � トラブルシューティング
 
-| 形式 | サイズ | 配布方法 | インストール難易度 |
-|------|--------|---------|-------------------|
-| DMG | 56MB | GitHub/Web | 簡単 |
-| .app ZIP | 44MB | メール/Web | 中程度 |
-| GitHub Releases | 変動 | GitHub | 簡単 |
-| インストーラー | 大 | Web | 簡単 |
+### Google Drive のダウンロード制限
 
-## 📝 ライセンス注記
+Google Drive では大容量ファイルのダウンロード時に警告が表示される場合があります。
+この場合、ユーザーは「ダウンロード」ボタンをクリックして続行できます。
 
-Apple Developer アカウントがなくても配布可能ですが、以下の制限があります：
+### ファイルサイズが大きい
 
-- **署名なし** - ユーザーが初回起動時に確認が必要
-- **公証化なし** - 新しい macOS で警告が表示される可能性
-- **更新通知なし** - 手動でダウンロードしてもらう必要がある
+- DMG ファイルが 56MB の場合、Google Drive の無料容量（15GB）で十分です
+- 複数バージョンを保持する場合は、古いバージョンは削除してください
 
-## 💰 今後のステップ（オプション）
+### ダウンロードが遅い場合
 
-### Apple Developer アカウント取得時
-
-- Developer ID で署名（年間 99 USD）
-- App Store での配布
-- 自動更新機能の追加
-
-### 初回配布時の無料選択肢
-
-- **現在のセットアップのまま配布** - 署名なし
-- **オンラインで無料コード署名** - Web ベースのツール
-- **コミュニティツール** - オープンソースの署名ツール
+- ユーザーのネットワーク接続を確認
+- Google Drive の同期サービスを使わず、直接ダウンロードさせる
 
 ---
 
-**このドキュメントを参考に、ユーザーへの配布を進めてください！**
+**Google Drive での配布が完了しました。ユーザーに共有リンクを配布してください！**
