@@ -34,22 +34,17 @@ class GirlsChanApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoApp(
-      debugShowCheckedModeBanner: false,
       title: 'がるちゃんあぷり',
-      theme: const CupertinoThemeData(
-        brightness: Brightness.light,
-        primaryColor: CupertinoColors.systemPink,
-        textTheme: CupertinoTextThemeData(),
-      ),
-      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-        DefaultCupertinoLocalizations.delegate,
-        DefaultWidgetsLocalizations.delegate,
+      locale: const Locale('ja', 'JP'),
+      localizationsDelegates: const [
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate, 
       ],
-      supportedLocales: const <Locale>[
-        Locale('ja'),
-        Locale('en'),
+      supportedLocales: const [
+        Locale('ja', 'JP'),
+        Locale('en', 'US'),
       ],
-      // プラットフォーム依存を AdaptiveShell に隠す
       home: AdaptiveShell(tabs: kAppTabs),
     );
   }
