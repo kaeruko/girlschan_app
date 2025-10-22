@@ -369,30 +369,30 @@ Future<List<Map<String, dynamic>>> getWatchedTopics() async {
   
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
+  // logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
   
   final topics = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
+  // logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
   
   // 各トピックのメタキャッシュから最新のコメント数を取得
   for (final topic in topics) {
     final topicId = topic['id'] as int;
-    logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
+    // logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
     
     try {
-      logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
+      // logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
       final meta = await CacheService.loadMap('topic_meta_$topicId');
       
       if (meta != null) {
         final total = meta['total'] as int?;
-        logd('📋 [getWatchedTopics] Got meta: total=$total');
+        // logd('📋 [getWatchedTopics] Got meta: total=$total');
         
         if (total != null) {
-          logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
+          // logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
           topic['comments'] = total;
         }
       } else {
-        logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
+        // logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
       }
     } catch (e, st) {
       logd('📋 [getWatchedTopics] ❌ Error processing topic $topicId: $e');
@@ -401,7 +401,7 @@ Future<List<Map<String, dynamic>>> getWatchedTopics() async {
   }
   
   logd('📋 [getWatchedTopics] ✅ Complete');
-  return topics;
+  return topics.reversed.toList();
 }
 
 /// 履歴のトピックIDリストを取得（後方互換性用）

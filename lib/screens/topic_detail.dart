@@ -13,6 +13,8 @@ class TopicDetailScreen extends StatefulWidget {
   final int topicId;
   final String title;
   final int commentCount;
+
+  // ★ 追加: テスト用バイパス
   final bool enableRefresh;
   final bool testingBypassInit;
   final List<Map<String, dynamic>>? testingInitialComments;
@@ -51,27 +53,25 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   void initState() {
     super.initState();
-    logd('initState: topicId=${widget.topicId}, title=${widget.title}');
-    
-    // テスト用: 初期ロードをバイパス
+
+    // ★ 追加: テストバイパス
     if (widget.testingBypassInit) {
-      if (widget.testingInitialComments != null) {
-        _allComments = widget.testingInitialComments!;
-        _totalComments = widget.commentCount;
-      }
+      _allComments = (widget.testingInitialComments ?? const [])
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      _totalComments = _allComments.length;
       _loading = false;
+      // 復元や差分同期など一切走らせない
       return;
     }
-    
+
+    logd('initState: topicId=${widget.topicId}, title=${widget.title}');
     _load();
   }
 
   @override
   void dispose() {
-    // テスト中はスクロール位置の保存をスキップ
-    if (!widget.testingBypassInit) {
-      _saveScrollPosition();
-    }
+    _saveScrollPosition();
     _scrollController.dispose();
     super.dispose();
   }
@@ -879,6 +879,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       controller: _scrollController,
       primary: false,
       slivers: [
+        // ★ 変更: テスト時はRefreshControlを無効化できるように
         if (widget.enableRefresh)
           CupertinoSliverRefreshControl(
             onRefresh: fetchComments,

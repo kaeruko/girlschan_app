@@ -1,6 +1,6 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../utils/platform_helper.dart';
+import '../router/app_router.dart';
 import 'topic_detail.dart';
 
 class ClipsScreen extends StatefulWidget {
@@ -23,6 +23,7 @@ class _ClipsScreenState extends State<ClipsScreen> {
   Future<void> _loadClips() async {
     final clips = await getClippedComments();
     setState(() {
+      // 新しい順（clipDate 降順）でソート
       clips.sort((a, b) {
         final dateA = DateTime.parse(a['clipDate'] as String);
         final dateB = DateTime.parse(b['clipDate'] as String);
@@ -45,7 +46,6 @@ class _ClipsScreenState extends State<ClipsScreen> {
           (c) => c['topicId'] == topicId && c['no'] == commentNo,
         );
       });
-      // PlatformHelper.showSnackBar(context, 'クリップを削除しました');
     }
   }
 
@@ -57,7 +57,7 @@ class _ClipsScreenState extends State<ClipsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Center(child: PlatformHelper.buildLoadingIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_clips.isEmpty) {
@@ -66,24 +66,24 @@ class _ClipsScreenState extends State<ClipsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              CupertinoIcons.heart,
+              Icons.favorite_border,
               size: 64,
-              color: CupertinoColors.systemGrey,
+              color: Colors.grey[400],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'クリップはまだありません',
               style: TextStyle(
                 fontSize: 16,
-                color: CupertinoColors.secondaryLabel,
+                color: Colors.grey[600],
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'コメント右の❤️をタップして保存',
               style: TextStyle(
                 fontSize: 13,
-                color: CupertinoColors.tertiaryLabel,
+                color: Colors.grey[500],
               ),
             ),
           ],
@@ -91,105 +91,89 @@ class _ClipsScreenState extends State<ClipsScreen> {
       );
     }
 
-    return CustomScrollView(
-      slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: _refreshClips,
-        ),
-        SliverPadding(
+    return RefreshIndicator(
+      onRefresh: _refreshClips,
+      child: Scrollbar(
+        child: ListView.builder(
+          itemCount: _clips.length,
           padding: const EdgeInsets.symmetric(vertical: 8),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) => _buildClipCard(context, _clips[i]),
-              childCount: _clips.length,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+          itemBuilder: (context, i) {
+            final clip = _clips[i];
+            final topicTitle = clip['topicTitle'] as String;
+            final commentBody = clip['body'] as String;
+            final commentNo = clip['no'] as int;
+            final time = clip['time'] as String;
+            final plus = clip['plus'] as int;
+            final minus = clip['minus'] as int;
+            final topicId = clip['topicId'] as int;
 
-  Widget _buildClipCard(BuildContext context, Map<String, dynamic> clip) {
-    final topicTitle = clip['topicTitle'] as String;
-    final commentBody = clip['body'] as String;
-    final commentNo = clip['no'] as int;
-    final time = clip['time'] as String;
-    final plus = clip['plus'] as int;
-    final minus = clip['minus'] as int;
-    final topicId = clip['topicId'] as int;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          CupertinoPageRoute(
-            builder: (_) => TopicDetailScreen(
-              topicId: topicId,
-              title: topicTitle,
-              commentCount: 0,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: CupertinoColors.white,
-          border: Border.all(
-            color: CupertinoColors.separator,
-            width: 0.5,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              topicTitle,
-              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                fontSize: 13,
-                color: CupertinoColors.secondaryLabel,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              commentBody,
-              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                fontSize: 14,
-              ),
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    'No.$commentNo • $time • ＋$plus −$minus',
-                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel,
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: InkWell(
+                onTap: () {
+                  AppRouter.pushTopicDetail(
+                    context,
+                    topicId: topicId.toString(),
+                    title: topicTitle,
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // トピックタイトル
+                      Text(
+                        topicTitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      // コメント本文
+                      Text(
+                        commentBody,
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                    // 情報行（No・日時・評価）と削除ボタン
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'No.$commentNo • $time • ＋$plus −$minus',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.close,
+                            size: 18,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () => _removeClip(clip),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                        ),
+                      ],
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ),
-                CupertinoButton(
-                  padding: const EdgeInsets.all(4),
-                  onPressed: () => _removeClip(clip),
-                  child: const Icon(
-                    CupertinoIcons.xmark,
-                    size: 18,
-                    color: CupertinoColors.secondaryLabel,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ],
+          );
+          },
         ),
       ),
     );

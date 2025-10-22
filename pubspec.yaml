@@ -41,10 +41,12 @@ flutter:
   assets:
     - assets/mock_data/topics.json
     - assets/mock_data/
-  fonts:
-    - family: NotoSansCJKjp
-      fonts:
-        - asset: assets/fonts/NotoSansCJKjp-VF.ttf
+  # フォントをプロジェクトで使わないならフォント定義は省略でOK
+  # もし全プラットフォームで同じ和文フォントに固定したい場合は、ここで共通定義に戻す
+  # fonts:
+  #   - family: NotoSansCJKjp
+  #     fonts:
+  #       - asset: assets/fonts/NotoSansCJKjp-VF.ttf
 
 flutter_launcher_icons:
   ios: true

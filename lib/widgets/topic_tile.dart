@@ -54,7 +54,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   @override
   Future<void> refreshCacheState() async {
     final id = widget.topic['id'] as int;
-    logd('🔍 [TopicTile.refreshCacheState] id=$id', name: 'TopicTile');
+    // logd('🔍 [TopicTile.refreshCacheState] id=$id', name: 'TopicTile');
 
     final hasCached = await CacheService.exists('comments_$id');
 

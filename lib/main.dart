@@ -5,6 +5,7 @@ import 'config/app_config.dart';
 import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
 import 'desktop/desktop_window.dart';
+import 'router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,7 @@ class GirlsChanApp extends StatelessWidget {
         Locale('ja', 'JP'),
         Locale('en', 'US'),
       ],
+      onGenerateRoute: AppRouter.onGenerateRoute,
       home: AdaptiveShell(tabs: kAppTabs),
     );
   }

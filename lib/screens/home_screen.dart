@@ -1,5 +1,7 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import '../app/app_tabs.dart';
+import '../router/app_router.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,62 +15,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: null,
-      child: SafeArea(
-        child: Row(
-          children: [
-            // サイドメニューバー
-            Container(
-              width: 60,
-              color: CupertinoColors.systemGrey6,
-              child: Column(
-                children: List.generate(
-                  kAppTabs.length,
-                  (index) => Expanded(
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        setState(() => _currentIndex = index);
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: _currentIndex == index
-                              ? CupertinoColors.systemPink.withAlpha(50)
-                              : CupertinoColors.transparent,
-                          border: _currentIndex == index
-                              ? const Border(
-                                  right: BorderSide(
-                                    color: CupertinoColors.systemPink,
-                                    width: 3,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        child: Center(
-                          child: Text(
-                            kAppTabs[index].label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _currentIndex == index
-                                  ? CupertinoColors.systemPink
-                                  : CupertinoColors.systemGrey,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+    final currentTab = kAppTabs[_currentIndex];
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(currentTab.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              AppRouter.pushSearch(context);
+            },
+          ),
+        ],
+      ),
+      body: currentTab.widget,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.pinkAccent,
+        type: BottomNavigationBarType.fixed,
+        onTap: (i) => setState(() => _currentIndex = i),
+        items: [
+          for (final tab in kAppTabs)
+            BottomNavigationBarItem(
+              icon: Icon(tab.icon),
+              label: tab.label,
             ),
-            // コンテンツエリア
-            Expanded(
-              child: kAppTabs[_currentIndex].widget,
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

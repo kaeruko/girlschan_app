@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import '../app/app_tabs.dart';
+import '../router/app_router.dart';
 
 class IOSShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -26,6 +27,7 @@ class _IOSShellState extends State<IOSShell> {
       tabBuilder: (context, i) {
         // ここは必ず CupertinoTabView にしておく（iOSでの戻るアニメ等が自然になる）
         return CupertinoTabView(
+          onGenerateRoute: AppRouter.onGenerateRoute,
           builder: (_) => widget.tabs[i].widget,
         );
       },

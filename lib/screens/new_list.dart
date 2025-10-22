@@ -1,12 +1,13 @@
 // lib/screens/new_list.dart
 import 'dart:convert';
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
-import '../widgets/inline_notice.dart';
+
+// 共通コンポーネント
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 
@@ -14,10 +15,10 @@ class NewListScreen extends StatefulWidget {
   const NewListScreen({super.key});
 
   @override
-  State<NewListScreen> createState() => NewListScreenState();
+  State<NewListScreen> createState() => _NewListScreenState();
 }
 
-class NewListScreenState extends State<NewListScreen>
+class _NewListScreenState extends State<NewListScreen>
     with WidgetsBindingObserver {
   static const String cacheKey = 'new_topics';
 
@@ -25,8 +26,6 @@ class NewListScreenState extends State<NewListScreen>
 
   List<Map<String, dynamic>> _topics = [];
   bool _loading = true;
-  String? _notice;
-  bool _noticeIsError = false;
 
   @override
   void initState() {
@@ -68,13 +67,13 @@ class NewListScreenState extends State<NewListScreen>
       });
       await _controller.refreshAll();
     } else {
-      await fetchFromServer();
+      await _fetchFromServer();
     }
   }
 
-  Future<void> fetchFromServer() async {
+  Future<void> _fetchFromServer() async {
     try {
-      logd('🌐 [NewList.fetchFromServer] GET /topics/new', name: 'NewList');
+      logd('🌐 [NewList._fetchFromServer] GET /topics/new', name: 'NewList');
       final uri = Uri.parse('${AppConfig.apiBase}/topics/new');
       final res = await http.get(uri);
       if (res.statusCode != 200) {
@@ -90,12 +89,11 @@ class NewListScreenState extends State<NewListScreen>
       setState(() {
         _topics = list;
         _loading = false;
-        _notice = null;
       });
 
       await _controller.refreshAll();
     } catch (e) {
-      logd('❌ [NewList.fetchFromServer] $e', name: 'NewList');
+      logd('❌ [NewList._fetchFromServer] $e', name: 'NewList');
       final cached = await CacheService.load(cacheKey);
       if (!mounted) return;
       setState(() {
@@ -103,48 +101,42 @@ class NewListScreenState extends State<NewListScreen>
           _topics = cached.cast<Map<String, dynamic>>();
         }
         _loading = false;
-        _notice = '通信に失敗しました（キャッシュを使用）';
-        _noticeIsError = true;
       });
       await _controller.refreshAll();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('通信に失敗しました（キャッシュを使用）')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CupertinoActivityIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
 
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: fetchFromServer,
-        ),
-        if (_notice != null)
-          SliverToBoxAdapter(
-            child: InlineNotice(
-              text: _notice!,
-              isError: _noticeIsError,
-              onClose: () => setState(() => _notice = null),
-            ),
+    return RefreshIndicator(
+      onRefresh: _fetchFromServer,
+      child: Scrollbar(
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
           ),
-        SliverList.builder(
+          itemCount: _topics.length,
           itemBuilder: (context, i) {
             final t = _topics[i];
             return TopicTile(
               topic: t,
               controller: _controller,
-              showThumb: true,
-              onRemoveIfCached: _removeCommentsCache,
+              showThumb: true,                 // 新着はサムネ表示
+              onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
+              // onAfterPop: 何か必要なら渡せる
             );
           },
-          itemCount: _topics.length,
         ),
-      ],
+      ),
     );
   }
 }
