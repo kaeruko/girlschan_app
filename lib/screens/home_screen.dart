@@ -1,8 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'new_list.dart';
-import 'topic_list.dart';
-import 'favorites_screen.dart';
-import 'clips_screen.dart';
+import '../app/app_tabs.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,20 +10,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-
-  final _tabs = const [
-    NewListScreen(),
-    TopicListScreen(),
-    FavoritesScreen(),
-    ClipsScreen(),
-  ];
-
-  final _labels = const [
-    '新着',
-    '人気',
-    '履歴',
-    'クリップ',
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: CupertinoColors.systemGrey6,
               child: Column(
                 children: List.generate(
-                  _tabs.length,
+                  kAppTabs.length,
                   (index) => Expanded(
                     child: CupertinoButton(
                       padding: EdgeInsets.zero,
@@ -65,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            _labels[index],
+                            kAppTabs[index].label,
                             style: TextStyle(
                               fontSize: 12,
                               color: _currentIndex == index
@@ -82,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             // コンテンツエリア
             Expanded(
-              child: _tabs[_currentIndex],
+              child: kAppTabs[_currentIndex].widget,
             ),
           ],
         ),
