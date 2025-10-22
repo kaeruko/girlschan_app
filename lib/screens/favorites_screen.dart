@@ -155,6 +155,7 @@ class _FavoritesTile extends StatefulWidget {
 class _FavoritesTileState extends State<_FavoritesTile> {
   bool _hasCachedComments = false;
   int _cachedCommentCount = 0;
+  int _savedCommentNo = 0;  // 復元対象のコメント番号
 
   @override
   void initState() {
@@ -173,17 +174,20 @@ class _FavoritesTileState extends State<_FavoritesTile> {
     final id = widget.topic['id'] as int;
     final hasCached = await CacheService.exists('comments_$id');
     
-    // SharedPreferencesからキャッシュされたコメント数を取得
+    // SharedPreferencesからキャッシュされたコメント数と保存位置を取得
     int cachedCount = 0;
+    int savedCommentNo = 0;
     if (hasCached) {
       final prefs = await SharedPreferences.getInstance();
       cachedCount = prefs.getInt('synced_$id') ?? 0;
+      savedCommentNo = prefs.getInt('scroll_$id') ?? 0;
     }
     
     if (mounted) {
       setState(() {
         _hasCachedComments = hasCached;
         _cachedCommentCount = cachedCount;
+        _savedCommentNo = savedCommentNo;
       });
     }
   }
@@ -195,9 +199,9 @@ class _FavoritesTileState extends State<_FavoritesTile> {
     final comments = widget.topic['comments'] as int? ?? 0;
     final time = widget.topic['time'] as String? ?? '';
 
-    // キャッシュ数/総数形式でコメント数を表示
+    // キャッシュ数/総数形式でコメント数を表示、保存位置があれば追加表示
     final commentDisplay = _hasCachedComments 
-        ? '$_cachedCommentCount/$comments件'
+        ? '${_savedCommentNo > 0 ? ' (No.$_savedCommentNo)' : ''}/$comments件'
         : '$comments件';
 
     return Container(
