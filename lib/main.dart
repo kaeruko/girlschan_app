@@ -4,9 +4,9 @@ import 'package:girlschan_app/config/app_config.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'dart:io';
-import 'screens/home_screen.dart';
-import 'screens/home_screen_macos.dart';
-import 'screens/search_screen.dart';
+import 'app/app_tabs.dart';
+import 'shell/ios_shell.dart';
+import 'shell/macos_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,23 +53,27 @@ class GirlsChanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const CupertinoApp(
+    // フェーズ1の kAppTabs を使う
+    final tabs = kAppTabs;
+
+    return CupertinoApp(
       debugShowCheckedModeBanner: false,
       title: 'がるちゃんあぷり',
-      theme: CupertinoThemeData(
+      theme: const CupertinoThemeData(
         brightness: Brightness.light,
         primaryColor: CupertinoColors.systemPink,
         textTheme: CupertinoTextThemeData(),
       ),
-      localizationsDelegates: <LocalizationsDelegate<dynamic>>[
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
-      supportedLocales: <Locale>[
+      supportedLocales: const <Locale>[
         Locale('ja'),
         Locale('en'),
       ],
-      home: HomeScreenMacOS(),
+      // プラットフォーム分岐
+      home: Platform.isMacOS ? MacShell(tabs: tabs) : IOSShell(tabs: tabs),
     );
   }
 }
