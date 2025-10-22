@@ -41,6 +41,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   static const Duration _bottomCheckCooldown = Duration(seconds: 2);
 
   static const int _commentsPerPage = 10;
+  static const double _kItemExtent = 150.0; // ← 推定アイテム高さを統一
   final ScrollController _scrollController = ScrollController();
   int _savedCommentNo = 0;        // ★ 修正: ピクセル位置→コメントNo
   Set<int> _clippedCommentNos = {};
@@ -98,8 +99,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       }
       
       // ListView.builder内でのコメント位置を計算
-      // アイテム高さを150pxと仮定（ヘッダー等込み）
-      final estimatedOffset = targetIndex * 150.0;
+      // 推定アイテム高さでオフセット計算
+      final estimatedOffset = targetIndex * _kItemExtent;
       
       if (!_scrollController.hasClients) {
         _isRestoringScroll = false;
@@ -253,17 +254,21 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   // スクロール位置保存
   // =========================================
   Future<void> _saveScrollPosition() async {
+    if (_isRestoringScroll) {
+      logd('💾 スクロール位置保存: skip (restoring)');
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
-    if (_scrollController.hasClients) {
+    if (_scrollController.hasClients && _allComments.isNotEmpty) {
       // 現在のスクロール位置に最も近いコメントのNoを取得
       int commentNo = 0;
       final current = _scrollController.offset;
       
       // シンプルな推定: (offset / 平均アイテム高さ) でアイテムインデックスを推定
       // ただしここでは、_allComments内のコメントのNoを保存する
-      if (_allComments.isNotEmpty && current > 0) {
+      if (current > 0) {
         // 表示中のコメント一覧から、現在位置に近いNoを推定
-        final estimatedIndex = (current / 150).toInt().clamp(0, _allComments.length - 1);
+        final estimatedIndex = (current / _kItemExtent).floor().clamp(0, _allComments.length - 1);
         if (estimatedIndex < _allComments.length) {
           commentNo = _allComments[estimatedIndex]['no'] as int? ?? 0;
         }
@@ -521,7 +526,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     final index = _allComments.indexWhere((c) => c['no'] == no); // ★ 修正
     debugPrint('📍 コメント インデックス: $index / 総数: ${_allComments.length}');
     if (index != -1) {
-      final estimatedOffset = index * 120.0;
+      final double estimatedOffset = index * _kItemExtent;
       debugPrint('📐 スクロール目標: $estimatedOffset');
       _scrollController.animateTo(
         estimatedOffset,
@@ -988,6 +993,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                   child: Scrollbar(
                     controller: _scrollController,
                     child: ListView.builder(
+                      primary: false,                       // controller を使うので明示
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: BouncingScrollPhysics(),
                       ),
