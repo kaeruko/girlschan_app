@@ -14,11 +14,19 @@ class TopicDetailScreen extends StatefulWidget {
   final String title;
   final int commentCount;
 
+  // ★ 追加: テスト用バイパス
+  final bool enableRefresh;
+  final bool testingBypassInit;
+  final List<Map<String, dynamic>>? testingInitialComments;
+
   const TopicDetailScreen({
     super.key,
     required this.topicId,
     required this.title,
     required this.commentCount,
+    this.enableRefresh = true,
+    this.testingBypassInit = false,
+    this.testingInitialComments,
   });
 
   @override
@@ -45,6 +53,18 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   void initState() {
     super.initState();
+
+    // ★ 追加: テストバイパス
+    if (widget.testingBypassInit) {
+      _allComments = (widget.testingInitialComments ?? const [])
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      _totalComments = _allComments.length;
+      _loading = false;
+      // 復元や差分同期など一切走らせない
+      return;
+    }
+
     logd('initState: topicId=${widget.topicId}, title=${widget.title}');
     _load();
   }
@@ -859,9 +879,11 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       controller: _scrollController,
       primary: false,
       slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: fetchComments,
-        ),
+        // ★ 変更: テスト時はRefreshControlを無効化できるように
+        if (widget.enableRefresh)
+          CupertinoSliverRefreshControl(
+            onRefresh: fetchComments,
+          ),
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, i) {
