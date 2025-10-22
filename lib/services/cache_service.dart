@@ -49,14 +49,14 @@ class CacheService {
   static Future<void> save(String name, Object data) async {
     try {
       print('💾 [CacheService.save] Saving cache: $name');
-      print('💾 [CacheService.save] Data: $data (type: ${data.runtimeType})');
+      // print('💾 [CacheService.save] Data: $data (type: ${data.runtimeType})');
       
       final file = await _file(name);
       print('💾 [CacheService.save] File path: ${file.path}');
       
       final encoded = jsonEncode(data);
-      print('💾 [CacheService.save] Encoded JSON length: ${encoded.length} bytes');
-      print('💾 [CacheService.save] Encoded JSON: $encoded');
+      // print('💾 [CacheService.save] Encoded JSON length: ${encoded.length} bytes');
+      // print('💾 [CacheService.save] Encoded JSON: $encoded');
       
       await file.writeAsString(encoded);
       print('💾 [CacheService.save] ✅ Save complete');

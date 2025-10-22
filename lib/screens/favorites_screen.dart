@@ -201,7 +201,7 @@ class _FavoritesTileState extends State<_FavoritesTile> {
 
     // キャッシュ数/総数形式でコメント数を表示、保存位置があれば追加表示
     final commentDisplay = _hasCachedComments 
-        ? '${_savedCommentNo > 0 ? ' (No.$_savedCommentNo)' : ''}/$comments件'
+        ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments件'
         : '$comments件';
 
     return Container(
