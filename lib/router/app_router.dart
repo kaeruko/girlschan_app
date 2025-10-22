@@ -75,7 +75,7 @@ class AppRouter {
       return CupertinoPageRoute(
         builder: (_) => TopicDetailScreen(
           topicId: int.tryParse(detailArgs.topicId) ?? 0,
-          title: detailArgs.title,
+          title: detailArgs.title ?? 'Topic',
           commentCount: 0, // Will be fetched from API
         ),
         settings: settings,
