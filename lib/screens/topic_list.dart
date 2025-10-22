@@ -4,6 +4,7 @@ import '../services/cache_service.dart';
 import '../utils/log.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
+import '../widgets/common/app_spinner.dart';
 
 class TopicListScreen extends StatefulWidget {
   const TopicListScreen({super.key});
@@ -97,7 +98,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       body: RefreshIndicator(
         onRefresh: _fetchFromServer,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppSpinner(size: 20))
             : Scrollbar(
                 child: ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(

@@ -6,6 +6,7 @@ import '../models/topic.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
+import '../widgets/common/app_spinner.dart';
 
 // 共通タイル
 import '../widgets/topic_tile.dart';
@@ -229,7 +230,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     }
 
     if (_isLoading && _searchResults.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppSpinner(size: 20));
     }
 
     if (_searchResults.isEmpty) {
@@ -245,7 +246,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
             _loadMore();
             return const Padding(
               padding: EdgeInsets.all(16.0),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: AppSpinner(size: 16)),
             );
           }
           final topic = _searchResults[index];

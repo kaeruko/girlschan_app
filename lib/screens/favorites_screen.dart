@@ -6,6 +6,7 @@ import '../config/app_config.dart';
 import '../utils/log.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
+import '../widgets/common/app_spinner.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -69,7 +70,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppSpinner(size: 20));
     }
     if (_watchedTopics.isEmpty) {
       return Center(

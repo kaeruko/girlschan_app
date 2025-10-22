@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../router/app_router.dart';
+import '../widgets/common/app_spinner.dart';
 import 'topic_detail.dart';
 
 class ClipsScreen extends StatefulWidget {
@@ -57,7 +58,7 @@ class _ClipsScreenState extends State<ClipsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppSpinner(size: 20));
     }
 
     if (_clips.isEmpty) {

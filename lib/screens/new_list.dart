@@ -10,6 +10,7 @@ import '../utils/log.dart';
 // 共通コンポーネント
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
+import '../widgets/common/app_spinner.dart';
 
 class NewListScreen extends StatefulWidget {
   const NewListScreen({super.key});
@@ -114,7 +115,7 @@ class _NewListScreenState extends State<NewListScreen>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppSpinner(size: 20));
     }
 
     return RefreshIndicator(
