@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/app_tabs.dart';
+import '../router/app_router.dart';
 import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -23,11 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const SearchScreen(),
-                ),
-              );
+              AppRouter.pushSearch(context);
             },
           ),
         ],

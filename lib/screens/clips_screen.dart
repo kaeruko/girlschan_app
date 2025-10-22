@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../router/app_router.dart';
 import 'topic_detail.dart';
 
 class ClipsScreen extends StatefulWidget {
@@ -110,15 +111,10 @@ class _ClipsScreenState extends State<ClipsScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: InkWell(
                 onTap: () {
-                  Navigator.push(
+                  AppRouter.pushTopicDetail(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => TopicDetailScreen(
-                        topicId: topicId,
-                        title: topicTitle,
-                        commentCount: 0,
-                      ),
-                    ),
+                    topicId: topicId.toString(),
+                    title: topicTitle,
                   );
                 },
                 child: Padding(

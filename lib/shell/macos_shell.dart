@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import '../app/app_tabs.dart';
+import '../router/app_router.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -119,7 +120,10 @@ class _MacShellState extends State<MacShell> {
                     ),
                     // コンテンツエリア：kAppTabs[_index].widget を表示
                     Expanded(
-                      child: current.widget,
+                      child: Navigator(
+                        onGenerateRoute: AppRouter.onGenerateRoute,
+                        initialRoute: '/',
+                      ),
                     ),
                   ],
                 ),
