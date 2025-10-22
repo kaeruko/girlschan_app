@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'config/app_config.dart';
@@ -8,8 +9,10 @@ import 'desktop/desktop_window.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // デスクトップ系の事前初期化（iOSはノーオペ）
-  await DesktopWindow.preRunInit();
+  // macOS だけウィンドウ初期化
+  if (Platform.isMacOS) {
+    await DesktopWindow.init();
+  }
 
   try {
     print('🚀 AppConfig 初期化開始');
@@ -18,14 +21,10 @@ void main() async {
   } catch (e, stackTrace) {
     print('❌ AppConfig 初期化失敗: $e');
     print('❌ スタックトレース: $stackTrace');
-    // ここでも強制的にフォールバック値を設定
     AppConfig.apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
   }
 
   runApp(const GirlsChanApp());
-
-  // ラン後フック（bitsdojoの doWhenWindowReady など）
-  DesktopWindow.postRunInit(); // await しない
 }
 
 class GirlsChanApp extends StatelessWidget {
