@@ -67,7 +67,9 @@ class _TopicListScreenState extends State<TopicListScreen>
 
   Future<void> _fetchFromServer() async {
     try {
-      final topics = await fetchPopularTopicsWithCache();
+      final topics = widget.sortOrder == 'new'
+          ? await fetchNewTopicsWithCache()
+          : await fetchPopularTopicsWithCache();
       final list = topics.cast<Map<String, dynamic>>();
       await CacheService.save(cacheKey, list);
       if (!mounted) return;
