@@ -36,9 +36,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // タブが表示されるたびに再読み込み
+    _loadWatchedTopics();
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _controller.refreshAll();
+      _loadWatchedTopics();
     }
   }
 
