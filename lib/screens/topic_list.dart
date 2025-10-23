@@ -25,6 +25,7 @@ class _TopicListScreenState extends State<TopicListScreen>
   late final String cacheKey;
 
   final _controller = TopicTileController();
+  final _scrollController = ScrollController();
 
   List<Map<String, dynamic>> _topics = [];
   bool _loading = true;
@@ -40,6 +41,7 @@ class _TopicListScreenState extends State<TopicListScreen>
 
   @override
   void dispose() {
+    _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -109,7 +111,9 @@ class _TopicListScreenState extends State<TopicListScreen>
         child: _loading
             ? const Center(child: AppSpinner(size: 20))
             : Scrollbar(
+                controller: _scrollController,
                 child: ListView.builder(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics(),
                   ),
