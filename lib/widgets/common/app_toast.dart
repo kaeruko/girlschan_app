@@ -92,7 +92,7 @@ class _ToastBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: CupertinoColors.black.withOpacity(0.72),
+          color: CupertinoColors.black.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(

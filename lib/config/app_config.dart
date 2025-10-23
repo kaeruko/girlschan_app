@@ -1,4 +1,5 @@
 import 'package:http/http.dart' as http;
+import '../utils/log.dart';
 
 class AppConfig {
   // ==== 接続先API ====
@@ -29,7 +30,7 @@ class AppConfig {
       final response = await _fetchApiBaseFromGoogleDrive();
       apiBase = response.trim();
     } catch (e) {
-      print('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
+      logd('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
       // フォールバック値を設定
       apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
 
@@ -39,7 +40,7 @@ class AppConfig {
   /// Google Drive からテキストファイルを読み込み
   static Future<String> _fetchApiBaseFromGoogleDrive() async {
     try {
-      print('📥 Google Drive から読み込み開始: $googleDriveDownloadUrl');
+      logd('📥 Google Drive から読み込み開始: $googleDriveDownloadUrl');
       
       final response = await http.get(
         Uri.parse(googleDriveDownloadUrl),
@@ -48,9 +49,9 @@ class AppConfig {
         onTimeout: () => throw Exception('タイムアウト: Google Drive からの読み込みがタイムアウトしました'),
       );
       
-      print('📊 ステータスコード: ${response.statusCode}');
-      print('📋 レスポンスボディ長: ${response.body.length} 文字');
-      print('📋 レスポンスボディ: ${response.body}');
+      logd('📊 ステータスコード: ${response.statusCode}');
+      logd('📋 レスポンスボディ長: ${response.body.length} 文字');
+      logd('📋 レスポンスボディ: ${response.body}');
       
       if (response.statusCode == 200) {
         return response.body;
@@ -58,8 +59,8 @@ class AppConfig {
         throw Exception('エラー: ステータスコード ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Google Drive 読み込みエラー詳細: $e');
-      print('❌ エラータイプ: ${e.runtimeType}');
+      logd('❌ Google Drive 読み込みエラー詳細: $e');
+      logd('❌ エラータイプ: ${e.runtimeType}');
       rethrow;
     }
   }

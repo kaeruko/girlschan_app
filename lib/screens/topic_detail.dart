@@ -49,7 +49,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // ★ 追加: 復元のための保存値
   int _savedSyncedCount = 0;      // 保存しておいた「サーバ同期済み件数」
   bool _needsDeferredRestore = false; // 差分取得後に再ジャンプが必要か
-  bool _isRestoringScroll = false; // ★ 新規: スクロール復元中フラグ
+  bool _isRestoringScroll = false; // スクロール復現中フラグ
 
   @override
   void initState() {
@@ -117,9 +117,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         _isRestoringScroll = false;
         return;
       }
-      
-      final max = _scrollController.position.maxScrollExtent;
-      final jump = estimatedOffset.clamp(0.0, max);
       
       // さらに1フレーム待ってから復元（ビルド完全終了まで待つ）
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -219,35 +216,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   // =========================================
   // ローカル投稿
   // =========================================
-  Future<void> _saveLocalComment(String text) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'local_comments_${widget.topicId}';
-    final existing = prefs.getStringList(key) ?? [];
-
-    // 既存の no の最大値 + 1 を割り当て（サーバ同期済みの続きとして表示） // ★ 修正
-    int maxNo = 0;
-    for (final c in _allComments) {
-      final n = (c['no'] as int?) ?? 0;
-      if (n > maxNo) maxNo = n;
-    }
-
-    final newComment = {
-      'no': maxNo + 1,
-      'body': text,
-      'time': DateTime.now().toString().substring(0, 19),
-      'plus': 0,
-      'minus': 0,
-      'name': '自分（投稿済）',
-      'isLocal': true, // ★ 修正: ローカルフラグ
-    };
-
-    existing.add(jsonEncode(newComment));
-    await prefs.setStringList(key, existing);
-
-    setState(() {
-      _allComments.add(newComment);
-    });
-  }
 
   Future<List<Map<String, dynamic>>> _loadLocalComments() async {
     final prefs = await SharedPreferences.getInstance();

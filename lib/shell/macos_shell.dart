@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
 import '../router/app_router.dart';
+import '../utils/log.dart';
 import '../screens/search_screen.dart';
 
 class MacShell extends StatefulWidget {
@@ -192,7 +193,7 @@ class _MacShellState extends State<MacShell> {
   }) {
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      minSize: 0,
+      minimumSize: const Size.square(0),
       onPressed: onPressed,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -239,11 +240,11 @@ class _MacShellState extends State<MacShell> {
       } else {
       }
     } catch (e) {
-      print('[🔴 ERROR] 更新エラー: $e');
+      logd('[🔴 ERROR] 更新エラー: $e');
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
-        print('[🔵 DEBUG] Set _isRefreshing = false');
+        logd('[🔵 DEBUG] Set _isRefreshing = false');
       }
     }
   }

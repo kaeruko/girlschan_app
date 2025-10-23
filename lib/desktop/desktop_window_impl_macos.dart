@@ -9,7 +9,7 @@ Future<void> initDesktopWindow() async {
     size: Size(1400, 900),
     minimumSize: Size(1200, 800),
     center: true,
-    titleBarStyle: TitleBarStyle.hiddenInset,
+    titleBarStyle: TitleBarStyle.hidden,
     backgroundColor: null,
     fullScreen: false,
     skipTaskbar: false,

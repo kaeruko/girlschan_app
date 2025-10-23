@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
-import '../services/cache_service.dart';
-import '../config/app_config.dart';
-import '../utils/log.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';

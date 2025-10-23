@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/cache_service.dart';
-import '../utils/log.dart';
 import '../screens/topic_detail.dart';
 import 'topic_tile_controller.dart';
 
@@ -11,7 +10,7 @@ class TopicTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final TopicTileController controller;
 
-  /// キャッシュ（comments_<id>）があるときだけ × ボタンを表示して削除可能にする
+  /// キャッシュ（`comments_<id>`）があるときだけ × ボタンを表示して削除可能にする
   final Future<void> Function(int topicId)? onRemoveIfCached;
 
   /// 詳細から戻った直後に呼ばれる（自分→全体の順で更新する前後に外側の再評価を差し込みたい時）
@@ -35,7 +34,6 @@ class TopicTile extends StatefulWidget {
 
 class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   bool _hasCachedComments = false;
-  int _cachedCommentCount = 0;
   int _savedCommentNo = 0;
 
   @override
@@ -58,18 +56,15 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
 
     final hasCached = await CacheService.exists('comments_$id');
 
-    int cached = 0;
     int saved = 0;
     if (hasCached) {
       final prefs = await SharedPreferences.getInstance();
-      cached = prefs.getInt('synced_$id') ?? 0;
       saved  = prefs.getInt('scroll_$id') ?? 0;
     }
 
     if (!mounted) return;
     setState(() {
       _hasCachedComments = hasCached;
-      _cachedCommentCount = cached;
       _savedCommentNo = saved;
     });
   }
@@ -89,7 +84,6 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
         : '$comments件';
 
     final blue = CupertinoColors.systemBlue;
-    final grey = CupertinoColors.systemGrey;
 
     return Container(
       decoration: BoxDecoration(
@@ -196,7 +190,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
               if (_hasCachedComments && widget.onRemoveIfCached != null)
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 28,
+                  minimumSize: const Size(28, 28),
                   onPressed: () async {
                     await widget.onRemoveIfCached!(id);
                     if (mounted) await refreshCacheState();

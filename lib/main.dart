@@ -4,6 +4,7 @@ import 'config/app_config.dart';
 import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
 import 'utils/platform_helper.dart';
+import 'utils/log.dart';
 import 'router/app_router.dart';
 import 'widgets/common/app_scroll.dart';
 
@@ -14,12 +15,12 @@ void main() async {
   await PlatformHelper.initDesktopWindowIfNeeded();
 
   try {
-    print('🚀 AppConfig 初期化開始');
+    logd('🚀 AppConfig 初期化開始');
     await AppConfig.initializeApiBase();
-    print('✅ AppConfig 初期化完了: ${AppConfig.apiBase}');
+    logd('✅ AppConfig 初期化完了: ${AppConfig.apiBase}');
   } catch (e, stackTrace) {
-    print('❌ AppConfig 初期化失敗: $e');
-    print('❌ スタックトレース: $stackTrace');
+    logd('❌ AppConfig 初期化失敗: $e');
+    logd('❌ スタックトレース: $stackTrace');
     AppConfig.apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
   }
 

@@ -133,7 +133,7 @@ class _SearchScreenMacOSState extends State<SearchScreenMacOS> {
                   suffix: _searchController.text.isNotEmpty
                       ? CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minSize: 0,
+                          minimumSize: 0,
                           onPressed: () {
                             _searchController.clear();
                             setState(() {

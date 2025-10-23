@@ -5,12 +5,12 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations:        # ← Global*Localizations 使うので共通で入れる
+  flutter_localizations:
     sdk: flutter
 
   # 共通（モバイル/デスクトップ両方）
@@ -24,7 +24,6 @@ dependencies:
 
   # デスクトップ専用（iOSでは呼ばない＝安全）
   window_manager: ^0.3.7
-  bitsdojo_window: ^0.1.5
   webview_flutter: ^4.13.0
   webview_flutter_wkwebview: ^3.23.1
 
@@ -37,6 +36,7 @@ dev_dependencies:
   mocktail: ^1.0.3
   # どちらか一方に揃える。両OSで通る方へ
   network_image_mock: ^2.1.1   # ← もしmacOSで不具合なら ^2.1.0 に落とす
+  dart_code_linter: ^3.2.0
 
 flutter:
   # Materialを使わないなら `uses-material-design` は不要

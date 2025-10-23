@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/app_tabs.dart';
 import '../router/app_router.dart';
-import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: currentTab.widget,
+      body: currentTab.builder(context),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: Colors.pinkAccent,

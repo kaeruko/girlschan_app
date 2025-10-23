@@ -95,20 +95,6 @@ class AppRefreshLazy extends StatefulWidget {
 }
 
 class _AppRefreshLazyState extends State<AppRefreshLazy> {
-  bool _isRefreshing = false;
-
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
-    try {
-      await widget.onRefresh();
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     // Cupertino 版 RefreshIndicator の代わりに

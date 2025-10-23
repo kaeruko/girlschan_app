@@ -48,7 +48,7 @@ class InlineNotice extends StatelessWidget {
           if (onClose != null)
             CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 28,
+              minimumSize: const Size.square(28),
               onPressed: onClose,
               child: const Icon(CupertinoIcons.xmark, size: 16),
             ),

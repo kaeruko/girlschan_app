@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import '../utils/log.dart';
 
 class CacheService {
   static Future<File> _file(String name) async {
@@ -22,7 +23,7 @@ class CacheService {
         }
       }
     } catch (e) {
-      print('❌ loadList error: $e');
+      logd('❌ loadList error: $e');
     }
     return [];
   }
@@ -32,9 +33,9 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
-      print('💾 [saveList] ✅ Saved: $name');
+      logd('💾 [saveList] ✅ Saved: $name');
     } catch (e) {
-      print('❌ saveList error: $e');
+      logd('❌ saveList error: $e');
     }
   }
 
@@ -50,7 +51,7 @@ class CacheService {
         }
       }
     } catch (e) {
-      print('❌ loadMap error: $e');
+      logd('❌ loadMap error: $e');
     }
     return null;
   }
@@ -60,9 +61,9 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
-      print('💾 [saveMap] ✅ Saved: $name');
+      logd('💾 [saveMap] ✅ Saved: $name');
     } catch (e) {
-      print('❌ saveMap error: $e');
+      logd('❌ saveMap error: $e');
     }
   }
 
@@ -81,7 +82,7 @@ class CacheService {
         }
       }
     } catch (e) {
-      print('❌ loadInt error: $e');
+      logd('❌ loadInt error: $e');
     }
     return null;
   }
@@ -91,9 +92,9 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
-      print('💾 [saveInt] ✅ Saved: $name = $data');
+      logd('💾 [saveInt] ✅ Saved: $name = $data');
     } catch (e) {
-      print('❌ saveInt error: $e');
+      logd('❌ saveInt error: $e');
     }
   }
 
@@ -105,7 +106,7 @@ class CacheService {
       // print('💾 [CacheService.exists] Checking: $name -> exists: $exists (path: ${file.path})');
       return exists;
     } catch (e) {
-      print('❌ Cache exists check error: $e');
+      logd('❌ Cache exists check error: $e');
       return false;
     }
   }
@@ -115,7 +116,7 @@ class CacheService {
       final file = await _file(name);
       if (await file.exists()) await file.delete();
     } catch (e) {
-      print('Cache clear error: $e');
+      logd('Cache clear error: $e');
     }
   }
 
@@ -129,7 +130,7 @@ class CacheService {
         }
       }
     } catch (e) {
-      print('Clear all cache error: $e');
+      logd('Clear all cache error: $e');
     }
   }
 }
