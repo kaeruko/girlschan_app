@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
 import '../router/app_router.dart';
@@ -175,13 +176,6 @@ class _MacShellState extends State<MacShell> {
             label: '検索',
             onPressed: _showSearchDialog,
           ),
-          _buildActionButton(
-            icon: CupertinoIcons.star,
-            label: 'ブックマーク',
-            onPressed: () {
-              print('ブックマークボタンクリック');
-            },
-          ),
           const Spacer(),
           const SizedBox(width: 12),
         ],
@@ -260,24 +254,59 @@ class _MacShellState extends State<MacShell> {
     
     final query = await showCupertinoDialog<String>(
       context: context,
-      builder: (dialogCtx) => CupertinoAlertDialog(
-        title: const Text('検索'),
-        content: CupertinoTextField(
-          controller: controller,
-          placeholder: 'キーワードを入力',
-          onSubmitted: (value) => Navigator.pop(dialogCtx, value),
+      builder: (dialogCtx) => Dialog(
+        insetAnimationDuration: const Duration(milliseconds: 200),
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.6,
+            maxHeight: MediaQuery.of(context).size.height * 0.4,
+          ),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBackground,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '検索',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: CupertinoColors.label,
+                ),
+              ),
+              const SizedBox(height: 20),
+              CupertinoTextField(
+                controller: controller,
+                placeholder: 'キーワードを入力',
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: CupertinoColors.separator),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                onSubmitted: (value) => Navigator.pop(dialogCtx, value.trim()),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  CupertinoButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text('キャンセル'),
+                  ),
+                  const SizedBox(width: 12),
+                  CupertinoButton(
+                    color: CupertinoColors.systemBlue,
+                    onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
+                    child: const Text('検索'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('キャンセル'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
-            child: const Text('検索'),
-          ),
-        ],
       ),
     );
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/comment.dart';
@@ -987,19 +988,50 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               onTap: () {
                 showCupertinoDialog(
                   context: context,
-                  builder: (context) => CupertinoAlertDialog(
-                    content: Image.network(
-                      c['image_url'],
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(CupertinoIcons.exclamationmark_circle),
-                    ),
-                    actions: [
-                      CupertinoDialogAction(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('閉じる'),
+                  builder: (context) => Dialog(
+                    insetAnimationDuration: const Duration(milliseconds: 200),
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.9,
+                        maxHeight: MediaQuery.of(context).size.height * 0.85,
                       ),
-                    ],
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.black,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Image.network(
+                              c['image_url'],
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Center(
+                                child: Icon(
+                                  CupertinoIcons.exclamationmark_circle,
+                                  size: 40,
+                                  color: CupertinoColors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: CupertinoButton(
+                              padding: const EdgeInsets.all(8),
+                              onPressed: () => Navigator.pop(context),
+                              child: const Icon(
+                                CupertinoIcons.xmark_circle_fill,
+                                color: CupertinoColors.white,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },
