@@ -1,12 +1,38 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/cupertino.dart';
-import '../widgets/common/app_toast.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 
-/// macOS専用ヘルパークラス
+import '../desktop/desktop_window.dart';
+import '../widgets/common/app_spinner.dart';
+import '../widgets/common/app_toast.dart';
+import '../widgets/inline_notice.dart';
+
+/// テストで上書き可能なプラットフォーム識別
+enum PlatformKind { iOS, macOS, android, windows, linux, web }
+
+/// OS判定・ルーティング・ダイアログなど、プラットフォーム依存処理の窓口
 class PlatformHelper {
-  /// CupertinoPageRoute を返す
-  static Route<T> buildPageRoute<T>({
-    required WidgetBuilder builder,
-    required RouteSettings settings,
+  static PlatformKind? _override; // テスト用。通常は null のまま。
+
+  // ===== 判定系 =====
+  static bool get isMacOS => _override == PlatformKind.macOS || Platform.isMacOS;
+  static bool get isIOS => _override == PlatformKind.iOS || Platform.isIOS;
+  static bool get isApple => isMacOS || isIOS;
+
+  static bool get isDesktop => isMacOS; // 今回は macOS だけ想定
+  static bool get isMobile => isIOS; // iOS だけ想定
+
+  /// テスト用：明示的にプラットフォームを上書き（テスト終了時は reset）
+  static void setTestPlatform(PlatformKind? kind) {
+    if (!kDebugMode) return; // 本番ビルドで誤用しないための保険
+    _override = kind;
+  }
+
+  // ===== ルーティング（Cupertino統一） =====
+  static Route<T> cupertinoRoute<T>(
+    WidgetBuilder builder, {
+    RouteSettings? settings,
   }) {
     return CupertinoPageRoute<T>(
       builder: builder,
@@ -14,46 +40,85 @@ class PlatformHelper {
     );
   }
 
-  /// CupertinoAlertDialog を表示
-  static void showMessage(
-    BuildContext context, {
-    required String title,
-    required String message,
-    String? buttonText,
-    VoidCallback? onPressed,
+  /// 従来の buildPageRoute（後方互換性）
+  static Route<T> buildPageRoute<T>({
+    required WidgetBuilder builder,
+    required RouteSettings settings,
   }) {
-    final button = buttonText ?? '了解';
-
-    showCupertinoDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return CupertinoAlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            CupertinoDialogAction(
-              isDefaultAction: true,
-              onPressed: () {
-                Navigator.of(context).pop();
-                onPressed?.call();
-              },
-              child: Text(button),
-            ),
-          ],
-        );
-      },
-    );
+    return cupertinoRoute(builder, settings: settings);
   }
 
-  /// 画面下部にトースト通知を表示（AppToast で置換）
+  // ===== ローディング・通知（統一窓口） =====
+  static Widget buildLoadingIndicator({double size = 16}) => AppSpinner(size: size);
+
+  /// 画面上部に薄いお知らせ
+  static Widget buildInlineNotice(
+    String text, {
+    bool isError = false,
+    VoidCallback? onClose,
+  }) {
+    return InlineNotice(text: text, isError: isError, onClose: onClose);
+  }
+
+  // ===== 触覚フィードバック（あるなら軽く） =====
+  static Future<void> lightHaptic() async {
+    if (isApple) {
+      try {
+        await HapticFeedback.lightImpact();
+      } catch (_) {}
+    }
+  }
+
+  // ===== デスクトップウィンドウ初期化（macOSのみ） =====
+  static Future<void> initDesktopWindowIfNeeded() async {
+    if (isMacOS) {
+      await DesktopWindow.init();
+    }
+  }
+
+  static Future<void> showDesktopWindowIfNeeded() async {
+    if (isMacOS) {
+      await DesktopWindow.show();
+    }
+  }
+
+  // ===== トースト通知（AppToast 統一） =====
   static Future<void> showSnackBar(BuildContext context, String message) {
     return AppToast.show(context, message);
   }
 
-  /// CupertinoActivityIndicator を返す
-  static Widget buildLoadingIndicator() {
-    return const CupertinoActivityIndicator();
+  // ===== 汎用ダイアログ（Cupertino標準に寄せる） =====
+  static Future<bool?> showConfirm({
+    required BuildContext context,
+    required String title,
+    required String message,
+    String okText = 'OK',
+    String cancelText = 'キャンセル',
+  }) {
+    return showCupertinoDialog<bool>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(message),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(cancelText),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(okText),
+          ),
+        ],
+      ),
+    );
   }
+
+
 
   /// Cupertino区切り線を返す
   static Widget buildDivider() {
@@ -63,3 +128,4 @@ class PlatformHelper {
     );
   }
 }
+

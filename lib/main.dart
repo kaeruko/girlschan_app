@@ -1,20 +1,17 @@
-import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'config/app_config.dart';
 import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
-import 'desktop/desktop_window.dart';
+import 'utils/platform_helper.dart';
 import 'router/app_router.dart';
 import 'widgets/common/app_scroll.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // macOS だけウィンドウ初期化
-  if (Platform.isMacOS) {
-    await DesktopWindow.init();
-  }
+  // macOS ウィンドウ初期化（PlatformHelper 経由）
+  await PlatformHelper.initDesktopWindowIfNeeded();
 
   try {
     print('🚀 AppConfig 初期化開始');

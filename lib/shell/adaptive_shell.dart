@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/widgets.dart';
 import '../app/app_tabs.dart';
+import '../utils/platform_helper.dart';
 import 'ios_shell.dart';
 import 'macos_shell.dart';
 
@@ -13,6 +13,6 @@ class AdaptiveShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Platform.isMacOS ? MacShell(tabs: tabs) : IOSShell(tabs: tabs);
+    return PlatformHelper.isMacOS ? MacShell(tabs: tabs) : IOSShell(tabs: tabs);
   }
 }
