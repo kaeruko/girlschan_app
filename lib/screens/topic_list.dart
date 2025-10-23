@@ -22,7 +22,7 @@ class TopicListScreen extends StatefulWidget {
 
 class _TopicListScreenState extends State<TopicListScreen>
     with WidgetsBindingObserver {
-  static const String cacheKey = 'topics';
+  late final String cacheKey;
 
   final _controller = TopicTileController();
 
@@ -33,6 +33,8 @@ class _TopicListScreenState extends State<TopicListScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // sortOrder に応じてキャッシュキーを切り替える
+    cacheKey = widget.sortOrder == 'new' ? 'topics_new' : 'topics_popular';
     _loadFromCache();
   }
 
