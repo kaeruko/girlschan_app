@@ -46,7 +46,9 @@ class WebViewEnv {
   // WebViewController の共通初期化
   static Future<void> primeController(WebViewController c, {String? ua}) async {
     await c.setJavaScriptMode(JavaScriptMode.unrestricted);
-    await c.setBackgroundColor(const Color(0x00000000));
+    if (!Platform.isMacOS) {
+      await c.setBackgroundColor(const Color(0x00000000));
+    }
     await c.setUserAgent(ua ?? await userAgent());
   }
 }
