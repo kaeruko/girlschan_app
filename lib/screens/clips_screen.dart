@@ -14,11 +14,18 @@ class ClipsScreen extends StatefulWidget {
 class _ClipsScreenState extends State<ClipsScreen> {
   List<Map<String, dynamic>> _clips = [];
   bool _loading = true;
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadClips();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadClips() async {
@@ -95,7 +102,9 @@ class _ClipsScreenState extends State<ClipsScreen> {
     return RefreshIndicator(
       onRefresh: _refreshClips,
       child: Scrollbar(
+        controller: _scrollController,
         child: ListView.builder(
+          controller: _scrollController,
           itemCount: _clips.length,
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemBuilder: (context, i) {

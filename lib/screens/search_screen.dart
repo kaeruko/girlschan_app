@@ -25,6 +25,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver {
   late TextEditingController _searchController;
   final _controller = TopicTileController();
+  final _scrollController = ScrollController();
 
   // 検索状態
   List<Topic> _searchResults = [];
@@ -48,6 +49,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -237,7 +239,9 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     }
 
     return Scrollbar(
+      controller: _scrollController,
       child: ListView.builder(
+        controller: _scrollController,
         itemCount: _searchResults.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == _searchResults.length) {

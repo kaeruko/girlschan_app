@@ -17,6 +17,7 @@ class FavoritesScreen extends StatefulWidget {
 
 class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingObserver {
   final _controller = TopicTileController();
+  final _scrollController = ScrollController();
   List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
 
@@ -29,6 +30,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
 
   @override
   void dispose() {
+    _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -92,7 +94,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
     return RefreshIndicator(
       onRefresh: _refreshWatched,
       child: Scrollbar(
+        controller: _scrollController,
         child: ListView.builder(
+          controller: _scrollController,
           itemCount: _watchedTopics.length,
           itemBuilder: (context, i) {
             final topic = _watchedTopics[i];

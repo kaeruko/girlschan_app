@@ -25,6 +25,7 @@ class _NewListScreenState extends State<NewListScreen>
   static const String cacheKey = 'new_topics';
 
   final _controller = TopicTileController();
+  final _scrollController = ScrollController();
 
   List<Map<String, dynamic>> _topics = [];
   bool _loading = true;
@@ -38,6 +39,7 @@ class _NewListScreenState extends State<NewListScreen>
 
   @override
   void dispose() {
+    _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -120,7 +122,9 @@ class _NewListScreenState extends State<NewListScreen>
     return RefreshIndicator(
       onRefresh: _fetchFromServer,
       child: Scrollbar(
+        controller: _scrollController,
         child: ListView.builder(
+          controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
