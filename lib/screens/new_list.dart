@@ -120,7 +120,7 @@ class _NewListScreenState extends State<NewListScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _fetchFromServer,
+      onRefresh: fetchFromServer,
       child: Scrollbar(
         controller: _scrollController,
         child: ListView.builder(

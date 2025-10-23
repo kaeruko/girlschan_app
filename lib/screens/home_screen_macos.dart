@@ -5,6 +5,7 @@ import 'new_list.dart';
 import 'topic_list.dart';
 import 'favorites_screen.dart';
 import 'clips_screen.dart';
+import 'search_screen_macos.dart';
 
 class HomeScreenMacOS extends StatefulWidget {
   const HomeScreenMacOS({super.key});
@@ -28,8 +29,8 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
   String? _selectedHistory;
 
   // 各タブの State にアクセスするための GlobalKey
-  final _newListKey = GlobalKey<NewListScreenState>();
-  final _topicListKey = GlobalKey<TopicListScreenState>();
+  final _newListKey = GlobalKey<State<NewListScreen>>();
+  final _topicListKey = GlobalKey<State<TopicListScreen>>();
 
   late final List<Widget> _tabs;
 
@@ -38,6 +39,7 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
     '人気',
     '履歴',
     'クリップ',
+    '検索',
   ];
 
   @override
@@ -48,6 +50,7 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
       TopicListScreen(key: _topicListKey),
       const FavoritesScreen(),
       const ClipsScreen(),
+      const SearchScreenMacOS(),
     ];
   }
 
@@ -147,8 +150,7 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
                                   icon: CupertinoIcons.search,
                                   label: '検索',
                                   onPressed: () {
-                                    // 検索処理
-                                    print('検索ボタンクリック');
+                                    setState(() => _currentIndex = 4);
                                   },
                                 ),
                                 _buildActionButton(
@@ -318,14 +320,14 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
           // 新着タブ: API通信を実行
           final newListState = _newListKey.currentState;
           if (newListState != null) {
-            await newListState.fetchFromServer();
+            await (newListState as dynamic).fetchFromServer();
           }
           break;
         case 1:
           // 人気タブ: API通信を実行
           final topicListState = _topicListKey.currentState;
           if (topicListState != null) {
-            await topicListState.fetchFromServer();
+            await (topicListState as dynamic).fetchFromServer();
           }
           break;
         case 2:
@@ -338,6 +340,12 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
           // クリップタブ: キャッシュなし、特に処理なし
           if (mounted) {
             await AppToast.show(context, 'クリップはまだ登録されていません');
+          }
+          break;
+        case 4:
+          // 検索タブ: 検索ボタンでのみ検索実行
+          if (mounted) {
+            await AppToast.show(context, '検索タブでキーワードを入力してください');
           }
           break;
       }

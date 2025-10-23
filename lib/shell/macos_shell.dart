@@ -1,7 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:bitsdojo_window/bitsdojo_window.dart';
+import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
 import '../router/app_router.dart';
+import '../screens/search_screen.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -13,138 +14,88 @@ class MacShell extends StatefulWidget {
 
 class _MacShellState extends State<MacShell> {
   int _index = 0;
-  bool _showHistoryDropdown = false;
   bool _isRefreshing = false;
-
-  List<String> _historyItems = [
-    'テスト履歴1',
-    'テスト履歴2',
-    'テスト履歴3',
-    'テスト履歴4',
-    'テスト履歴5',
-  ];
-  String? _selectedHistory;
+  double _captionHeight = 28; // デフォルト（fallback）
 
   @override
   void initState() {
     super.initState();
+    _loadCaptionHeight();
+  }
+
+  Future<void> _loadCaptionHeight() async {
+    try {
+      final h = await windowManager.getTitleBarHeight(); // int?
+      if (!mounted) return;
+      if (h != null && h > 0) {
+        setState(() => _captionHeight = h.toDouble());
+      }
+    } catch (_) {
+      // 取得できない環境では fallback の 28.0 を使う
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = CupertinoColors.systemBackground;
-    final topBarColor = CupertinoColors.systemGrey6.withOpacity(0.8);
     final current = widget.tabs[_index];
 
     return CupertinoPageScaffold(
       navigationBar: null,
-      backgroundColor: backgroundColor,
-      child: Stack(
+      child: Column(
         children: [
-          Row(
-            children: [
-              // 左サイドバー（タブメニュー）
-              Container(
-                width: 220,
-                color: CupertinoColors.systemGrey6,
-                child: CupertinoScrollbar(
-                  child: ListView.builder(
-                    itemCount: widget.tabs.length,
-                    itemBuilder: (context, i) {
-                      final t = widget.tabs[i];
-                      final selected = i == _index;
-                      return _buildSidebarItem(
-                        icon: t.icon,
-                        label: t.label,
-                        selected: selected,
-                        onTap: () => setState(() => _index = i),
-                      );
-                    },
+          // OSの信号ボタン用のスペーサ（ここは何も描かない）
+          SizedBox(height: _captionHeight),
+          // 自前ツールバー（信号の"下"から始める）
+          _buildTopToolbar(),
+          // 本体
+          Expanded(
+            child: Row(
+              children: [
+                // 左サイドバー（タブメニュー）
+                SizedBox(
+                  width: 220,
+                  child: Container(
+                    color: CupertinoColors.systemGrey6,
+                    child: CupertinoScrollbar(
+                      child: ListView.builder(
+                        itemCount: widget.tabs.length,
+                        itemBuilder: (context, i) {
+                          final t = widget.tabs[i];
+                          final selected = i == _index;
+                          return _buildSidebarItem(
+                            icon: t.icon,
+                            label: t.label,
+                            selected: selected,
+                            onTap: () => setState(() => _index = i),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              // メインコンテンツ
-              Expanded(
-                child: Column(
-                  children: [
-                    // フラットな上部バー（SafariやXcode風）
-                    GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onPanStart: (_) => appWindow.startDragging(),
-                      child: Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: topBarColor,
-                          border: Border(
-                            bottom: BorderSide(
-                              color: CupertinoColors.separator.withOpacity(0.3),
-                              width: 0.5,
-                            ),
-                          ),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // 左側: タイトル
-                            Text(
-                              current.title,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            // 右側: アクションボタン
-                            Row(
-                              children: [
-                                _buildActionButton(
-                                  icon: CupertinoIcons.arrow_clockwise,
-                                  label: '更新',
-                                  isLoading: _isRefreshing,
-                                  onPressed: _isRefreshing ? null : _handleRefresh,
-                                ),
-                                _buildActionButton(
-                                  icon: CupertinoIcons.search,
-                                  label: '検索',
-                                  onPressed: () {
-                                    print('検索ボタンクリック');
-                                  },
-                                ),
-                                _buildActionButton(
-                                  icon: CupertinoIcons.star,
-                                  label: 'ブックマーク',
-                                  onPressed: () {
-                                    print('ブックマークボタンクリック');
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // コンテンツエリア：タブの builder から画面を生成
-                    // 各タブで独立したナビゲーションをサポート
-                    Expanded(
-                      child: KeyedSubtree(
-                        key: PageStorageKey('mac_${current.id}'),
-                        child: IndexedStack(
-                          index: _index,
-                          children: [
-                            for (int i = 0; i < widget.tabs.length; i++)
-                              CupertinoTabView(
-                                key: PageStorageKey('tab_view_$i'),
-                                onGenerateRoute: AppRouter.onGenerateRoute,
-                                builder: (ctx) => widget.tabs[i].builder(ctx),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                Container(
+                  width: 1,
+                  color: CupertinoColors.separator,
                 ),
-              ),
-            ],
+                // メインコンテンツ
+                Expanded(
+                  child: KeyedSubtree(
+                    key: PageStorageKey('mac_${current.id}'),
+                    child: IndexedStack(
+                      index: _index,
+                      children: [
+                        for (int i = 0; i < widget.tabs.length; i++)
+                          CupertinoTabView(
+                            key: PageStorageKey('tab_view_$i'),
+                            onGenerateRoute: AppRouter.onGenerateRoute,
+                            builder: (ctx) => widget.tabs[i].builder(ctx),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -206,6 +157,38 @@ class _MacShellState extends State<MacShell> {
     );
   }
 
+  /// 自前ツールバーを構築
+  Widget _buildTopToolbar() {
+    return SizedBox(
+      height: 40,
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          _buildActionButton(
+            icon: CupertinoIcons.arrow_clockwise,
+            label: '更新',
+            isLoading: _isRefreshing,
+            onPressed: _isRefreshing ? null : _handleRefresh,
+          ),
+          _buildActionButton(
+            icon: CupertinoIcons.search,
+            label: '検索',
+            onPressed: _showSearchDialog,
+          ),
+          _buildActionButton(
+            icon: CupertinoIcons.star,
+            label: 'ブックマーク',
+            onPressed: () {
+              print('ブックマークボタンクリック');
+            },
+          ),
+          const Spacer(),
+          const SizedBox(width: 12),
+        ],
+      ),
+    );
+  }
+
   /// アクションボタンを構築
   Widget _buildActionButton({
     required IconData icon,
@@ -258,5 +241,51 @@ class _MacShellState extends State<MacShell> {
         setState(() => _isRefreshing = false);
       }
     }
+  }
+
+  /// 検索ダイアログを表示
+  Future<void> _showSearchDialog() async {
+    final controller = TextEditingController();
+    
+    final query = await showCupertinoDialog<String>(
+      context: context,
+      builder: (dialogCtx) => CupertinoAlertDialog(
+        title: const Text('検索'),
+        content: CupertinoTextField(
+          controller: controller,
+          placeholder: 'キーワードを入力',
+          onSubmitted: (value) => Navigator.pop(dialogCtx, value),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('キャンセル'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
+            child: const Text('検索'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+
+    if (query == null || query.isEmpty) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    // 検索結果画面に遷移（初期クエリを渡す）
+    await Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => SearchScreen(initialQuery: query),
+      ),
+    );
   }
 }
