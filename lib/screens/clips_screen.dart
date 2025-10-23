@@ -11,7 +11,7 @@ class ClipsScreen extends StatefulWidget {
   State<ClipsScreen> createState() => _ClipsScreenState();
 }
 
-class _ClipsScreenState extends State<ClipsScreen> {
+class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _clips = [];
   bool _loading = true;
   final _scrollController = ScrollController();
@@ -19,11 +19,27 @@ class _ClipsScreenState extends State<ClipsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadClips();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // タブが表示されるたびに再読み込み
+    _loadClips();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadClips();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
   }
