@@ -1,5 +1,5 @@
 // lib/screens/search_screen.dart
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../models/topic.dart';
 import '../services/api_service.dart';
@@ -18,10 +18,10 @@ class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, this.initialQuery});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  State<SearchScreen> createState() => SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver {
+class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver {
   late TextEditingController _searchController;
   final _controller = TopicTileController();
   final _scrollController = ScrollController();
@@ -59,6 +59,12 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     }
   }
 
+  /// タブから呼ばれるメソッド：クエリを設定して検索開始
+  void setQueryAndSearch(String q) {
+    _searchController.text = q;
+    _performSearch(q);
+  }
+
   Future<void> _performSearch(String query, {bool loadMore = false}) async {
     if (query.isEmpty) {
       setState(() {
@@ -80,8 +86,6 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
     });
 
     try {
-      logd('🔍 検索開始: query=$query, page=$_currentPage', name: 'Search');
-
       final result = await searchTopics(
         query: query,
         page: _currentPage,
@@ -153,22 +157,26 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final canSubmit = _searchController.text.isNotEmpty;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('検索')),
-      body: Column(
-        children: [
-          // 検索入力
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '検索キーワード',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('検索'),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // 検索入力
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: CupertinoTextField(
+                controller: _searchController,
+                placeholder: '検索キーワード',
+                prefix: const Padding(
+                  padding: EdgeInsets.only(left: 8.0),
+                  child: Icon(CupertinoIcons.search, color: CupertinoColors.systemGrey),
+                ),
+                suffix: _searchController.text.isNotEmpty
+                    ? GestureDetector(
+                        onTap: () {
                           _searchController.clear();
                           setState(() {
                             _searchResults = [];
@@ -177,40 +185,53 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
                             _hasMore = false;
                           });
                         },
+                        child: const Padding(
+                          padding: EdgeInsets.only(right: 8.0),
+                          child: Icon(CupertinoIcons.xmark_circle_fill, color: CupertinoColors.systemGrey),
+                        ),
                       )
                     : null,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (v) => _performSearch(v),
               ),
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (v) => _performSearch(v),
             ),
-          ),
 
-          if (canSubmit && _currentQuery.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _performSearch(_searchController.text),
-                  icon: const Icon(Icons.search),
-                  label: const Text('検索'),
+            if (canSubmit && _currentQuery.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: CupertinoButton(
+                    color: CupertinoColors.systemBlue,
+                    onPressed: () => _performSearch(_searchController.text),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(CupertinoIcons.search, color: CupertinoColors.white),
+                        SizedBox(width: 8),
+                        Text('検索', style: TextStyle(color: CupertinoColors.white)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
 
-          if (_currentQuery.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Text(
-                '「$_currentQuery」の検索結果: $_totalCount件',
-                style: Theme.of(context).textTheme.bodySmall,
+            if (_currentQuery.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Text(
+                  '「$_currentQuery」の検索結果: $_totalCount件',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.systemGrey,
+                  ),
+                ),
               ),
-            ),
 
-          // 結果リスト
-          Expanded(child: _buildResultsList()),
-        ],
+            // 結果リスト
+            Expanded(child: _buildResultsList()),
+          ],
+        ),
       ),
     );
   }
@@ -221,9 +242,16 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 64, color: Colors.grey[400]),
+            Icon(CupertinoIcons.search, size: 64, color: CupertinoColors.systemGrey),
             const SizedBox(height: 16),
-            Text('キーワードを入力して検索', style: Theme.of(context).textTheme.bodyLarge),
+            const Text(
+              'キーワードを入力して検索',
+              style: TextStyle(
+                fontSize: 15,
+                color: CupertinoColors.systemGrey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       );
@@ -237,7 +265,7 @@ class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver
       return Center(child: Text('「$_currentQuery」に該当するトピックがありません'));
     }
 
-    return Scrollbar(
+    return CupertinoScrollbar(
       controller: _scrollController,
       child: ListView.builder(
         controller: _scrollController,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
@@ -80,13 +81,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
+            Icon(CupertinoIcons.bookmark, size: 64, color: CupertinoColors.systemGrey),
             const SizedBox(height: 16),
             Text('履歴に登録されたトピックはありません',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+                style: TextStyle(fontSize: 16, color: CupertinoColors.systemGrey)),
             const SizedBox(height: 8),
             Text('トピック詳細の📘をタップして登録',
-                style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+                style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey)),
           ],
         ),
       );
@@ -94,7 +95,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
 
     return RefreshIndicator(
       onRefresh: _refreshWatched,
-      child: Scrollbar(
+      child: CupertinoScrollbar(
         controller: _scrollController,
         child: ListView.builder(
           controller: _scrollController,

@@ -313,20 +313,16 @@ class _MacShellState extends State<MacShell> {
 
     controller.dispose();
 
-    if (query == null || query.isEmpty) {
+    if (query == null || query.isEmpty || !mounted) {
       return;
     }
 
-    if (!mounted) {
-      return;
+    // 検索タブに切り替えて、検索を実行
+    final idx = widget.tabs.indexWhere((t) => t.id == 'tab_search');
+    if (idx != -1) {
+      setState(() => _index = idx);
+      final st = widget.tabs[idx].stateKey?.currentState as SearchScreenState?;
+      st?.setQueryAndSearch(query);
     }
-
-    // 検索結果画面に遷移（初期クエリを渡す）
-    await Navigator.push(
-      context,
-      CupertinoPageRoute(
-        builder: (_) => SearchScreen(initialQuery: query),
-      ),
-    );
   }
 }

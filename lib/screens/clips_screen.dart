@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../router/app_router.dart';
 import '../widgets/common/app_spinner.dart';
@@ -88,27 +89,13 @@ class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.favorite_border,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(CupertinoIcons.heart, size: 64, color: CupertinoColors.systemGrey),
             const SizedBox(height: 16),
-            Text(
-              'クリップはまだありません',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
+            Text('クリップに登録されたコメントはありません',
+                style: TextStyle(fontSize: 16, color: CupertinoColors.systemGrey)),
             const SizedBox(height: 8),
-            Text(
-              'コメント右の❤️をタップして保存',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
-            ),
+            Text('コメント詳細の❤️をタップして登録',
+                style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey)),
           ],
         ),
       );
@@ -116,7 +103,7 @@ class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
 
     return RefreshIndicator(
       onRefresh: _refreshClips,
-      child: Scrollbar(
+      child: CupertinoScrollbar(
         controller: _scrollController,
         child: ListView.builder(
           controller: _scrollController,
@@ -152,7 +139,7 @@ class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
                         topicTitle,
                         style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.grey,
+                          color: CupertinoColors.systemGrey,
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
@@ -176,20 +163,21 @@ class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
                             'No.$commentNo • $time • ＋$plus −$minus',
                             style: const TextStyle(
                               fontSize: 12,
-                              color: Colors.grey,
+                              color: CupertinoColors.systemGrey,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.close,
-                            size: 18,
-                            color: Colors.grey,
+                        GestureDetector(
+                          onTap: () => _removeClip(clip),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(
+                              CupertinoIcons.xmark,
+                              size: 18,
+                              color: CupertinoColors.systemGrey,
+                            ),
                           ),
-                          onPressed: () => _removeClip(clip),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4),
                         ),
                       ],
                     ),

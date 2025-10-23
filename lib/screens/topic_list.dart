@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
@@ -118,7 +119,7 @@ class _TopicListScreenState extends State<TopicListScreen>
         onRefresh: fetchFromServer,
         child: _loading
             ? const Center(child: AppSpinner(size: 20))
-            : Scrollbar(
+            : CupertinoScrollbar(
                 controller: _scrollController,
                 child: ListView.builder(
                   controller: _scrollController,

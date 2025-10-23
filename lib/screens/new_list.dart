@@ -1,6 +1,7 @@
 // lib/screens/new_list.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -121,7 +122,7 @@ class _NewListScreenState extends State<NewListScreen>
 
     return RefreshIndicator(
       onRefresh: fetchFromServer,
-      child: Scrollbar(
+      child: CupertinoScrollbar(
         controller: _scrollController,
         child: ListView.builder(
           controller: _scrollController,
