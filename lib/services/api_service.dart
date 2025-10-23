@@ -119,60 +119,7 @@ Future<Map<String, dynamic>> searchTopics({
   }
 }
 
-Future<List<dynamic>> fetchNewTopics() async {
-  try {
-    final uri = '$apiBase/topics/new';
-    logd('');
-    logd('============================================');
-    logd('📰 [fetchNewTopics] API呼び出し開始');
-    logd('📰 [fetchNewTopics] API URL: $uri');
-    logd('============================================');
-    logd('');
-    
-    final response = await http.get(Uri.parse(uri));
-    logd('📰 [fetchNewTopics] Response status: ${response.statusCode}');
-    logd('📰 [fetchNewTopics] Response body (first 300 chars): ${response.body.substring(0, min(300, response.body.length))}');
-    
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as List<dynamic>;
-      logd('📰 [fetchNewTopics] ✅ Success - Fetched ${data.length} topics');
-      return data;
-    } else {
-      throw Exception('Failed to load topics: ${response.statusCode}');
-    }
-  } catch (e) {
-    logd('📰 [fetchNewTopics] ❌ Error: $e');
-    rethrow;
-  }
-}
 
-/// 人気トピックを取得
-Future<List<dynamic>> fetchPopularTopics() async {
-  try {
-    final uri = '$apiBase/topics/popular';
-    logd('');
-    logd('============================================');
-    logd('⭐ [fetchPopularTopics] API呼び出し開始');
-    logd('⭐ [fetchPopularTopics] API URL: $uri');
-    logd('============================================');
-    logd('');
-    
-    final response = await http.get(Uri.parse(uri));
-    logd('⭐ [fetchPopularTopics] Response status: ${response.statusCode}');
-    logd('⭐ [fetchPopularTopics] Response body (first 300 chars): ${response.body.substring(0, min(300, response.body.length))}');
-    
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as List<dynamic>;
-      logd('⭐ [fetchPopularTopics] ✅ Success - Fetched ${data.length} topics');
-      return data;
-    } else {
-      throw Exception('Failed to load topics: ${response.statusCode}');
-    }
-  } catch (e) {
-    logd('⭐ [fetchPopularTopics] ❌ Error: $e');
-    rethrow;
-  }
-}
 
 // キャッシュ対応のトピック取得
 Future<List<dynamic>> fetchNewTopicsWithCache() async {
@@ -301,58 +248,6 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     }
   } catch (e) {
     logd('💬 [fetchCommentsWithPagination] ❌ Error: $e');
-    rethrow;
-  }
-}
-
-// キャッシュ対応のコメント取得（旧版、互換性維持）
-Future<List<dynamic>> fetchCommentsWithCache(int topicId, {int limit = 10000}) async {
-  try {
-    logd('');
-    logd('============================================');
-    logd('💬 [fetchCommentsWithCache] API呼び出し開始');
-    logd('============================================');
-    logd('');
-    
-    final uri = Uri.parse('$apiBase/topic/$topicId').replace(
-      queryParameters: {'limit': limit.toString()},
-    );
-    logd('💬 [fetchCommentsWithCache] API URL: $uri');
-    logd('💬 [fetchCommentsWithCache] Parameters: topicId=$topicId, limit=$limit');
-    
-    final response = await http.get(uri);
-    logd('💬 [fetchCommentsWithCache] Response status: ${response.statusCode}');
-    logd('💬 [fetchCommentsWithCache] Response body length: ${response.body.length} bytes');
-    
-    if (response.statusCode == 200) {
-      logd('💬 [fetchCommentsWithCache] Parsing JSON...');
-      final data = jsonDecode(response.body);
-      final comments = data['comments'] as List<dynamic>;
-      final total = data['total'] as int? ?? comments.length;
-      logd('💬 [fetchCommentsWithCache] ✅ Successfully parsed ${comments.length} comments (total: $total)');
-      
-      // コメントをキャッシュに保存
-      await CacheService.saveList('comments_$topicId', comments);
-      logd('💬 [fetchCommentsWithCache] 💾 Cached successfully - ${comments.length} comments stored');
-      
-      // totalをメタキャッシュに保存（watched_topicsの更新用）
-      await CacheService.saveMap('topic_meta_$topicId', {'total': total});
-      logd('💬 [fetchCommentsWithCache] 💾 Cached total: $total for topic $topicId');
-      
-      return comments;
-    } else {
-      logd('💬 [fetchCommentsWithCache] ❌ API Error status: ${response.statusCode}');
-      throw Exception('Failed to load comments: ${response.statusCode}');
-    }
-  } catch (e) {
-    logd('💬 [fetchCommentsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
-    // エラー時はキャッシュから取得
-    final cached = await CacheService.loadList('comments_$topicId');
-    if (cached.isNotEmpty) {
-      logd('💬 [fetchCommentsWithCache] 📂 Loaded from cache - ${cached.length} comments');
-      return cached;
-    }
-    logd('💬 [fetchCommentsWithCache] ❌ No cache available');
     rethrow;
   }
 }
@@ -519,11 +414,3 @@ Future<void> removeClippedComment(int topicId, int commentNo) async {
   
   await prefs.setStringList('clipped_comments', clips);
 }
-
-Future<bool> isCommentClipped(int topicId, int commentNo) async {
-  final clips = await getClippedComments();
-  return clips.any((c) => c['topicId'] == topicId && c['no'] == commentNo);
-}
-
-Future<void> addFavoriteId(int id) async => addWatchedTopicId(id);
-Future<void> removeFavoriteId(int id) async => removeWatchedTopicId(id);
