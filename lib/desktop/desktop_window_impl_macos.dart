@@ -9,7 +9,7 @@ Future<void> initDesktopWindow() async {
     size: Size(1400, 900),
     minimumSize: Size(1200, 800),
     center: true,
-    titleBarStyle: TitleBarStyle.hidden,
+    titleBarStyle: TitleBarStyle.hiddenInset,
     backgroundColor: null,
     fullScreen: false,
     skipTaskbar: false,
@@ -25,16 +25,6 @@ Future<void> initDesktopWindow() async {
     await windowManager.show();
     await windowManager.focus();
   });
-
-  // bitsdojo_window を使う場合の例（任意）
-  // import 'package:bitsdojo_window/bitsdojo_window.dart';
-  // doWhenWindowReady(() {
-  //   const initialSize = Size(1400, 900);
-  //   appWindow.size = initialSize;
-  //   appWindow.minSize = const Size(1200, 800);
-  //   appWindow.alignment = Alignment.center;
-  //   appWindow.show();
-  // });
 }
 
 Future<void> showDesktopWindow() async {

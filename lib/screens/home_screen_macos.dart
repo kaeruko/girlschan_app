@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
+import '../widgets/common/app_toast.dart';
 import 'new_list.dart';
 import 'topic_list.dart';
 import 'favorites_screen.dart';
@@ -314,14 +315,14 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
       // 現在のタブに応じて異なるリフレッシュ処理を実行
       switch (_currentIndex) {
         case 0:
-          // 新着タブ: NewListScreenState から直接リフレッシュを呼び出し
+          // 新着タブ: API通信を実行
           final newListState = _newListKey.currentState;
           if (newListState != null) {
             await newListState.fetchFromServer();
           }
           break;
         case 1:
-          // 人気タブ: TopicListScreenState から直接リフレッシュを呼び出し
+          // 人気タブ: API通信を実行
           final topicListState = _topicListKey.currentState;
           if (topicListState != null) {
             await topicListState.fetchFromServer();
@@ -329,16 +330,22 @@ class _HomeScreenMacOSState extends State<HomeScreenMacOS> {
           break;
         case 2:
           // 履歴タブ: キャッシュなし、特に処理なし
+          if (mounted) {
+            await AppToast.show(context, 'これ以上の履歴はありません');
+          }
           break;
         case 3:
           // クリップタブ: キャッシュなし、特に処理なし
+          if (mounted) {
+            await AppToast.show(context, 'クリップはまだ登録されていません');
+          }
           break;
       }
-
-      // 短い遅延を追加して、ローディング状態を視覚的に確認できるようにする
-      await Future.delayed(const Duration(milliseconds: 500));
     } catch (e) {
       print('更新エラー: $e');
+      if (mounted) {
+        await AppToast.show(context, 'エラーが発生しました: $e');
+      }
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);

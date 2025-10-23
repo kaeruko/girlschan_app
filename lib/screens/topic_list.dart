@@ -68,10 +68,10 @@ class _TopicListScreenState extends State<TopicListScreen>
     }
 
     // キャッシュがない場合はサーバーから取得
-    await _fetchFromServer();
+    await fetchFromServer();
   }
 
-  Future<void> _fetchFromServer() async {
+  Future<void> fetchFromServer() async {
     try {
       final topics = widget.sortOrder == 'new'
           ? await fetchNewTopicsWithCache()
@@ -87,7 +87,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       });
       await _controller.refreshAll();
     } catch (e) {
-      logd('❌ [_fetchFromServer] $e', name: 'TopicList');
+      logd('❌ [fetchFromServer] $e', name: 'TopicList');
 
       final cached = await CacheService.loadList(cacheKey);
       if (!mounted) return;
@@ -115,7 +115,7 @@ class _TopicListScreenState extends State<TopicListScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _fetchFromServer,
+        onRefresh: fetchFromServer,
         child: _loading
             ? const Center(child: AppSpinner(size: 20))
             : Scrollbar(

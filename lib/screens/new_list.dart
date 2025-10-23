@@ -71,13 +71,13 @@ class _NewListScreenState extends State<NewListScreen>
       });
       await _controller.refreshAll();
     } else {
-      await _fetchFromServer();
+      await fetchFromServer();
     }
   }
 
-  Future<void> _fetchFromServer() async {
+  Future<void> fetchFromServer() async {
     try {
-      logd('🌐 [NewList._fetchFromServer] GET /topics/new', name: 'NewList');
+      logd('🌐 [NewList.fetchFromServer] GET /topics/new', name: 'NewList');
       final uri = Uri.parse('${AppConfig.apiBase}/topics/new');
       final res = await http.get(uri);
       if (res.statusCode != 200) {
@@ -97,7 +97,7 @@ class _NewListScreenState extends State<NewListScreen>
 
       await _controller.refreshAll();
     } catch (e) {
-      logd('❌ [NewList._fetchFromServer] $e', name: 'NewList');
+      logd('❌ [NewList.fetchFromServer] $e', name: 'NewList');
       final cached = await CacheService.loadList(cacheKey);
       if (!mounted) return;
       setState(() {
