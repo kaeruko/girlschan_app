@@ -1,56 +1,224 @@
-import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import '../services/webview_env.dart';
+import '../utils/log.dart';
 
+typedef PostCompleted = void Function(); // 戻った側で再読込する用
+
+/// WebView ベースのコメント投稿画面（二重送信ガード・戻る統一）
 class CommentPostWebView extends StatefulWidget {
   final int topicId;
-  final String text;
+  final String title;
+  final Uri postPageUrl; // コメント投稿ページのURL（フォーム表示）
+  final Map<String, String>
+      primeCookies; // 事前投入するCookie（セッション等）
+  final PostCompleted?
+      onCompleted; // 完了時コールバック（一覧をrefreshなど）
 
-  const CommentPostWebView({super.key, required this.topicId, required this.text});
+  /// 投稿成功を検知するURLの接頭（例: https://example.com/post_done）
+  final String successUrlPrefix;
+
+  const CommentPostWebView({
+    super.key,
+    required this.topicId,
+    required this.title,
+    required this.postPageUrl,
+    this.primeCookies = const {},
+    this.onCompleted,
+    this.successUrlPrefix = '/post_done', // ホストを含む/含まないは後で吸収
+  });
 
   @override
   State<CommentPostWebView> createState() => _CommentPostWebViewState();
 }
 
 class _CommentPostWebViewState extends State<CommentPostWebView> {
-  bool _isPosted = false;
+  late final WebViewController _ctrl;
+  bool _loading = true;
+  bool _completed = false; // 二重完了ガード
+  bool _blockingClose = false; // 完了直後の連打防止
 
   @override
-  Widget build(BuildContext context) {
-    final postData = Uint8List.fromList(utf8.encode(
-      'is_post=1&is_next=1&text=${Uri.encodeComponent(widget.text)}&anonymous=匿名で投稿',
-    ));
+  void initState() {
+    super.initState();
+    _ctrl = WebViewController();
+    _init();
+  }
 
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('投稿中...'),
-      ),
-      child: InAppWebView(
-        initialUrlRequest: URLRequest(
-          url: WebUri('https://girlschannel.net/make_comment/${widget.topicId}/'),
-          method: 'POST',
-          body: postData,
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        ),
-        onLoadStop: (controller, url) async {
-          if (_isPosted) return; // 二重実行防止
-          
-          if (url != null && url.toString().contains('/topics/${widget.topicId}')) {
-            _isPosted = true;
-            if (mounted) {
-              // 遅延実行で UI の安定性を確保
-              await Future.delayed(const Duration(milliseconds: 500));
-              if (mounted) {
-                Navigator.pop(context, true); // 投稿完了
-              }
-            }
+  Future<void> _init() async {
+    await WebViewEnv.primeController(_ctrl);
+
+    // 成功検知：JS経由（フォーム submit 時に window.PostBridge.postMessage を呼ぶ想定）
+    await _ctrl.addJavaScriptChannel(
+      'PostBridge',
+      onMessageReceived: (msg) {
+        final text = msg.message.trim().toLowerCase();
+        if (text == 'post_ok') {
+          logd('✅ [PostBridge] post_ok 受信', name: 'CommentPostWebView');
+          _markComplete('js');
+        }
+      },
+    );
+
+    // ナビゲーション経由の成功検知
+    await _ctrl.setNavigationDelegate(
+      NavigationDelegate(
+        onPageStarted: (url) {
+          logd('🌐 [onPageStarted] $url', name: 'CommentPostWebView');
+          final u = Uri.tryParse(url);
+          if (u != null && _isSuccessUrl(u)) {
+            logd('✅ [Navigation] Success URL detected: $url',
+                name: 'CommentPostWebView');
+            _markComplete('nav');
           }
         },
-        onLoadError: (controller, url, code, message) {
-          debugPrint('❌ WebView Load Error: $message (code: $code)');
+        onPageFinished: (_) {
+          logd('✅ [onPageFinished]', name: 'CommentPostWebView');
+          setState(() => _loading = false);
+        },
+        onNavigationRequest: (req) {
+          // 完了後は全遷移をブロック（連打や戻るで二重送信しない）
+          if (_completed) {
+            logd('⛔ [NavigationRequest] BLOCKED (already completed): ${req.url}',
+                name: 'CommentPostWebView');
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
         },
       ),
     );
+
+    // Cookie 事前投入
+    await WebViewEnv.primeCookies(
+      baseUri: widget.postPageUrl,
+      cookies: widget.primeCookies,
+    );
+
+    logd('🚀 [_init] Loading ${widget.postPageUrl}',
+        name: 'CommentPostWebView');
+
+    // 1ページ目をロード
+    await _ctrl.loadRequest(widget.postPageUrl);
+  }
+
+  bool _isSuccessUrl(Uri u) {
+    // successUrlPrefix がホスト付き/相対、両対応にしておく
+    final p = widget.successUrlPrefix;
+    if (p.startsWith('http')) {
+      return u.toString().startsWith(p);
+    } else {
+      return u.path.startsWith(p);
+    }
+  }
+
+  Future<void> _markComplete(String source) async {
+    if (_completed) {
+      logd('⏭️ [_markComplete] Already completed, ignoring source=$source',
+          name: 'CommentPostWebView');
+      return; // 二重ガード
+    }
+    _completed = true;
+    logd('🎉 [_markComplete] Marking complete (source=$source)',
+        name: 'CommentPostWebView');
+
+    // 画面上の送信ボタンなどを無効化（ページに依存しない最低限の抑止）
+    unawaited(_ctrl.runJavaScriptReturningResult('''
+      (function(){
+        try{
+          if (window.__posted) return 1;
+          window.__posted = true;
+          var btns = document.querySelectorAll('button[type=submit],input[type=submit]');
+          btns.forEach(function(b){ b.disabled = true; b.innerText = '送信済み'; });
+          return 0;
+        }catch(e){return -1;}
+      })();
+    '''));
+
+    setState(() => _blockingClose = true);
+
+    // 呼び出し元に通知（一覧の再読込など）
+    widget.onCompleted?.call();
+
+    logd('⏳ [_markComplete] Waiting 300ms before closing',
+        name: 'CommentPostWebView');
+
+    // 少し待ってから安全に閉じる（UI連打の吸収）
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) {
+      logd('👈 [_markComplete] Closing screen', name: 'CommentPostWebView');
+      Navigator.of(context).maybePop(true);
+    }
+  }
+
+  Future<bool> _handleBack() async {
+    // WebView 内で戻れるなら戻る、無理なら画面を閉じる
+    if (await _ctrl.canGoBack()) {
+      logd('⬅️ [_handleBack] Going back in WebView',
+          name: 'CommentPostWebView');
+      await _ctrl.goBack();
+      return false; // 画面は閉じない
+    }
+    logd('⬅️ [_handleBack] Cannot go back, closing screen',
+        name: 'CommentPostWebView');
+    return true; // 画面を閉じる
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Flutter 3.13+ は PopScope、3.7 は WillPopScope
+    return PopScope(
+      canPop: !_blockingClose,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        final allow = await _handleBack();
+        if (allow && mounted) {
+          logd('👈 [build.onPopInvoked] Popping screen',
+              name: 'CommentPostWebView');
+          Navigator.of(context).pop();
+        }
+      },
+      child: CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          middle: Text('コメント投稿 - ${widget.title}'),
+          previousPageTitle: '戻る',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_loading)
+                const CupertinoActivityIndicator()
+              else
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    logd('🔄 [reload] Reloading WebView',
+                        name: 'CommentPostWebView');
+                    _ctrl.reload();
+                  },
+                  child: const Icon(CupertinoIcons.refresh),
+                ),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Stack(
+            children: [
+              WebViewWidget(controller: _ctrl),
+              if (_loading)
+                const Center(child: CupertinoActivityIndicator()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    logd('🗑️ [dispose] Disposing CommentPostWebView',
+        name: 'CommentPostWebView');
+    super.dispose();
   }
 }
+
