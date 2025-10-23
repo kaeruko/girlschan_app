@@ -8,7 +8,13 @@ import '../widgets/common/app_spinner.dart';
 import '../widgets/common/app_toast.dart';
 
 class TopicListScreen extends StatefulWidget {
-  const TopicListScreen({super.key});
+  /// 'new' または 'popular' - どのトピックを表示するか
+  final String sortOrder;
+
+  const TopicListScreen({
+    super.key,
+    this.sortOrder = 'popular',
+  });
 
   @override
   State<TopicListScreen> createState() => _TopicListScreenState();

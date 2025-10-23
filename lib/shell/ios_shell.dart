@@ -11,24 +11,36 @@ class IOSShell extends StatefulWidget {
 }
 
 class _IOSShellState extends State<IOSShell> {
-  int _index = 0;
+  late final CupertinoTabController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = CupertinoTabController(initialIndex: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
+      controller: _controller,
       tabBar: CupertinoTabBar(
         items: [
           for (final t in widget.tabs)
             BottomNavigationBarItem(icon: Icon(t.icon), label: t.label),
         ],
-        currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        // ← currentIndex / onTap は指定しない（CupertinoTabScaffold が自動で制御）
       ),
       tabBuilder: (context, i) {
         // ここは必ず CupertinoTabView にしておく（iOSでの戻るアニメ等が自然になる）
         return CupertinoTabView(
           onGenerateRoute: AppRouter.onGenerateRoute,
-          builder: (_) => widget.tabs[i].widget,
+          builder: (ctx) => widget.tabs[i].builder(ctx),
         );
       },
     );

@@ -118,11 +118,11 @@ class _MacShellState extends State<MacShell> {
                         ),
                       ),
                     ),
-                    // コンテンツエリア：kAppTabs[_index].widget を表示
+                    // コンテンツエリア：タブの builder から画面を生成
                     Expanded(
-                      child: Navigator(
-                        onGenerateRoute: AppRouter.onGenerateRoute,
-                        initialRoute: '/',
+                      child: KeyedSubtree(
+                        key: PageStorageKey('mac_${current.id}'),
+                        child: current.builder(context),
                       ),
                     ),
                   ],
