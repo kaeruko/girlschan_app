@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// WebView の UA・Cookie 初期化を集約するサービス層
@@ -23,24 +23,24 @@ class WebViewEnv {
     bool isSecure = true,
   }) async {
     if (cookies.isEmpty) return;
-    final mgr = CookieManager();
+    
+    // WebView 4.x では WebViewCookieManager を使用
     for (final e in cookies.entries) {
-      await mgr.setCookie(
+      await WebViewCookieManager().setCookie(
         WebViewCookie(
           name: e.key,
           value: e.value,
           domain: baseUri.host,
           path: '/',
-          isSecure: isSecure,
         ),
       );
     }
   }
 
   // 不要Cookieの掃除（ログアウト等）
-  static Future<bool> clearAllCookies() {
-    final mgr = CookieManager();
-    return mgr.clearCookies();
+  static Future<bool> clearAllCookies() async {
+    await WebViewCookieManager().clearCookies();
+    return true;
   }
 
   // WebViewController の共通初期化

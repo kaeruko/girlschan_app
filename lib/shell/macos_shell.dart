@@ -26,6 +26,11 @@ class _MacShellState extends State<MacShell> {
   String? _selectedHistory;
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final backgroundColor = CupertinoColors.systemBackground;
     final topBarColor = CupertinoColors.systemGrey6.withOpacity(0.8);
@@ -119,10 +124,21 @@ class _MacShellState extends State<MacShell> {
                       ),
                     ),
                     // コンテンツエリア：タブの builder から画面を生成
+                    // 各タブで独立したナビゲーションをサポート
                     Expanded(
                       child: KeyedSubtree(
                         key: PageStorageKey('mac_${current.id}'),
-                        child: current.builder(context),
+                        child: IndexedStack(
+                          index: _index,
+                          children: [
+                            for (int i = 0; i < widget.tabs.length; i++)
+                              CupertinoTabView(
+                                key: PageStorageKey('tab_view_$i'),
+                                onGenerateRoute: AppRouter.onGenerateRoute,
+                                builder: (ctx) => widget.tabs[i].builder(ctx),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

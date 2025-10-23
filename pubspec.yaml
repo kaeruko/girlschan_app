@@ -25,6 +25,8 @@ dependencies:
   # デスクトップ専用（iOSでは呼ばない＝安全）
   window_manager: ^0.3.7
   bitsdojo_window: ^0.1.5
+  webview_flutter: ^4.13.0
+  webview_flutter_wkwebview: ^3.23.1
 
 dev_dependencies:
   flutter_test:

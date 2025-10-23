@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../services/webview_env.dart';
@@ -19,6 +20,9 @@ class CommentPostWebView extends StatefulWidget {
   /// 投稿成功を検知するURLの接頭（例: https://example.com/post_done）
   final String successUrlPrefix;
 
+  /// 初期テキスト（テキストエリアに事前入力）
+  final String? initialText;
+
   const CommentPostWebView({
     super.key,
     required this.topicId,
@@ -27,6 +31,7 @@ class CommentPostWebView extends StatefulWidget {
     this.primeCookies = const {},
     this.onCompleted,
     this.successUrlPrefix = '/post_done', // ホストを含む/含まないは後で吸収
+    this.initialText,
   });
 
   @override
@@ -73,9 +78,28 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
             _markComplete('nav');
           }
         },
-        onPageFinished: (_) {
+        onPageFinished: (_) async {
           logd('✅ [onPageFinished]', name: 'CommentPostWebView');
           setState(() => _loading = false);
+          
+          // 初期テキストがあれば textarea に流し込む（最初の textarea を対象）
+          if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+            final js = '''
+              (function(t){
+                try{
+                  var ta = document.querySelector('textarea');
+                  if(ta){ ta.value = t; return 1; }
+                  return 0;
+                }catch(e){ return -1; }
+              })(${_escapeForJs(widget.initialText!)});
+            ''';
+            try {
+              await _ctrl.runJavaScriptReturningResult(js);
+              logd('✅ [initialText] Injected into textarea', name: 'CommentPostWebView');
+            } catch (e) {
+              logd('⚠️ [initialText] Failed to inject: $e', name: 'CommentPostWebView');
+            }
+          }
         },
         onNavigationRequest: (req) {
           // 完了後は全遷移をブロック（連打や戻るで二重送信しない）
@@ -221,4 +245,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
     super.dispose();
   }
 }
+
+/// 文字列をJavaScriptリテラルにエスケープ
+String _escapeForJs(String s) => jsonEncode(s);
 

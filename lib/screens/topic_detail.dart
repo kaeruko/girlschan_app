@@ -1059,29 +1059,83 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     final controller = TextEditingController();
     final dialogContext = context; // コンテキストをキャプチャ
     
-    final text = await showCupertinoDialog<String>(
+    final text = await showCupertinoModalPopup<String>(
       context: dialogContext,
-      builder: (dialogCtx) => CupertinoAlertDialog(
-        title: const Text('コメント入力'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: CupertinoTextField(
-            controller: controller,
-            maxLines: 5,
-            placeholder: 'コメントを入力してください',
-          ),
+      builder: (dialogCtx) => Container(
+        height: MediaQuery.of(dialogCtx).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('キャンセル'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
-            child: const Text('確認'),
-          ),
-        ],
+        child: Column(
+          children: [
+            // ヘッダー
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: CupertinoColors.separator),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'コメント入力',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(4),
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Icon(CupertinoIcons.xmark, size: 20),
+                  ),
+                ],
+              ),
+            ),
+            // テキスト入力
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: CupertinoTextField(
+                  controller: controller,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  placeholder: 'コメントを入力してください',
+                  decoration: BoxDecoration(
+                    border: Border.all(color: CupertinoColors.separator),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                ),
+              ),
+            ),
+            // フッター（ボタン）
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: CupertinoColors.separator),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  CupertinoButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text('キャンセル'),
+                  ),
+                  const SizedBox(width: 8),
+                  CupertinoButton(
+                    color: CupertinoColors.systemBlue,
+                    onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
+                    child: const Text('確認'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -1116,17 +1170,20 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
     controller.dispose();
 
-    if (confirmed == true) {
-      if (!mounted) return;
-      
-      final success = await Navigator.push(
-        dialogContext,
-        CupertinoPageRoute(
-          builder: (_) => CommentPostWebView(topicId: widget.topicId, text: text),
-        ),
-      );
-
-      if (success == true && mounted) {
+      if (confirmed == true) {
+        if (!mounted) return;
+        
+        final success = await Navigator.push(
+          dialogContext,
+          CupertinoPageRoute(
+            builder: (_) => CommentPostWebView(
+              topicId: widget.topicId,
+              title: widget.title,
+              postPageUrl: Uri.parse('https://example.com/topic/${widget.topicId}/comment'),
+              initialText: text,
+            ),
+          ),
+        );      if (success == true && mounted) {
         await _saveLocalComment(text);
         if (mounted) {
           PlatformHelper.showSnackBar(dialogContext, '投稿を送信しました');
