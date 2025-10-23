@@ -841,11 +841,18 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(widget.title, style: const TextStyle(fontSize: 16)),
+            Text(
+              widget.title,
+              style: const TextStyle(fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             Text(
               'コメント: $remoteCount/$_totalComments'
               '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
               style: const TextStyle(fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
