@@ -164,7 +164,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       _allComments    = [...mergedRemote, ...locals];
     });
 
-    await CacheService.save('comments_${widget.topicId}', mergedRemote);
+    await CacheService.saveList('comments_${widget.topicId}', mergedRemote);
 
     // 復元待ち && 目標件数に到達したらもう一度 jump
     if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
@@ -325,7 +325,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
     // キャッシュ読み出し
     final cacheKey     = 'comments_${widget.topicId}';
-    final cachedRemote = await CacheService.load(cacheKey);
+    final cachedRemote = await CacheService.loadList(cacheKey);
 
     if (cachedRemote.isNotEmpty) {
       final locals = await _loadLocalComments();
@@ -362,7 +362,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       _allComments = newComments;
       _totalComments = total;
 
-      await CacheService.save('comments_${widget.topicId}', _allComments);
+      await CacheService.saveList('comments_${widget.topicId}', _allComments);
 
       final locals = await _loadLocalComments();
       setState(() {

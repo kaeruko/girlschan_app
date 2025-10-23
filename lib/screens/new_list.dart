@@ -61,7 +61,7 @@ class _NewListScreenState extends State<NewListScreen>
   Future<void> _load() async {
     // まずキャッシュ表示 → なければAPI
     logd('📂 [NewList._load] Load from cache', name: 'NewList');
-    final cached = await CacheService.load(cacheKey);
+    final cached = await CacheService.loadList(cacheKey);
     logd('📂 [NewList._load] cached=${cached.length}', name: 'NewList');
 
     if (cached.isNotEmpty) {
@@ -87,7 +87,7 @@ class _NewListScreenState extends State<NewListScreen>
       final data = jsonDecode(res.body) as List<dynamic>;
       final list = data.cast<Map<String, dynamic>>();
 
-      await CacheService.save(cacheKey, list);
+      await CacheService.saveList(cacheKey, list);
       if (!mounted) return;
 
       setState(() {
@@ -98,7 +98,7 @@ class _NewListScreenState extends State<NewListScreen>
       await _controller.refreshAll();
     } catch (e) {
       logd('❌ [NewList._fetchFromServer] $e', name: 'NewList');
-      final cached = await CacheService.load(cacheKey);
+      final cached = await CacheService.loadList(cacheKey);
       if (!mounted) return;
       setState(() {
         if (cached.isNotEmpty) {

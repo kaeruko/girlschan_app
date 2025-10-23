@@ -44,10 +44,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
 
   Future<void> _loadWatchedTopics() async {
     final topics = await getWatchedTopics();
-    // 「保存順の逆」にしたいならここで反転
-    final reversed = topics.reversed.toList();
     setState(() {
-      _watchedTopics = reversed;
+      _watchedTopics = topics;
       _loading = false;
     });
   }

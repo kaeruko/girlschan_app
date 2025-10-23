@@ -55,16 +55,20 @@ class _TopicListScreenState extends State<TopicListScreen>
 
   Future<void> _loadFromCache() async {
     logd('📂 [_loadFromCache] Loading topics from cache...', name: 'TopicList');
-    final cached = await CacheService.load(cacheKey);
+
+    List<dynamic> cached = await CacheService.loadList(cacheKey);
     if (cached.isNotEmpty) {
+      cached = cached.reversed.toList();
       setState(() {
         _topics = cached.cast<Map<String, dynamic>>();
         _loading = false;
       });
       await _controller.refreshAll();
-    } else {
-      await _fetchFromServer();
+      return;
     }
+
+    // キャッシュがない場合はサーバーから取得
+    await _fetchFromServer();
   }
 
   Future<void> _fetchFromServer() async {
@@ -72,8 +76,10 @@ class _TopicListScreenState extends State<TopicListScreen>
       final topics = widget.sortOrder == 'new'
           ? await fetchNewTopicsWithCache()
           : await fetchPopularTopicsWithCache();
+
       final list = topics.cast<Map<String, dynamic>>();
-      await CacheService.save(cacheKey, list);
+      await CacheService.saveList(cacheKey, list);
+
       if (!mounted) return;
       setState(() {
         _topics = list;
@@ -82,7 +88,8 @@ class _TopicListScreenState extends State<TopicListScreen>
       await _controller.refreshAll();
     } catch (e) {
       logd('❌ [_fetchFromServer] $e', name: 'TopicList');
-      final cached = await CacheService.load(cacheKey);
+
+      final cached = await CacheService.loadList(cacheKey);
       if (!mounted) return;
       setState(() {
         if (cached.isNotEmpty) {
@@ -91,6 +98,7 @@ class _TopicListScreenState extends State<TopicListScreen>
         _loading = false;
       });
       await _controller.refreshAll();
+
       if (mounted) {
         await AppToast.show(context, 'データの更新に失敗しました（キャッシュを使用）');
       }
