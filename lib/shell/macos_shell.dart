@@ -226,19 +226,30 @@ class _MacShellState extends State<MacShell> {
 
   /// 更新ボタンのハンドラー
   Future<void> _handleRefresh() async {
-    if (_isRefreshing) return;
+    if (_isRefreshing) {
+      return;
+    }
 
     setState(() => _isRefreshing = true);
 
     try {
-      // 更新処理はタブ側で個別に定義されているはず
-      // 今はプレースホルダー
-      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // TabSpec の stateKey を使用して各タブの fetchFromServer() を呼び出す
+      final stateKey = widget.tabs[_index].stateKey;
+      if (stateKey != null) {
+        final state = stateKey.currentState;
+        if (state != null && state.mounted) {
+          await (state as dynamic).fetchFromServer();
+        } else {
+        }
+      } else {
+      }
     } catch (e) {
-      print('更新エラー: $e');
+      print('[🔴 ERROR] 更新エラー: $e');
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
+        print('[🔵 DEBUG] Set _isRefreshing = false');
       }
     }
   }

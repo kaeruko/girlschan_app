@@ -10,6 +10,7 @@ class TabSpec {
   final IconData icon;          // アイコン
   final String title;           // AppBar タイトル
   final WidgetBuilder builder;  // ← タブ画面を生成するビルダー
+  final GlobalKey? stateKey;    // ← State にアクセスするための GlobalKey
 
   const TabSpec({
     required this.id,
@@ -17,19 +18,28 @@ class TabSpec {
     required this.icon,
     required this.title,
     required this.builder,
+    this.stateKey,
   });
 }
 
 /// アプリ全体で使う統一されたタブ定義
 /// iOS/macOS 両方で共通使用
+/// 注意: GlobalKey は各タブの State にアクセスするため、定義時に生成される
+
+// 各タブの State にアクセスするための GlobalKey
+final _newTopicListKey = GlobalKey<State>();
+final _popularTopicListKey = GlobalKey<State>();
+final _favoritesKey = GlobalKey<State>();
+
 final List<TabSpec> kAppTabs = [
   TabSpec(
     id: 'tab_new',
     label: '新着',
     icon: Icons.fiber_new,
     title: '新着トピック',
-    builder: (_) => const TopicListScreen(
-      key: PageStorageKey('tab_new'),
+    stateKey: _newTopicListKey,
+    builder: (_) => TopicListScreen(
+      key: _newTopicListKey,
       sortOrder: 'new',
     ),
   ),
@@ -38,8 +48,9 @@ final List<TabSpec> kAppTabs = [
     label: '人気',
     icon: Icons.trending_up,
     title: '人気トピック',
-    builder: (_) => const TopicListScreen(
-      key: PageStorageKey('tab_popular'),
+    stateKey: _popularTopicListKey,
+    builder: (_) => TopicListScreen(
+      key: _popularTopicListKey,
       sortOrder: 'popular',
     ),
   ),
@@ -48,8 +59,9 @@ final List<TabSpec> kAppTabs = [
     label: '履歴',
     icon: Icons.bookmark,
     title: '履歴',
-    builder: (_) => const FavoritesScreen(
-      key: PageStorageKey('tab_favorites'),
+    stateKey: _favoritesKey,
+    builder: (_) => FavoritesScreen(
+      key: _favoritesKey,
     ),
   ),
   TabSpec(
