@@ -66,12 +66,19 @@ class _NewListScreenState extends State<NewListScreen>
     logd('📂 [NewList._load] cached=${cached.length}', name: 'NewList');
 
     if (cached.isNotEmpty) {
+      final topics = cached.cast<Map<String, dynamic>>();
+      logd('📂 [NewList._load] ✅ キャッシュから${topics.length}件のトピック読み込み完了', name: 'NewList');
+      for (int i = 0; i < topics.length && i < 3; i++) {
+        final topic = topics[i];
+        logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'NewList');
+      }
       setState(() {
-        _topics = cached.cast<Map<String, dynamic>>();
+        _topics = topics;
         _loading = false;
       });
       await _controller.refreshAll();
     } else {
+      logd('📂 [NewList._load] キャッシュなし → サーバーから取得', name: 'NewList');
       await fetchFromServer();
     }
   }
@@ -87,8 +94,14 @@ class _NewListScreenState extends State<NewListScreen>
 
       final data = jsonDecode(res.body) as List<dynamic>;
       final list = data.cast<Map<String, dynamic>>();
+      logd('🌐 [NewList.fetchFromServer] ✅ API取得完了: ${list.length}件のトピック', name: 'NewList');
+      for (int i = 0; i < list.length && i < 3; i++) {
+        final topic = list[i];
+        logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'NewList');
+      }
 
       await CacheService.saveList(cacheKey, list);
+      logd('🌐 [NewList.fetchFromServer] 💾 キャッシュに保存完了', name: 'NewList');
       if (!mounted) return;
 
       setState(() {
@@ -104,6 +117,7 @@ class _NewListScreenState extends State<NewListScreen>
       setState(() {
         if (cached.isNotEmpty) {
           _topics = cached.cast<Map<String, dynamic>>();
+          logd('❌ [NewList.fetchFromServer] エラー時にキャッシュから${_topics.length}件読み込み', name: 'NewList');
         }
         _loading = false;
       });
@@ -119,6 +133,8 @@ class _NewListScreenState extends State<NewListScreen>
     if (_loading) {
       return const Center(child: AppSpinner(size: 20));
     }
+
+    logd('🎨 [NewList.build] UI描画: ${_topics.length}件のトピック表示', name: 'NewList');
 
     return Column(
       children: [
@@ -147,6 +163,7 @@ class _NewListScreenState extends State<NewListScreen>
                 itemCount: _topics.length,
                 itemBuilder: (context, i) {
                   final t = _topics[i];
+                  logd('🎨 [NewList.itemBuilder] アイテム[$i]: id=${t['id']}, title=${t['title']}', name: 'NewList');
                   return TopicTile(
                     topic: t,
                     controller: _controller,

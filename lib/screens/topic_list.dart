@@ -55,13 +55,21 @@ class _TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _loadFromCache() async {
-    logd('📂 [_loadFromCache] Loading topics from cache...', name: 'TopicList');
+    logd('📂 [_loadFromCache] Loading topics from cache... (sortOrder=${widget.sortOrder})', name: 'TopicList');
 
     List<dynamic> cached = await CacheService.loadList(cacheKey);
+    logd('📂 [_loadFromCache] キャッシュ件数: ${cached.length}', name: 'TopicList');
+    
     if (cached.isNotEmpty) {
       cached = cached.reversed.toList();
+      final topics = cached.cast<Map<String, dynamic>>();
+      logd('📂 [_loadFromCache] ✅ キャッシュから${topics.length}件のトピック読み込み完了', name: 'TopicList');
+      for (int i = 0; i < topics.length && i < 3; i++) {
+        final topic = topics[i];
+        logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
+      }
       setState(() {
-        _topics = cached.cast<Map<String, dynamic>>();
+        _topics = topics;
         _loading = false;
       });
       await _controller.refreshAll();
@@ -69,17 +77,27 @@ class _TopicListScreenState extends State<TopicListScreen>
     }
 
     // キャッシュがない場合はサーバーから取得
+    logd('📂 [_loadFromCache] キャッシュなし → サーバーから取得', name: 'TopicList');
     await fetchFromServer();
   }
 
   Future<void> fetchFromServer() async {
     try {
+      logd('🌐 [fetchFromServer] API呼び出し開始 (sortOrder=${widget.sortOrder})', name: 'TopicList');
+      
       final topics = widget.sortOrder == 'new'
           ? await fetchNewTopicsWithCache()
           : await fetchPopularTopicsWithCache();
 
       final list = topics.cast<Map<String, dynamic>>();
+      logd('🌐 [fetchFromServer] ✅ API取得完了: ${list.length}件のトピック', name: 'TopicList');
+      for (int i = 0; i < list.length && i < 3; i++) {
+        final topic = list[i];
+        logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
+      }
+      
       await CacheService.saveList(cacheKey, list);
+      logd('🌐 [fetchFromServer] 💾 キャッシュに保存完了', name: 'TopicList');
 
       if (!mounted) return;
       setState(() {
@@ -95,6 +113,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       setState(() {
         if (cached.isNotEmpty) {
           _topics = cached.cast<Map<String, dynamic>>();
+          logd('❌ [fetchFromServer] エラー時にキャッシュから${_topics.length}件読み込み', name: 'TopicList');
         }
         _loading = false;
       });
@@ -114,10 +133,16 @@ class _TopicListScreenState extends State<TopicListScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        body: const Center(child: AppSpinner(size: 20)),
+      );
+    }
+
+    logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder})', name: 'TopicList');
+
     return Scaffold(
-      body: _loading
-          ? const Center(child: AppSpinner(size: 20))
-          : Column(
+      body: Column(
               children: [
                 // 更新ボタン（各ページ内に置く）
                 Container(
@@ -144,6 +169,7 @@ class _TopicListScreenState extends State<TopicListScreen>
                         itemCount: _topics.length,
                         itemBuilder: (context, index) {
                           final topic = _topics[index];
+                          logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
                           return TopicTile(
                             topic: topic,
                             controller: _controller,

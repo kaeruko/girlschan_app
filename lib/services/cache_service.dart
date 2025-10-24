@@ -7,7 +7,7 @@ import '../utils/log.dart';
 class CacheService {
   static Future<File> _file(String name) async {
     final dir = await getApplicationSupportDirectory();
-    // print('📂 Cache directory: ${dir.path}');
+    logd('📂 キャッシュディレクトリ: ${dir.path}');
     return File('${dir.path}/$name.json');
   }
   
