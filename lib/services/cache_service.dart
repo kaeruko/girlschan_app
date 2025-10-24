@@ -16,6 +16,7 @@ class CacheService {
     try {
       final file = await _file(name);
       if (await file.exists()) {
+        print('💾 [loadList] Loading cache: $name');
         final text = await file.readAsString();
         final decoded = jsonDecode(text);
         if (decoded is List) {
