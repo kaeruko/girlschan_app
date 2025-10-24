@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +52,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _needsDeferredRestore = false; // 差分取得後に再ジャンプが必要か
   bool _isRestoringScroll = false; // スクロール復現中フラグ
 
+  // ★ 追加: 最下部到達時の自動差分取得用
+  Timer? _autoThrottle;
+  DateTime? _lastSync;
+
   @override
   void initState() {
     super.initState();
@@ -68,11 +73,23 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
     logd('initState: topicId=${widget.topicId}, title=${widget.title}');
     _load();
+
+    // ★ 追加: 最下部到達時の自動差分取得リスナー
+    _scrollController.addListener(() {
+      final pos = _scrollController.position;
+      if (pos.pixels >= pos.maxScrollExtent - 80) {
+        // スロットル: 1秒以内に複数回呼ばれないようにする
+        if (_autoThrottle?.isActive ?? false) return;
+        _autoThrottle = Timer(const Duration(seconds: 1), () {});
+        _fetchDeltaFromServer(); // 差分API呼び出し
+      }
+    });
   }
 
   @override
   void dispose() {
     _saveScrollPosition();
+    _autoThrottle?.cancel(); // ★ 追加: Timer をキャンセル
     _scrollController.dispose();
     super.dispose();
   }
@@ -83,6 +100,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   // 「サーバ同期済み」件数（ローカル投稿は除外） // ★ 修正
   int _serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
+
+  // ★ 追加: 最終同期時刻の表示用文字列
+  String get _lastSyncDisplay {
+    final d = _lastSync;
+    if (d == null) return '—';
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mm = d.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
 
   // スクロール復現 // ★ 修正: ピクセル位置→コメントNo
   void _restoreScrollAfterBuild() {
@@ -160,6 +186,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     setState(() {
       _totalComments  = total;
       _allComments    = [...mergedRemote, ...locals];
+      _lastSync = DateTime.now(); // ★ 追加: 最終同期時刻を更新
     });
 
     await CacheService.saveList('comments_${widget.topicId}', mergedRemote);
@@ -853,12 +880,24 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            Text(
-              'コメント: $remoteCount/$_totalComments'
-              '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
-              style: const TextStyle(fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'コメント: $remoteCount/$_totalComments'
+                  '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
+                  style: const TextStyle(fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 8),
+                // ★ 追加: 最終同期時刻を小さく表示
+                Text(
+                  '同期: $_lastSyncDisplay',
+                  style: const TextStyle(fontSize: 10, color: CupertinoColors.secondaryLabel),
+                ),
+              ],
             ),
           ],
         ),
