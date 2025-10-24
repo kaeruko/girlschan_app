@@ -2,8 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
 import '../widgets/history_sidebar.dart';
-import '../utils/log.dart';
 import '../screens/topic_detail.dart';
+import '../screens/clips_screen.dart';
+import '../screens/favorites_screen.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -17,6 +18,8 @@ class _MacShellState extends State<MacShell> {
   int _index = 0;
   late final List<TabSpec> _effectiveTabs;
   late final List<GlobalKey<NavigatorState>> _tabNavKeys;
+  late final GlobalKey<ClipsScreenState> _clipsKey;
+  late final GlobalKey<FavoritesScreenState> _favoritesKey;
   double _captionHeight = 28.0;
 
   @override
@@ -28,6 +31,8 @@ class _MacShellState extends State<MacShell> {
     ).toList();
 
     _tabNavKeys = List.generate(_effectiveTabs.length, (_) => GlobalKey<NavigatorState>());
+    _clipsKey = GlobalKey<ClipsScreenState>();
+    _favoritesKey = GlobalKey<FavoritesScreenState>();
     _loadCaptionHeight();
   }
 
@@ -49,11 +54,11 @@ class _MacShellState extends State<MacShell> {
 
     // ★ 履歴タブのリロード（型安全）
     if (tabId == 'tab_favorites') {
-      favoritesScreenStateKey.currentState?.reloadFromOutside();
+      _favoritesKey.currentState?.reloadFromOutside();
     }
     // ★ クリップタブのリロード（型安全）
     if (tabId == 'tab_clips') {
-      clipsScreenStateKey.currentState?.reloadFromOutside();
+      _clipsKey.currentState?.reloadFromOutside();
     }
   }
 
@@ -101,8 +106,18 @@ class _MacShellState extends State<MacShell> {
                           key: _tabNavKeys[i],
                           onGenerateRoute: (settings) {
                             if (settings.name == '/') {
+                              final spec = _effectiveTabs[i];
+                              Widget screen;
+                              // ★ GlobalKey を各スクリーンに渡す
+                              if (spec.id == 'tab_clips') {
+                                screen = ClipsScreen(key: _clipsKey);
+                              } else if (spec.id == 'tab_favorites') {
+                                screen = FavoritesScreen(key: _favoritesKey);
+                              } else {
+                                screen = spec.builder(context);
+                              }
                               return CupertinoPageRoute(
-                                builder: (_) => _effectiveTabs[i].builder(_),
+                                builder: (_) => screen,
                                 settings: settings,
                               );
                             }

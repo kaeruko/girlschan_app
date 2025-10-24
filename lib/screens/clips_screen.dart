@@ -3,7 +3,6 @@
   import '../services/api_service.dart';
   import '../screens/topic_detail.dart';
   import '../widgets/common/app_spinner.dart';
-  import '../utils/route_observer.dart';
 
   class ClipsScreen extends StatefulWidget {
     const ClipsScreen({super.key});
@@ -12,13 +11,12 @@
   }
 
   class ClipsScreenState extends State<ClipsScreen>
-      with WidgetsBindingObserver, RouteAware {
+      with WidgetsBindingObserver {
     final _scrollController = ScrollController();
     List<Map<String, dynamic>> _clips = [];
     bool _loading = true;
     bool _refreshing = false;
     bool _inFlight = false;  // ★ 重複ロード防止
-    bool _subscribed = false;  // ★ 二重 subscribe 防止
 
     /// ★ app_tab 側から叩くための公開メソッド
     void reloadFromOutside() {
@@ -35,21 +33,11 @@
     @override
     void didChangeDependencies() {
       super.didChangeDependencies();
-      final route = ModalRoute.of(context);
-      if (!_subscribed && route is PageRoute) {
-        // ★ 初回のみ subscribe（二重登録防止）
-        routeObserver.subscribe(this, route);
-        _subscribed = true;
-      }
+      // RouteAware を使わずに .then() コールバックで検知
     }
 
     @override
     void dispose() {
-      if (_subscribed) {
-        // ★ subscribe したなら unsubscribe
-        routeObserver.unsubscribe(this);
-        _subscribed = false;
-      }
       WidgetsBinding.instance.removeObserver(this);
       _scrollController.dispose();
       super.dispose();
@@ -60,20 +48,11 @@
       if (state == AppLifecycleState.resumed) _loadClips();
     }
 
-    /// 同タブ内で詳細→戻る でも再読込（RouteAware）
-    @override
-    void didPopNext() {
-      _loadClips();
-    }
-
     Future<void> _loadClips() async {
       if (_inFlight) return;  // ★ 既に読込中なら実行しない
       _inFlight = true;
       try {
-        print('[ClipsScreen] Loading clips...');
         final clips = await getClippedComments();
-        print('[ClipsScreen] Clips loaded: ${clips.length} items');
-        print('[ClipsScreen] Clips data: $clips');
         
         // ★ パース失敗時のフォールバック付き
         clips.sort((a, b) {
@@ -92,11 +71,8 @@
         setState(() {
           _clips = clips;
           _loading = false;
-          print('[ClipsScreen] State updated. _loading=$_loading, _clips.length=${_clips.length}');
         });
       } catch (e, stackTrace) {
-        print('[ClipsScreen] ERROR: $e');
-        print('[ClipsScreen] StackTrace: $stackTrace');
         if (!mounted) return;
         setState(() {
           _loading = false;
@@ -126,7 +102,6 @@
 
     @override
     Widget build(BuildContext context) {
-      print('[ClipsScreen] build() called. _loading=$_loading, _clips.length=${_clips.length}');
       return CupertinoPageScaffold(
         navigationBar: null,
         child: SafeArea(
@@ -194,7 +169,6 @@
     }
 
     Widget _buildClipItem(BuildContext context, Map<String, dynamic> clip) {
-      print('[ClipsScreen] _buildClipItem: clip=$clip');
       final topicTitle = clip['topicTitle'] as String;
       final commentBody = clip['body'] as String;
       final commentNo = clip['no'] as int;
@@ -213,7 +187,10 @@
                 commentCount: 0,
               ),
             ),
-          );
+          ).then((_) {
+            // ★ 詳細から戻ってきたら再読込
+            if (mounted) _loadClips();
+          });
         },
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

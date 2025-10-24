@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../app/app_tabs.dart';
-import '../utils/route_observer.dart';
+import '../screens/clips_screen.dart';
+import '../screens/favorites_screen.dart';
 
 class IOSShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -12,12 +13,16 @@ class IOSShell extends StatefulWidget {
 
 class _IOSShellState extends State<IOSShell> {
   late final CupertinoTabController _controller;
+  late final GlobalKey<ClipsScreenState> _clipsKey;
+  late final GlobalKey<FavoritesScreenState> _favoritesKey;
 
   @override
   void initState() {
     super.initState();
     _controller = CupertinoTabController(initialIndex: 0);
     _controller.addListener(_onTabChanged);
+    _clipsKey = GlobalKey<ClipsScreenState>();
+    _favoritesKey = GlobalKey<FavoritesScreenState>();
   }
 
   void _onTabChanged() {
@@ -26,11 +31,11 @@ class _IOSShellState extends State<IOSShell> {
 
     // ★ 履歴タブのリロード（型安全）
     if (tabId == 'tab_favorites') {
-      favoritesScreenStateKey.currentState?.reloadFromOutside();
+      _favoritesKey.currentState?.reloadFromOutside();
     }
     // ★ クリップタブのリロード（型安全）
     if (tabId == 'tab_clips') {
-      clipsScreenStateKey.currentState?.reloadFromOutside();
+      _clipsKey.currentState?.reloadFromOutside();
     }
   }
 
@@ -50,14 +55,24 @@ class _IOSShellState extends State<IOSShell> {
           for (final t in widget.tabs)
             BottomNavigationBarItem(icon: Icon(t.icon), label: t.label),
         ],
-        // ← currentIndex / onTap は指定しない（CupertinoTabScaffold が自動で制御）
       ),
       tabBuilder: (context, i) {
-        // ここは必ず CupertinoTabView にしておく（iOSでの戻るアニメ等が自然になる）
-        return CupertinoTabView(
-          navigatorObservers: [routeObserver],
-          builder: (ctx) => widget.tabs[i].builder(ctx),
-        );
+        final spec = widget.tabs[i];
+        // ★ GlobalKey を各タブに渡す
+        switch (spec.id) {
+          case 'tab_clips':
+            return CupertinoTabView(
+              builder: (_) => ClipsScreen(key: _clipsKey),
+            );
+          case 'tab_favorites':
+            return CupertinoTabView(
+              builder: (_) => FavoritesScreen(key: _favoritesKey),
+            );
+          default:
+            return CupertinoTabView(
+              builder: spec.builder,
+            );
+        }
       },
     );
   }

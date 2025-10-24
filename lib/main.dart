@@ -5,7 +5,6 @@ import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
 import 'utils/platform_helper.dart';
 import 'utils/log.dart';
-import 'utils/route_observer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +43,6 @@ class GirlsChanApp extends StatelessWidget {
         Locale('ja', 'JP'),
         Locale('en', 'US'),
       ],
-      navigatorObservers: [routeObserver],
       // iOS: ボトムタブ / macOS: 上バー＋履歴サイドバー を内包
       home: AdaptiveShell(tabs: kAppTabs),
     );

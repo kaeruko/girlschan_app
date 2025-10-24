@@ -4,7 +4,6 @@ import '../services/api_service.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
-import '../utils/route_observer.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -14,14 +13,13 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class FavoritesScreenState extends State<FavoritesScreen>
-    with WidgetsBindingObserver, RouteAware {
+    with WidgetsBindingObserver {
   final _controller = TopicTileController();
   final _scrollController = ScrollController();
   List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
   bool _refreshing = false;  // ★ リフレッシュスピナー用（_loading とは別）
   bool _inFlight = false;  // ★ 重複ロード防止
-  bool _subscribed = false;  // ★ 二重 subscribe 防止
 
   /// ★ app_tab 側から叩くための公開メソッド
   void reloadFromOutside() {
@@ -36,23 +34,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final route = ModalRoute.of(context);
-    if (!_subscribed && route is PageRoute) {
-      // ★ 初回のみ subscribe（二重登録防止）
-      routeObserver.subscribe(this, route);
-      _subscribed = true;
-    }
-  }
-
-  @override
   void dispose() {
-    if (_subscribed) {
-      // ★ subscribe したなら unsubscribe
-      routeObserver.unsubscribe(this);
-      _subscribed = false;
-    }
     _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -63,12 +45,6 @@ class FavoritesScreenState extends State<FavoritesScreen>
     if (state == AppLifecycleState.resumed) {
       _loadWatchedTopics();
     }
-  }
-
-  /// ★ 同タブ内で詳細→戻る でも再読込（RouteAware）
-  @override
-  void didPopNext() {
-    _loadWatchedTopics();
   }
 
   Future<void> _loadWatchedTopics() async {
@@ -110,7 +86,8 @@ class FavoritesScreenState extends State<FavoritesScreen>
   }
 
   void _onDetailReturned() {
-    // ここで何かしたければ（例：履歴リストの再読込など）
+    // ★ 詳細から戻ったら再読込
+    _loadWatchedTopics();
   }
 
   @override
