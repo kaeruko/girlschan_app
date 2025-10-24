@@ -851,11 +851,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(width: 8),
-                // ★ 追加: 最終同期時刻を小さく表示
-                Text(
-                  '同期: $_lastSyncDisplay',
-                  style: const TextStyle(fontSize: 10, color: CupertinoColors.secondaryLabel),
-                ),
               ],
             ),
           ],

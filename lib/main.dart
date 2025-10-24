@@ -21,11 +21,7 @@ void main() async {
     
     // 💾 キャッシュサービス初期化（ディレクトリ情報を表示）
     await CacheService.initialize();
-    
-    // 🧹 アプリ起動時に履歴を自動削除
-    logd('🧹 アプリ起動時に履歴を削除中...');
-    await clearWatchedHistory();
-    logd('✅ 履歴削除完了');
+        // await clearWatchedHistory();
   } catch (e, stackTrace) {
     logd('❌ AppConfig 初期化失敗: $e');
     logd('❌ スタックトレース: $stackTrace');

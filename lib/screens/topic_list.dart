@@ -75,10 +75,8 @@ class _TopicListScreenState extends State<TopicListScreen>
       });
       await _controller.refreshAll();
 
-      // ⭐ キャッシュを即表示しつつ、裏で最新を取りに行く（サイレント更新）
-      // ignore: discarded_futures
-      logd('📂 [_loadFromCache] 🔄 バックグラウンドで最新データ取得を開始', name: 'TopicList');
-      fetchFromServer();
+      // ★ サイレント更新を削除 → キャッシュがあれば表示するだけ
+      // 更新は「更新」ボタンまたは手動リフレッシュで実行
       return;
     }
 
