@@ -29,30 +29,40 @@ class AppConfig {
     try {
       final response = await _fetchApiBaseFromGoogleDrive();
       apiBase = response.trim();
+      // apiBase = 'http://192.168.40.171:5050/';
     } catch (e) {
       logd('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
       // フォールバック値を設定
-      apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
+      apiBase = 'http://192.168.40.171:5050/';
+      // apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
 
     }
   }
   
-  /// Google Drive からテキストファイルを読み込み
   static Future<String> _fetchApiBaseFromGoogleDrive() async {
     try {
-      logd('📥 Google Drive から読み込み開始: $googleDriveDownloadUrl');
-      
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final uri = Uri.parse(googleDriveDownloadUrl);
+
+      logd('📥 Google Drive から読み込み開始: $uri ($ts)');
+
       final response = await http.get(
-        Uri.parse(googleDriveDownloadUrl),
+        uri,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          // ランダムヘッダを追加（CDNのキャッシュキーを変える）
+          'X-Bypass-Cache': ts.toString(),
+        },
       ).timeout(
         const Duration(seconds: 10),
         onTimeout: () => throw Exception('タイムアウト: Google Drive からの読み込みがタイムアウトしました'),
       );
-      
+
       logd('📊 ステータスコード: ${response.statusCode}');
       logd('📋 レスポンスボディ長: ${response.body.length} 文字');
-      logd('📋 レスポンスボディ: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         return response.body;
       } else {
@@ -60,8 +70,9 @@ class AppConfig {
       }
     } catch (e) {
       logd('❌ Google Drive 読み込みエラー詳細: $e');
-      logd('❌ エラータイプ: ${e.runtimeType}');
       rethrow;
     }
   }
+
+
 }

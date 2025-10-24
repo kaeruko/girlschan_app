@@ -114,23 +114,6 @@
                     // ← MaterialのRefreshIndicatorの代わり
                     CupertinoSliverRefreshControl(onRefresh: _refresh),
 
-                    // 右上に小さな「更新」
-                    SliverToBoxAdapter(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: CupertinoButton(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          minSize: 28,
-                          color: CupertinoColors.systemGrey5,
-                          onPressed: _inFlight ? null : _refresh,  // ★ 連打防止
-                          child: _refreshing
-                              ? const CupertinoActivityIndicator(radius: 8)
-                              : const Text('更新', style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                    ),
-
                     if (_clips.isEmpty)
                       SliverFillRemaining(
                         hasScrollBody: false,
