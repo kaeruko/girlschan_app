@@ -467,7 +467,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'No.${comment['no']}  ${comment['name'] ?? ''}  ${comment['time'] ?? ''}', // ★ 修正: name 追加
+                    'No.${comment['no']}  ${comment['time'] ?? ''}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -967,6 +967,11 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
     final urls = (c['urls'] as List?) ?? [];
 
+    // ★ デバッグ: time が空でないか確認
+    if (i < 3) {
+      debugPrint('🔍 Comment[$i]: no=$no, time="$time", has_time=${time.isNotEmpty}');
+    }
+
     return Container(
       decoration: BoxDecoration(
         border: Border(
@@ -981,7 +986,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'No.$no  ${c['name'] ?? ''}  $time${c['isLocal'] == true ? '（ローカル）' : ''}', // ★ 修正: name 追加
+            'No.$no  $time${c['isLocal'] == true ? ' （ローカル）' : ''}',
             style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
           ),
           const SizedBox(height: 8),
