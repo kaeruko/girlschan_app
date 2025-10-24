@@ -10,6 +10,7 @@ import '../services/cache_service.dart';
 import '../utils/log.dart';
 import '../utils/platform_helper.dart';
 import 'comment_post_webview.dart';
+import 'image_viewer_page.dart';
 
 class TopicDetailScreen extends StatefulWidget {
   final int topicId;
@@ -505,52 +506,10 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                         const SizedBox(height: 12),
                         GestureDetector(
                           onTap: () {
-                            showCupertinoDialog(
-                              context: context,
-                              builder: (context) => Dialog(
-                                insetAnimationDuration: const Duration(milliseconds: 200),
-                                child: Container(
-                                  constraints: BoxConstraints(
-                                    maxWidth: MediaQuery.of(context).size.width * 0.9,
-                                    maxHeight: MediaQuery.of(context).size.height * 0.85,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: CupertinoColors.black,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Stack(
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Image.network(
-                                          comment['image_url'],
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (context, error, stackTrace) =>
-                                              const Center(
-                                            child: Icon(
-                                              CupertinoIcons.exclamationmark_circle,
-                                              size: 40,
-                                              color: CupertinoColors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: CupertinoButton(
-                                          padding: const EdgeInsets.all(8),
-                                          onPressed: () => Navigator.pop(context),
-                                          child: const Icon(
-                                            CupertinoIcons.xmark_circle_fill,
-                                            color: CupertinoColors.white,
-                                            size: 28,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                            Navigator.of(context).push(
+                              CupertinoPageRoute(
+                                fullscreenDialog: true,
+                                builder: (_) => ImageViewerPage(url: comment['image_url']),
                               ),
                             );
                           },
@@ -998,52 +957,10 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () {
-                showCupertinoDialog(
-                  context: context,
-                  builder: (context) => Dialog(
-                    insetAnimationDuration: const Duration(milliseconds: 200),
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.9,
-                        maxHeight: MediaQuery.of(context).size.height * 0.85,
-                      ),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.black,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Stack(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Image.network(
-                              c['image_url'],
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Center(
-                                child: Icon(
-                                  CupertinoIcons.exclamationmark_circle,
-                                  size: 40,
-                                  color: CupertinoColors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: CupertinoButton(
-                              padding: const EdgeInsets.all(8),
-                              onPressed: () => Navigator.pop(context),
-                              child: const Icon(
-                                CupertinoIcons.xmark_circle_fill,
-                                color: CupertinoColors.white,
-                                size: 28,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    fullscreenDialog: true,
+                    builder: (_) => ImageViewerPage(url: c['image_url']),
                   ),
                 );
               },
@@ -1116,7 +1033,9 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
-                onPressed: () => _toggleClip(c),
+                onPressed: () async {
+                  await _toggleClip(c);
+                },
                 child: Icon(
                   _clippedCommentNos.contains(no)
                       ? CupertinoIcons.heart_fill

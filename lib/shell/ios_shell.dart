@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import '../app/app_tabs.dart';
+import '../utils/route_observer.dart';
 
 class IOSShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -16,10 +17,26 @@ class _IOSShellState extends State<IOSShell> {
   void initState() {
     super.initState();
     _controller = CupertinoTabController(initialIndex: 0);
+    _controller.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    final idx = _controller.index;
+    final tabId = kAppTabs[idx].id;
+
+    // ★ 履歴タブのリロード（型安全）
+    if (tabId == 'tab_favorites') {
+      favoritesScreenStateKey.currentState?.reloadFromOutside();
+    }
+    // ★ クリップタブのリロード（型安全）
+    if (tabId == 'tab_clips') {
+      clipsScreenStateKey.currentState?.reloadFromOutside();
+    }
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onTabChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -38,6 +55,7 @@ class _IOSShellState extends State<IOSShell> {
       tabBuilder: (context, i) {
         // ここは必ず CupertinoTabView にしておく（iOSでの戻るアニメ等が自然になる）
         return CupertinoTabView(
+          navigatorObservers: [routeObserver],
           builder: (ctx) => widget.tabs[i].builder(ctx),
         );
       },

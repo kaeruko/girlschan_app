@@ -43,6 +43,20 @@ class _MacShellState extends State<MacShell> {
     }
   }
 
+  void _onTabChanged(int newIndex) {
+    setState(() => _index = newIndex);
+    final tabId = _effectiveTabs[newIndex].id;
+
+    // ★ 履歴タブのリロード（型安全）
+    if (tabId == 'tab_favorites') {
+      favoritesScreenStateKey.currentState?.reloadFromOutside();
+    }
+    // ★ クリップタブのリロード（型安全）
+    if (tabId == 'tab_clips') {
+      clipsScreenStateKey.currentState?.reloadFromOutside();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -125,7 +139,7 @@ class _MacShellState extends State<MacShell> {
           for (int i = 0; i < _effectiveTabs.length; i++) ...[
             CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              onPressed: () => setState(() => _index = i),
+              onPressed: () => _onTabChanged(i),
               child: Row(
                 children: [
                   Icon(

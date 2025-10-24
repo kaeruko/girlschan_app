@@ -31,8 +31,8 @@ class TabSpec {
 // 各タブの State にアクセスするための GlobalKey（重複なし）
 final _newTopicListKey = GlobalKey<State>();
 final _popularTopicListKey = GlobalKey<State>();
-final _favoritesKey = GlobalKey<State>();
-final _clipsKey = GlobalKey<State>();
+final favoritesScreenStateKey = GlobalKey<FavoritesScreenState>();  // ★ 型付き
+final clipsScreenStateKey = GlobalKey<ClipsScreenState>();  // ★ 型付き
 final _searchKey = GlobalKey<SearchScreenState>();
 
 final List<TabSpec> kAppTabs = [
@@ -63,9 +63,9 @@ final List<TabSpec> kAppTabs = [
     label: '履歴',
     icon: CupertinoIcons.clock,
     title: '履歴',
-    stateKey: _favoritesKey,
+    stateKey: favoritesScreenStateKey,
     builder: (_) => FavoritesScreen(
-      key: _favoritesKey,
+      key: favoritesScreenStateKey,
     ),
   ),
   TabSpec(
@@ -73,9 +73,9 @@ final List<TabSpec> kAppTabs = [
     label: 'クリップ',
     icon: CupertinoIcons.heart,
     title: 'クリップ',
-    stateKey: _clipsKey,
+    stateKey: clipsScreenStateKey,
     builder: (_) => ClipsScreen(
-      key: _clipsKey,
+      key: clipsScreenStateKey,
     ),
   ),
   TabSpec(

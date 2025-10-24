@@ -3,18 +3,27 @@
   import '../services/api_service.dart';
   import '../screens/topic_detail.dart';
   import '../widgets/common/app_spinner.dart';
+  import '../utils/route_observer.dart';
 
   class ClipsScreen extends StatefulWidget {
     const ClipsScreen({super.key});
     @override
-    State<ClipsScreen> createState() => _ClipsScreenState();
+    State<ClipsScreen> createState() => ClipsScreenState();
   }
 
-  class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
+  class ClipsScreenState extends State<ClipsScreen>
+      with WidgetsBindingObserver, RouteAware {
     final _scrollController = ScrollController();
     List<Map<String, dynamic>> _clips = [];
     bool _loading = true;
     bool _refreshing = false;
+    bool _inFlight = false;  // ★ 重複ロード防止
+    bool _subscribed = false;  // ★ 二重 subscribe 防止
+
+    /// ★ app_tab 側から叩くための公開メソッド
+    void reloadFromOutside() {
+      _loadClips();
+    }
 
     @override
     void initState() {
@@ -24,7 +33,23 @@
     }
 
     @override
+    void didChangeDependencies() {
+      super.didChangeDependencies();
+      final route = ModalRoute.of(context);
+      if (!_subscribed && route is PageRoute) {
+        // ★ 初回のみ subscribe（二重登録防止）
+        routeObserver.subscribe(this, route);
+        _subscribed = true;
+      }
+    }
+
+    @override
     void dispose() {
+      if (_subscribed) {
+        // ★ subscribe したなら unsubscribe
+        routeObserver.unsubscribe(this);
+        _subscribed = false;
+      }
       WidgetsBinding.instance.removeObserver(this);
       _scrollController.dispose();
       super.dispose();
@@ -35,16 +60,33 @@
       if (state == AppLifecycleState.resumed) _loadClips();
     }
 
+    /// 同タブ内で詳細→戻る でも再読込（RouteAware）
+    @override
+    void didPopNext() {
+      _loadClips();
+    }
+
     Future<void> _loadClips() async {
+      if (_inFlight) return;  // ★ 既に読込中なら実行しない
+      _inFlight = true;
       try {
         print('[ClipsScreen] Loading clips...');
         final clips = await getClippedComments();
         print('[ClipsScreen] Clips loaded: ${clips.length} items');
         print('[ClipsScreen] Clips data: $clips');
         
-        clips.sort((a, b) =>
-            DateTime.parse(b['clipDate'] as String)
-                .compareTo(DateTime.parse(a['clipDate'] as String)));
+        // ★ パース失敗時のフォールバック付き
+        clips.sort((a, b) {
+          DateTime parseDate(String s) {
+            try {
+              return DateTime.parse(s);
+            } catch (_) {
+              return DateTime.fromMillisecondsSinceEpoch(0);
+            }
+          }
+          return parseDate(b['clipDate'] as String)
+              .compareTo(parseDate(a['clipDate'] as String));
+        });
         
         if (!mounted) return;
         setState(() {
@@ -60,6 +102,8 @@
           _loading = false;
           _clips = [];
         });
+      } finally {
+        _inFlight = false;  // ★ ロード終了
       }
     }
 
@@ -104,7 +148,7 @@
                               horizontal: 10, vertical: 6),
                           minSize: 28,
                           color: CupertinoColors.systemGrey5,
-                          onPressed: _refresh,
+                          onPressed: _inFlight ? null : _refresh,  // ★ 連打防止
                           child: _refreshing
                               ? const CupertinoActivityIndicator(radius: 8)
                               : const Text('更新', style: TextStyle(fontSize: 12)),
@@ -137,10 +181,11 @@
                         ),
                       )
                     else
-                      SliverList.builder(
-                        itemCount: _clips.length,
-                        itemBuilder: (context, i) =>
-                            _buildClipItem(context, _clips[i]),
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) => _buildClipItem(context, _clips[i]),
+                          childCount: _clips.length,
+                        ),
                       ),
                   ],
                 ),
