@@ -1,10 +1,10 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
 import '../router/app_router.dart';
+import '../widgets/history_sidebar.dart';
 import '../utils/log.dart';
-import '../screens/search_screen.dart';
+import '../screens/topic_detail.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -16,18 +16,25 @@ class MacShell extends StatefulWidget {
 
 class _MacShellState extends State<MacShell> {
   int _index = 0;
-  bool _isRefreshing = false;
-  double _captionHeight = 28; // デフォルト（fallback）
+  late final List<TabSpec> _effectiveTabs;
+  late final List<GlobalKey<NavigatorState>> _tabNavKeys;
+  double _captionHeight = 28.0;
 
   @override
   void initState() {
     super.initState();
+    // macOS では 4 タブのみ使用（検索は上バーに出さない方針）
+    _effectiveTabs = widget.tabs.where((t) =>
+      t.id == 'tab_new' || t.id == 'tab_popular' || t.id == 'tab_favorites' || t.id == 'tab_clips'
+    ).toList();
+
+    _tabNavKeys = List.generate(_effectiveTabs.length, (_) => GlobalKey<NavigatorState>());
     _loadCaptionHeight();
   }
 
   Future<void> _loadCaptionHeight() async {
     try {
-      final h = await windowManager.getTitleBarHeight(); // int?
+      final h = await windowManager.getTitleBarHeight();
       if (!mounted) return;
       if (h != null && h > 0) {
         setState(() => _captionHeight = h.toDouble());
@@ -39,61 +46,54 @@ class _MacShellState extends State<MacShell> {
 
   @override
   Widget build(BuildContext context) {
-    final current = widget.tabs[_index];
-
     return CupertinoPageScaffold(
       navigationBar: null,
       child: Column(
         children: [
-          // OSの信号ボタン用のスペーサ（ここは何も描かない）
+          // ネイティブ信号下のスペーサ
           SizedBox(height: _captionHeight),
-          // 自前ツールバー（信号の"下"から始める）
-          _buildTopToolbar(),
-          // 本体
+          // 上バー：タブ切替のみ（更新ボタンは置かない）
+          _buildTopTabBar(),
+          // 本体：左＝履歴サイドバー、右＝タブ内容
           Expanded(
             child: Row(
               children: [
-                // 左サイドバー（タブメニュー）
+                // 左サイド（キャッシュ履歴）
                 SizedBox(
-                  width: 220,
-                  child: Container(
-                    color: CupertinoColors.systemGrey6,
-                    child: CupertinoScrollbar(
-                      child: ListView.builder(
-                        itemCount: widget.tabs.length,
-                        itemBuilder: (context, i) {
-                          final t = widget.tabs[i];
-                          final selected = i == _index;
-                          return _buildSidebarItem(
-                            icon: t.icon,
-                            label: t.label,
-                            selected: selected,
-                            onTap: () => setState(() => _index = i),
-                          );
-                        },
-                      ),
-                    ),
+                  width: 260,
+                  child: HistorySidebar(
+                    onSelectTopic: (id, title, count) {
+                      // 現在タブの Navigator に詳細を push
+                      final nav = _tabNavKeys[_index].currentState;
+                      if (nav != null) {
+                        nav.push(CupertinoPageRoute(
+                          builder: (_) => TopicDetailScreen(
+                            topicId: id,
+                            title: title,
+                            commentCount: count ?? 0,
+                          ),
+                        ));
+                      }
+                    },
                   ),
                 ),
-                Container(
-                  width: 1,
-                  color: CupertinoColors.separator,
-                ),
-                // メインコンテンツ
+                Container(width: 1, color: CupertinoColors.separator),
+                // 右ペイン（タブの中身）
                 Expanded(
-                  child: KeyedSubtree(
-                    key: PageStorageKey('mac_${current.id}'),
-                    child: IndexedStack(
-                      index: _index,
-                      children: [
-                        for (int i = 0; i < widget.tabs.length; i++)
-                          CupertinoTabView(
-                            key: PageStorageKey('tab_view_$i'),
-                            onGenerateRoute: AppRouter.onGenerateRoute,
-                            builder: (ctx) => widget.tabs[i].builder(ctx),
-                          ),
-                      ],
-                    ),
+                  child: IndexedStack(
+                    index: _index,
+                    children: [
+                      for (int i = 0; i < _effectiveTabs.length; i++)
+                        Navigator(
+                          key: _tabNavKeys[i],
+                          onGenerateRoute: (settings) {
+                            return CupertinoPageRoute(
+                              builder: (ctx) => _effectiveTabs[i].builder(ctx),
+                              settings: settings,
+                            );
+                          },
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -104,225 +104,55 @@ class _MacShellState extends State<MacShell> {
     );
   }
 
-  /// サイドバー項目を構築
-  Widget _buildSidebarItem({
-    required IconData icon,
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: onTap,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: selected
-              ? CupertinoColors.systemPink.withAlpha(50)
-              : CupertinoColors.transparent,
-          border: selected
-              ? const Border(
-                  right: BorderSide(
-                    color: CupertinoColors.systemPink,
-                    width: 3,
-                  ),
-                )
-              : null,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected
-                  ? CupertinoColors.systemPink
-                  : CupertinoColors.systemGrey,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: selected
-                      ? CupertinoColors.systemPink
-                      : CupertinoColors.systemGrey,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ),
-            if (selected) const Icon(CupertinoIcons.check_mark, size: 14),
-          ],
+  /// 上バー：タブ切替のみ
+  Widget _buildTopTabBar() {
+    return Container(
+      height: 44,
+      decoration: const BoxDecoration(
+        color: CupertinoColors.systemGrey6,
+        border: Border(
+          bottom: BorderSide(
+            color: CupertinoColors.separator,
+            width: 0.5,
+          ),
         ),
       ),
-    );
-  }
-
-  /// 自前ツールバーを構築
-  Widget _buildTopToolbar() {
-    return SizedBox(
-      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          const SizedBox(width: 12),
-          _buildActionButton(
-            icon: CupertinoIcons.arrow_clockwise,
-            label: '更新',
-            isLoading: _isRefreshing,
-            onPressed: _isRefreshing ? null : _handleRefresh,
-          ),
-          _buildActionButton(
-            icon: CupertinoIcons.search,
-            label: '検索',
-            onPressed: _showSearchDialog,
-          ),
-          const Spacer(),
-          const SizedBox(width: 12),
-        ],
-      ),
-    );
-  }
-
-  /// アクションボタンを構築
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-    bool isLoading = false,
-  }) {
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      minimumSize: const Size.square(0),
-      onPressed: onPressed,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isLoading && label == '更新')
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CupertinoActivityIndicator(radius: 7),
-            )
-          else
-            Icon(icon, size: 14, color: CupertinoColors.label),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: CupertinoColors.label,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 更新ボタンのハンドラー
-  Future<void> _handleRefresh() async {
-    if (_isRefreshing) {
-      return;
-    }
-
-    setState(() => _isRefreshing = true);
-
-    try {
-      
-      // TabSpec の stateKey を使用して各タブの fetchFromServer() を呼び出す
-      final stateKey = widget.tabs[_index].stateKey;
-      if (stateKey != null) {
-        final state = stateKey.currentState;
-        if (state != null && state.mounted) {
-          await (state as dynamic).fetchFromServer();
-        } else {
-        }
-      } else {
-      }
-    } catch (e) {
-      logd('[🔴 ERROR] 更新エラー: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-        logd('[🔵 DEBUG] Set _isRefreshing = false');
-      }
-    }
-  }
-
-  /// 検索ダイアログを表示
-  Future<void> _showSearchDialog() async {
-    final controller = TextEditingController();
-    
-    final query = await showCupertinoDialog<String>(
-      context: context,
-      builder: (dialogCtx) => Dialog(
-        insetAnimationDuration: const Duration(milliseconds: 200),
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.6,
-            maxHeight: MediaQuery.of(context).size.height * 0.4,
-          ),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '検索',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: CupertinoColors.label,
-                ),
-              ),
-              const SizedBox(height: 20),
-              CupertinoTextField(
-                controller: controller,
-                placeholder: 'キーワードを入力',
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: CupertinoColors.separator),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                onSubmitted: (value) => Navigator.pop(dialogCtx, value.trim()),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+          for (int i = 0; i < _effectiveTabs.length; i++) ...[
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              onPressed: () => setState(() => _index = i),
+              child: Row(
                 children: [
-                  CupertinoButton(
-                    onPressed: () => Navigator.pop(dialogCtx),
-                    child: const Text('キャンセル'),
+                  Icon(
+                    _effectiveTabs[i].icon,
+                    size: 16,
+                    color: i == _index
+                        ? CupertinoColors.systemPink
+                        : CupertinoColors.secondaryLabel,
                   ),
-                  const SizedBox(width: 12),
-                  CupertinoButton(
-                    color: CupertinoColors.systemBlue,
-                    onPressed: () => Navigator.pop(dialogCtx, controller.text.trim()),
-                    child: const Text('検索'),
+                  const SizedBox(width: 6),
+                  Text(
+                    _effectiveTabs[i].label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: i == _index
+                          ? CupertinoColors.systemPink
+                          : CupertinoColors.label,
+                      fontWeight: i == _index ? FontWeight.w600 : FontWeight.w400,
+                    ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
+            ),
+            if (i < _effectiveTabs.length - 1) const SizedBox(width: 4),
+          ],
+          const Spacer(),
+          // 上バー右側は空（更新ボタンは各ページ内に置く）
+        ],
       ),
     );
-
-    controller.dispose();
-
-    if (query == null || query.isEmpty || !mounted) {
-      return;
-    }
-
-    // 検索タブに切り替えて、検索を実行
-    final idx = widget.tabs.indexWhere((t) => t.id == 'tab_search');
-    if (idx != -1) {
-      setState(() => _index = idx);
-      final st = widget.tabs[idx].stateKey?.currentState as SearchScreenState?;
-      st?.setQueryAndSearch(query);
-    }
   }
 }

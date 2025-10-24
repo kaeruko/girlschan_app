@@ -120,28 +120,46 @@ class _NewListScreenState extends State<NewListScreen>
       return const Center(child: AppSpinner(size: 20));
     }
 
-    return RefreshIndicator(
-      onRefresh: fetchFromServer,
-      child: CupertinoScrollbar(
-        controller: _scrollController,
-        child: ListView.builder(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
+    return Column(
+      children: [
+        // 更新ボタン（各ページ内に置く）
+        Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            minSize: 28,
+            color: CupertinoColors.systemGrey5,
+            onPressed: fetchFromServer,
+            child: const Text('更新', style: TextStyle(fontSize: 12)),
           ),
-          itemCount: _topics.length,
-          itemBuilder: (context, i) {
-            final t = _topics[i];
-            return TopicTile(
-              topic: t,
-              controller: _controller,
-              showThumb: true,                 // 新着はサムネ表示
-              onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
-              // onAfterPop: 何か必要なら渡せる
-            );
-          },
         ),
-      ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: fetchFromServer,
+            child: CupertinoScrollbar(
+              controller: _scrollController,
+              child: ListView.builder(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                itemCount: _topics.length,
+                itemBuilder: (context, i) {
+                  final t = _topics[i];
+                  return TopicTile(
+                    topic: t,
+                    controller: _controller,
+                    showThumb: true,                 // 新着はサムネ表示
+                    onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
+                    // onAfterPop: 何か必要なら渡せる
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

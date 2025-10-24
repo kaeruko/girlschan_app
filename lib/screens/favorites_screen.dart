@@ -93,27 +93,45 @@ class _FavoritesScreenState extends State<FavoritesScreen> with WidgetsBindingOb
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _refreshWatched,
-      child: CupertinoScrollbar(
-        controller: _scrollController,
-        child: ListView.builder(
-          controller: _scrollController,
-          itemCount: _watchedTopics.length,
-          itemBuilder: (context, i) {
-            final topic = _watchedTopics[i];
-            return TopicTile(
-              topic: topic,
-              controller: _controller,
-              showThumb: false,                   // 履歴はサムネ無しで軽量に
-              onRemoveIfCached: (id) async {      // ×で「履歴から外す」
-                await _removeFromWatch(id);
-              },
-              onAfterPop: _onDetailReturned,      // 詳細から戻ったフック
-            );
-          },
+    return Column(
+      children: [
+        // 更新ボタン（各ページ内に置く）
+        Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            minSize: 28,
+            color: CupertinoColors.systemGrey5,
+            onPressed: _refreshWatched,
+            child: const Text('更新', style: TextStyle(fontSize: 12)),
+          ),
         ),
-      ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshWatched,
+            child: CupertinoScrollbar(
+              controller: _scrollController,
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: _watchedTopics.length,
+                itemBuilder: (context, i) {
+                  final topic = _watchedTopics[i];
+                  return TopicTile(
+                    topic: topic,
+                    controller: _controller,
+                    showThumb: false,                   // 履歴はサムネ無しで軽量に
+                    onRemoveIfCached: (id) async {      // ×で「履歴から外す」
+                      await _removeFromWatch(id);
+                    },
+                    onAfterPop: _onDetailReturned,      // 詳細から戻ったフック
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
