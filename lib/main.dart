@@ -5,6 +5,8 @@ import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
 import 'utils/platform_helper.dart';
 import 'utils/log.dart';
+import 'services/api_service.dart';
+import 'services/cache_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +18,14 @@ void main() async {
     logd('🚀 AppConfig 初期化開始');
     await AppConfig.initializeApiBase();
     logd('✅ AppConfig 初期化完了: ${AppConfig.apiBase}');
+    
+    // 💾 キャッシュサービス初期化（ディレクトリ情報を表示）
+    await CacheService.initialize();
+    
+    // 🧹 アプリ起動時に履歴を自動削除
+    logd('🧹 アプリ起動時に履歴を削除中...');
+    await clearWatchedHistory();
+    logd('✅ 履歴削除完了');
   } catch (e, stackTrace) {
     logd('❌ AppConfig 初期化失敗: $e');
     logd('❌ スタックトレース: $stackTrace');

@@ -30,6 +30,7 @@ class _TopicListScreenState extends State<TopicListScreen>
 
   List<Map<String, dynamic>> _topics = [];
   bool _loading = true;
+  bool _fetching = false; // ⭐ 多重実行防止フラグ
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _TopicListScreenState extends State<TopicListScreen>
     WidgetsBinding.instance.addObserver(this);
     // sortOrder に応じてキャッシュキーを切り替える
     cacheKey = widget.sortOrder == 'new' ? 'topics_new' : 'topics_popular';
+    logd('🔧 [initState] sortOrder=${widget.sortOrder}, cacheKey=$cacheKey', name: 'TopicList');
     _loadFromCache();
   }
 
@@ -55,13 +57,12 @@ class _TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _loadFromCache() async {
-    logd('📂 [_loadFromCache] Loading topics from cache... (sortOrder=${widget.sortOrder})', name: 'TopicList');
+    logd('📂 [_loadFromCache] Loading topics from cache... (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
-    List<dynamic> cached = await CacheService.loadList(cacheKey);
-    logd('📂 [_loadFromCache] キャッシュ件数: ${cached.length}', name: 'TopicList');
+    final cached = await CacheService.loadList(cacheKey);
+    logd('📂 [_loadFromCache] キャッシュ件数: ${cached.length} (cacheKey=$cacheKey)', name: 'TopicList');
     
-    if (cached.isNotEmpty) {
-      cached = cached.reversed.toList();
+    if (mounted && cached.isNotEmpty) {
       final topics = cached.cast<Map<String, dynamic>>();
       logd('📂 [_loadFromCache] ✅ キャッシュから${topics.length}件のトピック読み込み完了', name: 'TopicList');
       for (int i = 0; i < topics.length && i < 3; i++) {
@@ -73,6 +74,11 @@ class _TopicListScreenState extends State<TopicListScreen>
         _loading = false;
       });
       await _controller.refreshAll();
+
+      // ⭐ キャッシュを即表示しつつ、裏で最新を取りに行く（サイレント更新）
+      // ignore: discarded_futures
+      logd('📂 [_loadFromCache] 🔄 バックグラウンドで最新データ取得を開始', name: 'TopicList');
+      fetchFromServer();
       return;
     }
 
@@ -82,8 +88,14 @@ class _TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> fetchFromServer() async {
+    if (_fetching) {
+      logd('⏳ [fetchFromServer] スキップ（既に実行中）', name: 'TopicList');
+      return;
+    }
+    _fetching = true;
+
     try {
-      logd('🌐 [fetchFromServer] API呼び出し開始 (sortOrder=${widget.sortOrder})', name: 'TopicList');
+      logd('🌐 [fetchFromServer] API呼び出し開始 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
       
       final topics = widget.sortOrder == 'new'
           ? await fetchNewTopicsWithCache()
@@ -122,6 +134,8 @@ class _TopicListScreenState extends State<TopicListScreen>
       if (mounted) {
         await AppToast.show(context, 'データの更新に失敗しました（キャッシュを使用）');
       }
+    } finally {
+      _fetching = false; // ⭐ ロック解除
     }
   }
 
@@ -139,7 +153,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       );
     }
 
-    logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder})', name: 'TopicList');
+    logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
     return Scaffold(
       body: Column(

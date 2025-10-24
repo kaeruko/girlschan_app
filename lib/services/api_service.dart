@@ -139,23 +139,15 @@ Future<List<dynamic>> fetchNewTopicsWithCache() async {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List<dynamic>;
       logd('📰 [fetchNewTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
-      // キャッシュに保存
-      await CacheService.saveList('new_topics', data);
-      logd('📰 [fetchNewTopicsWithCache] 💾 Cached successfully');
+      // ⚠️ キャッシュへの保存はUI側（TopicListScreen）で一本化
+      logd('📰 [fetchNewTopicsWithCache] (キャッシュ保存は UI 側で処理)');
       return data;
     } else {
       throw Exception('Failed to load topics: ${response.statusCode}');
     }
   } catch (e) {
-    logd('📰 [fetchNewTopicsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
-    // エラー時はキャッシュから取得
-    final cached = await CacheService.loadList('new_topics');
-    if (cached.isNotEmpty) {
-      logd('📰 [fetchNewTopicsWithCache] 📂 Loaded from cache - ${cached.length} topics');
-      return cached;
-    }
-    logd('📰 [fetchNewTopicsWithCache] ❌ No cache available');
-    rethrow;
+    logd('📰 [fetchNewTopicsWithCache] ❌ Error: $e');
+    rethrow; // ← UI側で cacheKey を使ってキャッシュから拾う
   }
 }
 
@@ -177,23 +169,15 @@ Future<List<dynamic>> fetchPopularTopicsWithCache() async {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List<dynamic>;
       logd('⭐ [fetchPopularTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
-      // キャッシュに保存
-      await CacheService.saveList('popular_topics', data);
-      logd('⭐ [fetchPopularTopicsWithCache] 💾 Cached successfully');
+      // ⚠️ キャッシュへの保存はUI側（TopicListScreen）で一本化
+      logd('⭐ [fetchPopularTopicsWithCache] (キャッシュ保存は UI 側で処理)');
       return data;
     } else {
       throw Exception('Failed to load topics: ${response.statusCode}');
     }
   } catch (e) {
-    logd('⭐ [fetchPopularTopicsWithCache] ⚠️ Error occurred, attempting to load from cache: $e');
-    // エラー時はキャッシュから取得
-    final cached = await CacheService.loadList('popular_topics');
-    if (cached.isNotEmpty) {
-      logd('⭐ [fetchPopularTopicsWithCache] 📂 Loaded from cache - ${cached.length} topics');
-      return cached;
-    }
-    logd('⭐ [fetchPopularTopicsWithCache] ❌ No cache available');
-    rethrow;
+    logd('⭐ [fetchPopularTopicsWithCache] ❌ Error: $e');
+    rethrow; // ← UI側で cacheKey を使ってキャッシュから拾う
   }
 }
 
@@ -264,30 +248,30 @@ Future<List<Map<String, dynamic>>> getWatchedTopics() async {
   
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  // logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
+  logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
   
   final topics = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  // logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
+  logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
   
   // 各トピックのメタキャッシュから最新のコメント数を取得
   for (final topic in topics) {
     final topicId = topic['id'] as int;
-    // logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
+    logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
     
     try {
-      // logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
+      logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
       final meta = await CacheService.loadMap('topic_meta_$topicId');
       
       if (meta != null) {
         final total = meta['total'] as int?;
-        // logd('📋 [getWatchedTopics] Got meta: total=$total');
+        logd('📋 [getWatchedTopics] Got meta: total=$total');
         
         if (total != null) {
-          // logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
+          logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
           topic['comments'] = total;
         }
       } else {
-        // logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
+        logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
       }
     } catch (e, st) {
       logd('📋 [getWatchedTopics] ❌ Error processing topic $topicId: $e');
@@ -358,6 +342,16 @@ Future<void> removeWatchedTopicId(int id) async {
   });
   
   await prefs.setStringList('watched_topics_full', jsonList);
+}
+
+/// 履歴全体を削除
+Future<void> clearWatchedHistory() async {
+  final prefs = await SharedPreferences.getInstance();
+  final hadFull = prefs.containsKey('watched_topics_full');
+  final hadIds = prefs.containsKey('watched_topics');
+  await prefs.remove('watched_topics_full');
+  await prefs.remove('watched_topics'); // 旧形式も一緒に消す
+  logd('🧹 [clearWatchedHistory] full=$hadFull, ids=$hadIds → cleared', name: 'ClearHistory');
 }
 
 // ========== クリップ関連（コメント保存） ==========

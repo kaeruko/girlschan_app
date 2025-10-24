@@ -5,6 +5,47 @@ import 'package:path_provider/path_provider.dart';
 import '../utils/log.dart';
 
 class CacheService {
+  static bool _initialized = false;
+
+  /// キャッシュディレクトリを初期化して情報を出力
+  static Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+    
+    try {
+      final dir = await getApplicationSupportDirectory();
+      logd('');
+      logd('============================================');
+      logd('💾 キャッシュサービス初期化');
+      logd('============================================');
+      logd('📂 キャッシュディレクトリ: ${dir.path}');
+      
+      // ディレクトリが存在しなければ作成
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+        logd('📂 ディレクトリを新規作成しました');
+      }
+      
+      // ディレクトリ内のファイル一覧を表示
+      final files = dir.listSync();
+      logd('📂 キャッシュファイル数: ${files.length}');
+      for (int i = 0; i < files.length && i < 10; i++) {
+        final file = files[i];
+        if (file is File) {
+          final size = await file.length();
+          logd('  [$i] ${file.path.split('/').last} (${size} bytes)');
+        }
+      }
+      if (files.length > 10) {
+        logd('  ... 他 ${files.length - 10}個のファイル');
+      }
+      logd('============================================');
+      logd('');
+    } catch (e) {
+      logd('❌ キャッシュ初期化エラー: $e');
+    }
+  }
+  
   static Future<File> _file(String name) async {
     final dir = await getApplicationSupportDirectory();
     logd('📂 キャッシュディレクトリ: ${dir.path}');
