@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
-import '../router/app_router.dart';
+import '../screens/topic_detail.dart';
 import '../widgets/common/app_spinner.dart';
 
 class ClipsScreen extends StatefulWidget {
@@ -121,10 +121,14 @@ class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
                     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: InkWell(
                       onTap: () {
-                        AppRouter.pushTopicDetail(
-                          context,
-                          topicId: topicId.toString(),
-                          title: topicTitle,
+                        Navigator.of(context).push(
+                          CupertinoPageRoute(
+                            builder: (_) => TopicDetailScreen(
+                              topicId: topicId,
+                              title: topicTitle,
+                              commentCount: 0,
+                            ),
+                          ),
                         );
                       },
                       child: Padding(
@@ -190,96 +194,6 @@ class _ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
           ),
         ),
       ],
-    );
-
-    return RefreshIndicator(
-      onRefresh: _refreshClips,
-      child: CupertinoScrollbar(
-        controller: _scrollController,
-        child: ListView.builder(
-          controller: _scrollController,
-          itemCount: _clips.length,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemBuilder: (context, i) {
-            final clip = _clips[i];
-            final topicTitle = clip['topicTitle'] as String;
-            final commentBody = clip['body'] as String;
-            final commentNo = clip['no'] as int;
-            final time = clip['time'] as String;
-            final plus = clip['plus'] as int;
-            final minus = clip['minus'] as int;
-            final topicId = clip['topicId'] as int;
-
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: InkWell(
-                onTap: () {
-                  AppRouter.pushTopicDetail(
-                    context,
-                    topicId: topicId.toString(),
-                    title: topicTitle,
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // トピックタイトル
-                      Text(
-                        topicTitle,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: CupertinoColors.systemGrey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      // コメント本文
-                      Text(
-                        commentBody,
-                        style: const TextStyle(fontSize: 14),
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                    // 情報行（No・日時・評価）と削除ボタン
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'No.$commentNo • $time • ＋$plus −$minus',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: CupertinoColors.systemGrey,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => _removeClip(clip),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(
-                              CupertinoIcons.xmark,
-                              size: 18,
-                              color: CupertinoColors.systemGrey,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-          },
-        ),
-      ),
     );
   }
 }
