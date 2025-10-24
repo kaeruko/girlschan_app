@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
-import '../router/app_router.dart';
 import '../widgets/history_sidebar.dart';
 import '../utils/log.dart';
 import '../screens/topic_detail.dart';
@@ -86,12 +85,6 @@ class _MacShellState extends State<MacShell> {
                       for (int i = 0; i < _effectiveTabs.length; i++)
                         Navigator(
                           key: _tabNavKeys[i],
-                          onGenerateRoute: (settings) {
-                            return CupertinoPageRoute(
-                              builder: (ctx) => _effectiveTabs[i].builder(ctx),
-                              settings: settings,
-                            );
-                          },
                         ),
                     ],
                   ),

@@ -5,7 +5,6 @@ import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
 import 'utils/platform_helper.dart';
 import 'utils/log.dart';
-import 'router/app_router.dart';
 import 'widgets/common/app_scroll.dart';
 
 void main() async {
@@ -45,7 +44,6 @@ class GirlsChanApp extends StatelessWidget {
         Locale('en', 'US'),
       ],
       scrollBehavior: const NoGlowScrollBehavior(),
-      onGenerateRoute: AppRouter.onGenerateRoute,
       home: AdaptiveShell(tabs: kAppTabs),
     );
   }
