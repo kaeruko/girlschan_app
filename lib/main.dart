@@ -5,7 +5,6 @@ import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
 import 'utils/platform_helper.dart';
 import 'utils/log.dart';
-import 'widgets/common/app_scroll.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,18 +31,25 @@ class GirlsChanApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoApp(
+      debugShowCheckedModeBanner: false,
       title: 'がるちゃんあぷり',
       locale: const Locale('ja', 'JP'),
       localizationsDelegates: const [
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate, 
+        GlobalMaterialLocalizations.delegate,
       ],
       supportedLocales: const [
         Locale('ja', 'JP'),
         Locale('en', 'US'),
       ],
-      scrollBehavior: const NoGlowScrollBehavior(),
+      // ★ named route をやめたので削除
+      // onGenerateRoute: AppRouter.onGenerateRoute,
+
+      // スクロールグロー無効が必要なら、Cupertino版の振る舞いにしておく
+      // scrollBehavior: const CupertinoScrollBehavior(),
+
+      // iOS: ボトムタブ / macOS: 上バー＋履歴サイドバー を内包
       home: AdaptiveShell(tabs: kAppTabs),
     );
   }

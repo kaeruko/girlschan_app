@@ -85,6 +85,15 @@ class _MacShellState extends State<MacShell> {
                       for (int i = 0; i < _effectiveTabs.length; i++)
                         Navigator(
                           key: _tabNavKeys[i],
+                          onGenerateRoute: (settings) {
+                            if (settings.name == '/') {
+                              return CupertinoPageRoute(
+                                builder: (_) => _effectiveTabs[i].builder(_),
+                                settings: settings,
+                              );
+                            }
+                            return null;
+                          },
                         ),
                     ],
                   ),
