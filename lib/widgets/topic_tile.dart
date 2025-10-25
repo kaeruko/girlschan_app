@@ -35,6 +35,7 @@ class TopicTile extends StatefulWidget {
 class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   bool _hasCachedComments = false;
   int _savedCommentNo = 0;
+  DateTime? _cacheModifiedTime;
 
   @override
   void initState() {
@@ -57,15 +58,20 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final hasCached = await CacheService.exists('comments_$id');
 
     int saved = 0;
+    DateTime? modifiedTime;
+    
     if (hasCached) {
       final prefs = await SharedPreferences.getInstance();
-      saved  = prefs.getInt('scroll_$id') ?? 0;
+      saved = prefs.getInt('scroll_$id') ?? 0;
+      // キャッシュ作成日時を取得
+      modifiedTime = await CacheService.getModifiedTime('comments_$id');
     }
 
     if (!mounted) return;
     setState(() {
       _hasCachedComments = hasCached;
       _savedCommentNo = saved;
+      _cacheModifiedTime = modifiedTime;
     });
   }
 
@@ -76,12 +82,34 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final comments = widget.topic['comments'] is int
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
-    final time = widget.topic['time'] as String? ?? '';
+    final posted_at = widget.topic['posted_at'] as String? ?? '';
     final thumb = widget.topic['thumb'] as String?;
 
     final commentDisplay = _hasCachedComments
-        ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments件'
+        ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments $posted_at'
         : '$comments件';
+
+    // キャッシュ作成日時のフォーマット
+    String cacheTimeDisplay = '';
+    if (_cacheModifiedTime != null) {
+      final now = DateTime.now();
+      final diff = now.difference(_cacheModifiedTime!);
+      
+      if (diff.inMinutes < 1) {
+        cacheTimeDisplay = '今';
+      } else if (diff.inHours < 1) {
+        cacheTimeDisplay = '${diff.inMinutes}分前';
+      } else if (diff.inDays < 1) {
+        cacheTimeDisplay = '${diff.inHours}時間前';
+      } else if (diff.inDays == 1) {
+        cacheTimeDisplay = '昨日';
+      } else if (diff.inDays < 7) {
+        cacheTimeDisplay = '${diff.inDays}日前';
+      } else {
+        // それ以上古い場合は日付で表示
+        cacheTimeDisplay = '${_cacheModifiedTime!.month}/${_cacheModifiedTime!.day}';
+      }
+    }
 
     final blue = CupertinoColors.systemBlue;
 
@@ -179,7 +207,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'コメント: $commentDisplay $time',
+                        'コメント: $commentDisplay ${_hasCachedComments && cacheTimeDisplay.isNotEmpty ? '(キャッシュ: $cacheTimeDisplay)' : ''}',
                         style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
                       ),
                     ],

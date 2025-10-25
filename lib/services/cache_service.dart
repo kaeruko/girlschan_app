@@ -153,6 +153,20 @@ class CacheService {
     }
   }
 
+  /// キャッシュファイルの作成/更新日時を取得
+  static Future<DateTime?> getModifiedTime(String name) async {
+    try {
+      final file = await _file(name);
+      if (await file.exists()) {
+        final stat = file.statSync();
+        return stat.modified;
+      }
+    } catch (e) {
+      // logd('❌ getModifiedTime error: $e');
+    }
+    return null;
+  }
+
   static Future<void> clear(String name) async {
     try {
       final file = await _file(name);
