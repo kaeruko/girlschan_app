@@ -14,21 +14,21 @@ class CacheService {
     
     try {
       final dir = await getApplicationSupportDirectory();
-      logd('');
-      logd('============================================');
-      logd('💾 キャッシュサービス初期化');
-      logd('============================================');
-      logd('📂 キャッシュディレクトリ: ${dir.path}');
+      // logd('');
+      // logd('============================================');
+      // logd('💾 キャッシュサービス初期化');
+      // logd('============================================');
+      // logd('📂 キャッシュディレクトリ: ${dir.path}');
       
       // ディレクトリが存在しなければ作成
       if (!await dir.exists()) {
         await dir.create(recursive: true);
-        logd('📂 ディレクトリを新規作成しました');
+        // logd('📂 ディレクトリを新規作成しました');
       }
       
       // ディレクトリ内のファイル一覧を表示
       final files = dir.listSync();
-      logd('📂 キャッシュファイル数: ${files.length}');
+      // logd('📂 キャッシュファイル数: ${files.length}');
       for (int i = 0; i < files.length && i < 10; i++) {
         final file = files[i];
         if (file is File) {
@@ -37,18 +37,18 @@ class CacheService {
         }
       }
       if (files.length > 10) {
-        logd('  ... 他 ${files.length - 10}個のファイル');
+        // logd('  ... 他 ${files.length - 10}個のファイル');
       }
-      logd('============================================');
-      logd('');
+      // logd('============================================');
+      // logd('');
     } catch (e) {
-      logd('❌ キャッシュ初期化エラー: $e');
+      // logd('❌ キャッシュ初期化エラー: $e');
     }
   }
   
   static Future<File> _file(String name) async {
     final dir = await getApplicationSupportDirectory();
-    logd('📂 キャッシュディレクトリ: ${dir.path}');
+    // logd('📂 キャッシュディレクトリ: ${dir.path}');
     return File('${dir.path}/$name.json');
   }
   
@@ -57,7 +57,7 @@ class CacheService {
     try {
       final file = await _file(name);
       if (await file.exists()) {
-        print('💾 [loadList] Loading cache: $name');
+        // print('💾 [loadList] Loading cache: $name');
         final text = await file.readAsString();
         final decoded = jsonDecode(text);
         if (decoded is List) {
@@ -65,7 +65,7 @@ class CacheService {
         }
       }
     } catch (e) {
-      logd('❌ loadList error: $e');
+      // logd('❌ loadList error: $e');
     }
     return [];
   }
@@ -75,7 +75,7 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
-      logd('💾 [saveList] ✅ Saved: $name');
+      // logd('💾 [saveList] ✅ Saved: $name');
     } catch (e) {
       logd('❌ saveList error: $e');
     }
@@ -134,7 +134,7 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
-      logd('💾 [saveInt] ✅ Saved: $name = $data');
+      // logd('💾 [saveInt] ✅ Saved: $name = $data');
     } catch (e) {
       logd('❌ saveInt error: $e');
     }
@@ -148,7 +148,7 @@ class CacheService {
       // print('💾 [CacheService.exists] Checking: $name -> exists: $exists (path: ${file.path})');
       return exists;
     } catch (e) {
-      logd('❌ Cache exists check error: $e');
+      // logd('❌ Cache exists check error: $e');
       return false;
     }
   }

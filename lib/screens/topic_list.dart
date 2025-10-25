@@ -169,7 +169,7 @@ class _TopicListScreenState extends State<TopicListScreen>
                         itemCount: _topics.length,
                         itemBuilder: (context, index) {
                           final topic = _topics[index];
-                          logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
+                          // logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
                           return TopicTile(
                             topic: topic,
                             controller: _controller,

@@ -43,7 +43,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _isWatched = false;
   int _totalComments = 0;
 
-  static const int _commentsPerPage = 20;
+  static const int _commentsPerPage = 500;
   static const double _kItemExtent = 150.0; // 推定アイテム高さを統一
   final ScrollController _scrollController = ScrollController();
   int _savedCommentNo = 0;        // ★ 修正: ピクセル位置→コメントNo
@@ -859,7 +859,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'コメント: $remoteCount/$_totalComments'
+                  'コメント: $remoteCount/${widget.commentCount}'
                   '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
                   style: const TextStyle(fontSize: 11),
                   maxLines: 1,

@@ -139,7 +139,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
                 itemCount: _watchedTopics.length,
                 itemBuilder: (context, i) {
                   final topic = _watchedTopics[i];
-                  logd('📚 [Favorites.itemBuilder] アイテム[$i]: id=${topic['id']}, title=${topic['title']}', name: 'Favorites');
+                  // logd('📚 [Favorites.itemBuilder] アイテム[$i]: id=${topic['id']}, title=${topic['title']}', name: 'Favorites');
                   return TopicTile(
                     topic: topic,
                     controller: _controller,
