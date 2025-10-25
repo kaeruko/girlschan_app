@@ -106,6 +106,9 @@ class _TopicListScreenState extends State<TopicListScreen>
         // logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
       }
       
+      // ⭐ watchedTopicsのコメント数を更新
+      await updateWatchedTopicsComments(list);
+      
       await CacheService.saveList(cacheKey, list);
       // logd('🌐 [fetchFromServer] 💾 キャッシュに保存完了', name: 'TopicList');
 

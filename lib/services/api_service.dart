@@ -344,6 +344,52 @@ Future<void> removeWatchedTopicId(int id) async {
   await prefs.setStringList('watched_topics_full', jsonList);
 }
 
+/// APIから取得したトピックリストで、watchedTopicsのコメント数を更新
+Future<void> updateWatchedTopicsComments(
+  List<Map<String, dynamic>> fetchedTopics,
+) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+    
+    if (jsonList.isEmpty) {
+      return; // watchedTopicsがなければスキップ
+    }
+    
+    // APIから取得したトピックをMapに変換（IDをキーに）
+    final fetchedMap = {
+      for (final topic in fetchedTopics) 
+        (topic['id'] as int): topic
+    };
+    
+    // watchedTopicsを更新
+    bool updated = false;
+    for (int i = 0; i < jsonList.length; i++) {
+      final watched = jsonDecode(jsonList[i]) as Map<String, dynamic>;
+      final topicId = watched['id'] as int;
+      
+      if (fetchedMap.containsKey(topicId)) {
+        final fetchedComments = fetchedMap[topicId]!['comments'] as int?;
+        if (fetchedComments != null && 
+            watched['comments'] != fetchedComments) {
+          // コメント数が更新されていたら更新
+          watched['comments'] = fetchedComments;
+          jsonList[i] = jsonEncode(watched);
+          updated = true;
+          // logd('📝 [updateWatchedTopicsComments] Updated topic $topicId: ${watched['comments']} comments', name: 'WatchedUpdate');
+        }
+      }
+    }
+    
+    if (updated) {
+      await prefs.setStringList('watched_topics_full', jsonList);
+      // logd('📝 [updateWatchedTopicsComments] ✅ Saved updated watched topics', name: 'WatchedUpdate');
+    }
+  } catch (e) {
+    // logd('📝 [updateWatchedTopicsComments] ❌ Error: $e', name: 'WatchedUpdate');
+  }
+}
+
 /// 履歴全体を削除
 Future<void> clearWatchedHistory() async {
   final prefs = await SharedPreferences.getInstance();
