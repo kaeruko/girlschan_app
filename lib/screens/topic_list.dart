@@ -38,7 +38,7 @@ class _TopicListScreenState extends State<TopicListScreen>
     WidgetsBinding.instance.addObserver(this);
     // sortOrder に応じてキャッシュキーを切り替える
     cacheKey = widget.sortOrder == 'new' ? 'topics_new' : 'topics_popular';
-    logd('🔧 [initState] sortOrder=${widget.sortOrder}, cacheKey=$cacheKey', name: 'TopicList');
+    // logd('🔧 [initState] sortOrder=${widget.sortOrder}, cacheKey=$cacheKey', name: 'TopicList');
     _loadFromCache();
   }
 
@@ -57,17 +57,17 @@ class _TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _loadFromCache() async {
-    logd('📂 [_loadFromCache] Loading topics from cache... (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
+    // logd('📂 [_loadFromCache] Loading topics from cache... (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
     final cached = await CacheService.loadList(cacheKey);
-    logd('📂 [_loadFromCache] キャッシュ件数: ${cached.length} (cacheKey=$cacheKey)', name: 'TopicList');
+    // logd('📂 [_loadFromCache] キャッシュ件数: ${cached.length} (cacheKey=$cacheKey)', name: 'TopicList');
     
     if (mounted && cached.isNotEmpty) {
       final topics = cached.cast<Map<String, dynamic>>();
-      logd('📂 [_loadFromCache] ✅ キャッシュから${topics.length}件のトピック読み込み完了', name: 'TopicList');
+      // logd('📂 [_loadFromCache] ✅ キャッシュから${topics.length}件のトピック読み込み完了', name: 'TopicList');
       for (int i = 0; i < topics.length && i < 3; i++) {
         final topic = topics[i];
-        logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
+        // logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
       }
       setState(() {
         _topics = topics;
@@ -81,33 +81,33 @@ class _TopicListScreenState extends State<TopicListScreen>
     }
 
     // キャッシュがない場合はサーバーから取得
-    logd('📂 [_loadFromCache] キャッシュなし → サーバーから取得', name: 'TopicList');
+    // logd('📂 [_loadFromCache] キャッシュなし → サーバーから取得', name: 'TopicList');
     await fetchFromServer();
   }
 
   Future<void> fetchFromServer() async {
     if (_fetching) {
-      logd('⏳ [fetchFromServer] スキップ（既に実行中）', name: 'TopicList');
+      // logd('⏳ [fetchFromServer] スキップ（既に実行中）', name: 'TopicList');
       return;
     }
     _fetching = true;
 
     try {
-      logd('🌐 [fetchFromServer] API呼び出し開始 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
+      // logd('🌐 [fetchFromServer] API呼び出し開始 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
       
       final topics = widget.sortOrder == 'new'
           ? await fetchNewTopicsWithCache()
           : await fetchPopularTopicsWithCache();
 
       final list = topics.cast<Map<String, dynamic>>();
-      logd('🌐 [fetchFromServer] ✅ API取得完了: ${list.length}件のトピック', name: 'TopicList');
+      // logd('🌐 [fetchFromServer] ✅ API取得完了: ${list.length}件のトピック', name: 'TopicList');
       for (int i = 0; i < list.length && i < 3; i++) {
         final topic = list[i];
-        logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
+        // logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
       }
       
       await CacheService.saveList(cacheKey, list);
-      logd('🌐 [fetchFromServer] 💾 キャッシュに保存完了', name: 'TopicList');
+      // logd('🌐 [fetchFromServer] 💾 キャッシュに保存完了', name: 'TopicList');
 
       if (!mounted) return;
       setState(() {
@@ -116,7 +116,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       });
       await _controller.refreshAll();
     } catch (e) {
-      logd('❌ [fetchFromServer] $e', name: 'TopicList');
+      // logd('❌ [fetchFromServer] $e', name: 'TopicList');
 
       final cached = await CacheService.loadList(cacheKey);
       if (!mounted) return;
@@ -151,7 +151,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       );
     }
 
-    logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
+    // logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
     return Scaffold(
       body: Column(

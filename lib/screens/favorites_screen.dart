@@ -44,7 +44,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadWatchedTopics();
+      // _loadWatchedTopics();
     }
   }
 
@@ -52,16 +52,16 @@ class FavoritesScreenState extends State<FavoritesScreen>
     if (_inFlight) return;  // ★ 既に読込中なら実行しない
     _inFlight = true;
     try {
-      logd('📚 [_loadWatchedTopics] 履歴トピック読み込み開始', name: 'Favorites');
+      // logd('📚 [_loadWatchedTopics] 履歴トピック読み込み開始', name: 'Favorites');
       final topics = await getWatchedTopics();
-      logd('📚 [_loadWatchedTopics] ✅ 読み込み完了: ${topics.length}件', name: 'Favorites');
+      // logd('📚 [_loadWatchedTopics] ✅ 読み込み完了: ${topics.length}件', name: 'Favorites');
       
       for (int i = 0; i < topics.length && i < 5; i++) {
         final topic = topics[i];
-        logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'Favorites');
+        // logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'Favorites');
       }
       if (topics.length > 5) {
-        logd('  ... 他 ${topics.length - 5}件', name: 'Favorites');
+        // logd('  ... 他 ${topics.length - 5}件', name: 'Favorites');
       }
 
       // もし時系列表示したいなら（存在するキー名に合わせて）
@@ -73,7 +73,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
         _loading = false;
       });
     } catch (e) {
-      logd('❌ [_loadWatchedTopics] エラー: $e', name: 'Favorites');
+      // logd('❌ [_loadWatchedTopics] エラー: $e', name: 'Favorites');
       if (!mounted) return;
       setState(() => _loading = false);
     } finally {
@@ -108,7 +108,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
       return const Center(child: AppSpinner(size: 20));
     }
     if (_watchedTopics.isEmpty) {
-      logd('📚 [Favorites.build] 履歴トピックなし', name: 'Favorites');
+      // logd('📚 [Favorites.build] 履歴トピックなし', name: 'Favorites');
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -125,7 +125,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
       );
     }
 
-    logd('📚 [Favorites.build] UI描画: ${_watchedTopics.length}件の履歴トピック表示', name: 'Favorites');
+    // logd('📚 [Favorites.build] UI描画: ${_watchedTopics.length}件の履歴トピック表示', name: 'Favorites');
 
     return Column(
       children: [

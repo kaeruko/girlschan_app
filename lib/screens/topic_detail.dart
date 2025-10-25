@@ -237,7 +237,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       
       await prefs.setInt('scroll_${widget.topicId}', commentNo);
       await prefs.setInt('synced_${widget.topicId}', _serverSyncedCount());
-      logd('💾 スクロール位置保存: commentNo=$commentNo synced=${_serverSyncedCount()}');
+      // logd('💾 スクロール位置保存: commentNo=$commentNo synced=${_serverSyncedCount()}');
     }
   }
 

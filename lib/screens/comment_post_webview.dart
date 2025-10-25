@@ -43,6 +43,13 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
   bool _loading = true;
   bool _completed = false; // 二重完了ガード
   bool _blockingClose = false; // 完了直後の連打防止
+  bool _alive = true; // dispose後は false
+
+  // 安全版 setState（_alive と mounted をチェック）
+  void _safeSetState(VoidCallback fn) {
+    if (!_alive || !mounted) return;
+    setState(fn);
+  }
 
   @override
   void initState() {
@@ -52,12 +59,14 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
   }
 
   Future<void> _init() async {
+    if (!_alive) return;
     await WebViewEnv.primeController(_ctrl);
 
     // 成功検知：JS経由（フォーム submit 時に window.PostBridge.postMessage を呼ぶ想定）
     await _ctrl.addJavaScriptChannel(
       'PostBridge',
       onMessageReceived: (msg) {
+        if (!_alive || !mounted) return; // ガード
         final text = msg.message.trim().toLowerCase();
         if (text == 'post_ok') {
           logd('✅ [PostBridge] post_ok 受信', name: 'CommentPostWebView');
@@ -70,6 +79,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
     await _ctrl.setNavigationDelegate(
       NavigationDelegate(
         onPageStarted: (url) {
+          if (!_alive || !mounted) return; // ガード
           logd('🌐 [onPageStarted] $url', name: 'CommentPostWebView');
           final u = Uri.tryParse(url);
           if (u != null && _isSuccessUrl(u)) {
@@ -79,8 +89,9 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
           }
         },
         onPageFinished: (_) async {
+          if (!_alive || !mounted) return; // ガード
           logd('✅ [onPageFinished]', name: 'CommentPostWebView');
-          setState(() => _loading = false);
+          _safeSetState(() => _loading = false);
           
           // 初期テキストがあれば textarea に流し込む（最初の textarea を対象）
           if (widget.initialText != null && widget.initialText!.isNotEmpty) {
@@ -159,7 +170,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
       })();
     '''));
 
-    setState(() => _blockingClose = true);
+    _safeSetState(() => _blockingClose = true);
 
     // 呼び出し元に通知（一覧の再読込など）
     widget.onCompleted?.call();
@@ -169,10 +180,9 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
 
     // 少し待ってから安全に閉じる（UI連打の吸収）
     await Future.delayed(const Duration(milliseconds: 300));
-    if (mounted) {
-      logd('👈 [_markComplete] Closing screen', name: 'CommentPostWebView');
-      Navigator.of(context).maybePop(true);
-    }
+    if (!_alive || !mounted) return;
+    logd('👈 [_markComplete] Closing screen', name: 'CommentPostWebView');
+    Navigator.of(context).maybePop(true);
   }
 
   Future<bool> _handleBack() async {
@@ -240,6 +250,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
 
   @override
   void dispose() {
+    _alive = false; // 以後すべてのコールバックを無視
     logd('🗑️ [dispose] Disposing CommentPostWebView',
         name: 'CommentPostWebView');
     super.dispose();
