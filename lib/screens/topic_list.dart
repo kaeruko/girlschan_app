@@ -156,18 +156,6 @@ class _TopicListScreenState extends State<TopicListScreen>
     return Scaffold(
       body: Column(
               children: [
-                // 更新ボタン（各ページ内に置く）
-                Container(
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: CupertinoButton(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minSize: 28,
-                    color: CupertinoColors.systemGrey5,
-                    onPressed: fetchFromServer,
-                    child: const Text('更新', style: TextStyle(fontSize: 12)),
-                  ),
-                ),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: fetchFromServer,
