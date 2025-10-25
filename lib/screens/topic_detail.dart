@@ -177,7 +177,15 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       limit: _commentsPerPage,
     );
 
-    final newComments = (page['comments'] as List<dynamic>? ?? []);
+    var newComments = (page['comments'] as List<dynamic>? ?? []);
+    // ★ APIから返された posted_at を time にマッピング
+    newComments = newComments.map((c) {
+      if (c is Map<String, dynamic> && c.containsKey('posted_at') && !c.containsKey('time')) {
+        c['time'] = c['posted_at'];
+      }
+      return c;
+    }).toList();
+    
     final total = (page['total'] as int?) ?? _totalComments;
 
     final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
@@ -351,7 +359,14 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         offset: 0,
         limit: _commentsPerPage,
       );
-      final newComments = (page['comments'] as List<dynamic>? ?? []);
+      final newComments = (page['comments'] as List<dynamic>? ?? [])
+          .map((c) {
+            if (c is Map<String, dynamic> && c.containsKey('posted_at') && !c.containsKey('time')) {
+              c['time'] = c['posted_at'];
+            }
+            return c;
+          })
+          .toList();
       final total = (page['total'] as int?) ?? newComments.length;
 
       debugPrint('🚀 初期読み込み: ${newComments.length}/$total件');
