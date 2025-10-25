@@ -859,7 +859,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'コメント: $remoteCount/${widget.commentCount}'
+                  'コメント:! $remoteCount/${widget.commentCount}'
                   '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
                   style: const TextStyle(fontSize: 11),
                   maxLines: 1,

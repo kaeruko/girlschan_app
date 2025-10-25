@@ -85,9 +85,13 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final posted_at = widget.topic['posted_at'] as String? ?? '';
     final thumb = widget.topic['thumb'] as String?;
 
-    final commentDisplay = _hasCachedComments
-        ? '${_savedCommentNo > 0 ? '$_savedCommentNo' : ''}/$comments $posted_at'
-        : '$comments件';
+    String commentDisplay;
+    if (_hasCachedComments) {
+      final savedText = _savedCommentNo > 0 ? '($_savedCommentNo $posted_at)' : '0 $posted_at';
+      commentDisplay = '$savedText/$comments $posted_at';
+    } else {
+      commentDisplay = '$comments $posted_at';
+    }
 
     // キャッシュ作成日時のフォーマット
     String cacheTimeDisplay = '';
@@ -207,7 +211,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'コメント: $commentDisplay ${_hasCachedComments && cacheTimeDisplay.isNotEmpty ? '(キャッシュ: $cacheTimeDisplay)' : ''}',
+                        'コメント:? $commentDisplay ${_hasCachedComments && cacheTimeDisplay.isNotEmpty ? '(キャッシュ: $cacheTimeDisplay)' : ''}',
                         style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
                       ),
                     ],
