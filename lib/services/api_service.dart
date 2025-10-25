@@ -12,15 +12,15 @@ final apiBase = AppConfig.apiBase;
 
 Future<bool> rateComment(int topicId, String commentId, int value) async {
   try {
-    logd('');
-    logd('============================================');
-    logd('⭐ [rateComment] API呼び出し開始');
-    logd('============================================');
-    logd('');
+    // logd('');
+    // logd('============================================');
+    // logd('⭐ [rateComment] API呼び出し開始');
+    // logd('============================================');
+    // logd('');
     
     final url = 'https://girlschannel.net/topics/post_value?value=$value&topic_id=$topicId&comment_id=$commentId';
-    logd('⭐ [rateComment] Request URL: $url');
-    logd('⭐ [rateComment] Parameters: topicId=$topicId, commentId=$commentId, value=$value');
+    // logd('⭐ [rateComment] Request URL: $url');
+    // logd('⭐ [rateComment] Parameters: topicId=$topicId, commentId=$commentId, value=$value');
     
     final response = await http.get(
       Uri.parse(url),
@@ -40,27 +40,27 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
       },
     );
     
-    logd('⭐ [rateComment] Response status: ${response.statusCode}');
-    logd('⭐ [rateComment] Response body: ${response.body}');
+    // logd('⭐ [rateComment] Response status: ${response.statusCode}');
+    // logd('⭐ [rateComment] Response body: ${response.body}');
     
     if (response.statusCode == 200) {
       if (response.body.isEmpty) {
-        logd('⭐ [rateComment] ✅ Success (empty body)');
+        // logd('⭐ [rateComment] ✅ Success (empty body)');
         return true;
       }
       try {
         final data = jsonDecode(response.body);
-        logd('⭐ [rateComment] Parsed JSON: $data');
+        // logd('⭐ [rateComment] Parsed JSON: $data');
         return data['result'] == true;
       } catch (e) {
-        logd('⭐ [rateComment] ⚠️ JSON parse error: $e');
+        // logd('⭐ [rateComment] ⚠️ JSON parse error: $e');
         return true;
       }
     }
-    logd('⭐ [rateComment] ❌ Failed with status ${response.statusCode}');
+    // logd('⭐ [rateComment] ❌ Failed with status ${response.statusCode}');
     return false;
   } catch (e) {
-    logd('⭐ [rateComment] ❌ Error: $e');
+    // logd('⭐ [rateComment] ❌ Error: $e');
     return false;
   }
 }
@@ -75,11 +75,11 @@ Future<Map<String, dynamic>> searchTopics({
   String? dateFilter,
 }) async {
   try {
-    logd('');
-    logd('============================================');
-    logd('🔍 [searchTopics] API呼び出し開始');
-    logd('============================================');
-    logd('');
+    // logd('');
+    // logd('============================================');
+    // logd('🔍 [searchTopics] API呼び出し開始');
+    // logd('============================================');
+    // logd('');
     
     final uri = Uri.parse('$apiBase/search').replace(
       queryParameters: {
@@ -90,25 +90,25 @@ Future<Map<String, dynamic>> searchTopics({
       },
     );
     
-    logd('🔍 [searchTopics] API URL: $uri');
-    logd('� [searchTopics] Parameters:');
-    logd('   - query: $query');
-    logd('   - page: $page');
-    logd('   - count: $count');
+    // logd('🔍 [searchTopics] API URL: $uri');
+    // logd('� [searchTopics] Parameters:');
+    // logd('   - query: $query');
+    // logd('   - page: $page');
+    // logd('   - count: $count');
     if (dateFilter != null) logd('   - dateFilter: $dateFilter');
-    logd('🔍 [searchTopics] API Base: $apiBase');
+    // logd('🔍 [searchTopics] API Base: $apiBase');
     
     final response = await http.get(uri).timeout(
       const Duration(seconds: 10),
       onTimeout: () => throw Exception('タイムアウト: API応答がありません'),
     );
     
-    logd('� [searchTopics] Response status: ${response.statusCode}');
-    logd('� [searchTopics] Response body (first 500 chars): ${response.body.substring(0, min(500, response.body.length))}');
+    // logd('� [searchTopics] Response status: ${response.statusCode}');
+    // logd('� [searchTopics] Response body (first 500 chars): ${response.body.substring(0, min(500, response.body.length))}');
     
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      logd('🔍 [searchTopics] ✅ Success');
+      // logd('🔍 [searchTopics] ✅ Success');
       return data;
     } else {
       throw Exception('Failed to search topics: ${response.statusCode}');
@@ -134,19 +134,19 @@ Future<List<dynamic>> fetchNewTopicsWithCache() async {
     logd('📰 [fetchNewTopicsWithCache] API URL: $uri');
     
     final response = await http.get(Uri.parse(uri));
-    logd('📰 [fetchNewTopicsWithCache] Response status: ${response.statusCode}');
+    // logd('📰 [fetchNewTopicsWithCache] Response status: ${response.statusCode}');
     
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List<dynamic>;
-      logd('📰 [fetchNewTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
+      // logd('📰 [fetchNewTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
       // ⚠️ キャッシュへの保存はUI側（TopicListScreen）で一本化
-      logd('📰 [fetchNewTopicsWithCache] (キャッシュ保存は UI 側で処理)');
+      // logd('📰 [fetchNewTopicsWithCache] (キャッシュ保存は UI 側で処理)');
       return data;
     } else {
       throw Exception('Failed to load topics: ${response.statusCode}');
     }
   } catch (e) {
-    logd('📰 [fetchNewTopicsWithCache] ❌ Error: $e');
+    // logd('📰 [fetchNewTopicsWithCache] ❌ Error: $e');
     rethrow; // ← UI側で cacheKey を使ってキャッシュから拾う
   }
 }
@@ -154,29 +154,29 @@ Future<List<dynamic>> fetchNewTopicsWithCache() async {
 /// キャッシュ対応の人気トピック取得
 Future<List<dynamic>> fetchPopularTopicsWithCache() async {
   try {
-    logd('');
-    logd('============================================');
-    logd('⭐ [fetchPopularTopicsWithCache] API呼び出し開始');
-    logd('============================================');
-    logd('');
+    // logd('');
+    // logd('============================================');
+    // logd('⭐ [fetchPopularTopicsWithCache] API呼び出し開始');
+    // logd('============================================');
+    // logd('');
     
     final uri = '$apiBase/topics/popular';
-    logd('⭐ [fetchPopularTopicsWithCache] API URL: $uri');
+    // logd('⭐ [fetchPopularTopicsWithCache] API URL: $uri');
     
     final response = await http.get(Uri.parse(uri));
-    logd('⭐ [fetchPopularTopicsWithCache] Response status: ${response.statusCode}');
+    // logd('⭐ [fetchPopularTopicsWithCache] Response status: ${response.statusCode}');
     
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List<dynamic>;
-      logd('⭐ [fetchPopularTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
+      // logd('⭐ [fetchPopularTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
       // ⚠️ キャッシュへの保存はUI側（TopicListScreen）で一本化
-      logd('⭐ [fetchPopularTopicsWithCache] (キャッシュ保存は UI 側で処理)');
+      // logd('⭐ [fetchPopularTopicsWithCache] (キャッシュ保存は UI 側で処理)');
       return data;
     } else {
       throw Exception('Failed to load topics: ${response.statusCode}');
     }
   } catch (e) {
-    logd('⭐ [fetchPopularTopicsWithCache] ❌ Error: $e');
+    // logd('⭐ [fetchPopularTopicsWithCache] ❌ Error: $e');
     rethrow; // ← UI側で cacheKey を使ってキャッシュから拾う
   }
 }
@@ -188,11 +188,11 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
   int limit = 10,
 }) async {
   try {
-    logd('');
-    logd('============================================');
-    logd('💬 [fetchCommentsWithPagination] API呼び出し開始');
-    logd('============================================');
-    logd('');
+    // logd('');
+    // logd('============================================');
+    // logd('💬 [fetchCommentsWithPagination] API呼び出し開始');
+    // logd('============================================');
+    // logd('');
     
     final uri = Uri.parse('$apiBase/topic/$topicId').replace(
       queryParameters: {
@@ -200,25 +200,25 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
         'limit': limit.toString(),
       },
     );
-    logd('💬 [fetchCommentsWithPagination] API URL: $uri');
-    logd('💬 [fetchCommentsWithPagination] Parameters: topicId=$topicId, offset=$offset, limit=$limit');
+    // logd('💬 [fetchCommentsWithPagination] API URL: $uri');
+    // logd('💬 [fetchCommentsWithPagination] Parameters: topicId=$topicId, offset=$offset, limit=$limit');
     
     final response = await http.get(uri);
-    logd('💬 [fetchCommentsWithPagination] Response status: ${response.statusCode}');
-    logd('💬 [fetchCommentsWithPagination] Response body length: ${response.body.length} bytes');
+    // logd('💬 [fetchCommentsWithPagination] Response status: ${response.statusCode}');
+    // logd('💬 [fetchCommentsWithPagination] Response body length: ${response.body.length} bytes');
     
     if (response.statusCode == 200) {
-      logd('💬 [fetchCommentsWithPagination] Parsing JSON...');
+      // logd('💬 [fetchCommentsWithPagination] Parsing JSON...');
       final data = jsonDecode(response.body);
       final comments = data['comments'] as List<dynamic>? ?? [];
       final total = data['total'] as int? ?? comments.length;
       
-      logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
-      logd('💬 [fetchCommentsWithPagination] Offset: $offset, Limit: $limit');
+      // logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
+      // logd('💬 [fetchCommentsWithPagination] Offset: $offset, Limit: $limit');
       
       // totalをメタキャッシュに保存（watched_topicsの更新用）
       await CacheService.saveMap('topic_meta_$topicId', {'total': total});
-      logd('💬 [fetchCommentsWithPagination] 💾 Cached total: $total for topic $topicId');
+      // logd('💬 [fetchCommentsWithPagination] 💾 Cached total: $total for topic $topicId');
       
       return {
         'comments': comments,
@@ -227,11 +227,11 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
         'limit': limit,
       };
     } else {
-      logd('💬 [fetchCommentsWithPagination] ❌ API Error status: ${response.statusCode}');
+      // logd('💬 [fetchCommentsWithPagination] ❌ API Error status: ${response.statusCode}');
       throw Exception('Failed to load comments: ${response.statusCode}');
     }
   } catch (e) {
-    logd('💬 [fetchCommentsWithPagination] ❌ Error: $e');
+    // logd('💬 [fetchCommentsWithPagination] ❌ Error: $e');
     rethrow;
   }
 }
@@ -240,46 +240,46 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
 
 /// 履歴のトピック完全情報を取得
 Future<List<Map<String, dynamic>>> getWatchedTopics() async {
-  logd('');
-  logd('============================================');
-  logd('📋 [getWatchedTopics] Start');
-  logd('============================================');
-  logd('');
+  // logd('');
+  // logd('============================================');
+  // logd('📋 [getWatchedTopics] Start');
+  // logd('============================================');
+  // logd('');
   
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
+  // logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
   
   final topics = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
+  // logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
   
   // 各トピックのメタキャッシュから最新のコメント数を取得
   for (final topic in topics) {
     final topicId = topic['id'] as int;
-    logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
+    // logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
     
     try {
-      logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
+      // logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
       final meta = await CacheService.loadMap('topic_meta_$topicId');
       
       if (meta != null) {
         final total = meta['total'] as int?;
-        logd('📋 [getWatchedTopics] Got meta: total=$total');
+        // logd('📋 [getWatchedTopics] Got meta: total=$total');
         
         if (total != null) {
-          logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
+          // logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
           topic['comments'] = total;
         }
       } else {
-        logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
+        // logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
       }
     } catch (e, st) {
-      logd('📋 [getWatchedTopics] ❌ Error processing topic $topicId: $e');
-      logd('📋 [getWatchedTopics] Stack trace: $st');
+      // logd('📋 [getWatchedTopics] ❌ Error processing topic $topicId: $e');
+      // logd('📋 [getWatchedTopics] Stack trace: $st');
     }
   }
   
-  logd('📋 [getWatchedTopics] ✅ Complete');
+  // logd('📋 [getWatchedTopics] ✅ Complete');
   return topics.reversed.toList();
 }
 
