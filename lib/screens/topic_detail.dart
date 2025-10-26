@@ -72,7 +72,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       return;
     }
 
-    logd('initState: topicId=${widget.topicId}, title=${widget.title}');
+    // logd('initState: topicId=${widget.topicId}, title=${widget.title}');
     _load();
 
     // ★ 追加: 最下部到達時の自動差分取得リスナー
@@ -178,13 +178,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     );
 
     var newComments = (page['comments'] as List<dynamic>? ?? []);
-    // ★ APIから返された posted_at を time にマッピング
-    newComments = newComments.map((c) {
-      if (c is Map<String, dynamic> && c.containsKey('posted_at') && !c.containsKey('time')) {
-        c['time'] = c['posted_at'];
-      }
-      return c;
-    }).toList();
     
     final total = (page['total'] as int?) ?? _totalComments;
 
@@ -359,14 +352,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         offset: 0,
         limit: _commentsPerPage,
       );
-      final newComments = (page['comments'] as List<dynamic>? ?? [])
-          .map((c) {
-            if (c is Map<String, dynamic> && c.containsKey('posted_at') && !c.containsKey('time')) {
-              c['time'] = c['posted_at'];
-            }
-            return c;
-          })
-          .toList();
+      final newComments = (page['comments'] as List<dynamic>? ?? []).toList();
       final total = (page['total'] as int?) ?? newComments.length;
 
       debugPrint('🚀 初期読み込み: ${newComments.length}/$total件');
@@ -410,7 +396,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         topicTitle: widget.title,
         commentNo: no,
         commentBody: comment['body'] ?? '',
-        time: comment['time'] ?? '',
+        time: comment['posted_at'] ?? '',
         plus: comment['plus'] ?? 0,
         minus: comment['minus'] ?? 0,
       );
@@ -483,7 +469,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'No.${comment['no']}  ${comment['time'] ?? ''}',
+                    'No.${comment['no']}  ${comment['posted_at'] ?? ''}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -859,7 +845,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'コメント:! $remoteCount/${widget.commentCount}'
+                  'コメント: $remoteCount/${widget.commentCount}'
                   '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
                   style: const TextStyle(fontSize: 11),
                   maxLines: 1,
@@ -928,7 +914,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
     final no = c['no'] ?? '-';
-    final time = c['time'] ?? '';
+    final time = c['posted_at'] ?? '';
     final body = c['body'] ?? '';
     final plus = c['plus'] ?? 0;
     final minus = c['minus'] ?? 0;
