@@ -882,33 +882,36 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
   }
 
   Widget _buildRefreshableList(BuildContext context) {
-    return CustomScrollView(
+    return CupertinoScrollbar(
       controller: _scrollController,
-      primary: false,
-      slivers: [
-        // ★ 変更: テスト時はRefreshControlを無効化できるように
-        if (widget.enableRefresh)
-          CupertinoSliverRefreshControl(
-            onRefresh: fetchComments,
-          ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, i) {
-              if (i == _allComments.length) {
-                if (_loadingMore) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: CupertinoActivityIndicator(),
-                  );
+      child: CustomScrollView(
+        controller: _scrollController,
+        primary: false,
+        slivers: [
+          // ★ 変更: テスト時はRefreshControlを無効化できるように
+          if (widget.enableRefresh)
+            CupertinoSliverRefreshControl(
+              onRefresh: fetchComments,
+            ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                if (i == _allComments.length) {
+                  if (_loadingMore) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CupertinoActivityIndicator(),
+                    );
+                  }
+                  return const SizedBox.shrink();
                 }
-                return const SizedBox.shrink();
-              }
-              return _buildCommentItem(context, _allComments[i], i);
-            },
-            childCount: _allComments.length + (_loadingMore ? 1 : 0),
+                return _buildCommentItem(context, _allComments[i], i);
+              },
+              childCount: _allComments.length + (_loadingMore ? 1 : 0),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
