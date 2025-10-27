@@ -314,9 +314,8 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       await addWatchedTopicId(
         widget.topicId,
         title: widget.title,
-        url: '',
         comments: widget.commentCount,
-        time: '',
+        posted_at: widget.posted_at,
       );
       setState(() => _isWatched = true);
     }
@@ -396,7 +395,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         topicTitle: widget.title,
         commentNo: no,
         commentBody: comment['body'] ?? '',
-        time: comment['posted_at'] ?? '',
+        posted_at: comment['posted_at'] ?? '',
         plus: comment['plus'] ?? 0,
         minus: comment['minus'] ?? 0,
       );
@@ -549,7 +548,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
                             children: [
                               Text(
                                 '＋${comment['plus'] ?? 0}',
-                                style: const TextStyle(color: CupertinoColors.systemRed),
+                                style: const TextStyle(color: Color(0xFFED6D74)),
                               ),
                               const SizedBox(width: 16),
                               Text(
@@ -845,8 +844,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'コメント: $remoteCount/${widget.commentCount}'
-                  '${localCount > 0 ? '  +$localCount(ローカル)' : ''}',
+                  'コメント: ${widget.commentCount}',
                   style: const TextStyle(fontSize: 11),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -917,7 +915,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
 
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
     final no = c['no'] ?? '-';
-    final time = c['posted_at'] ?? '';
+    final posted_at = c['posted_at'] ?? '';
     final body = c['body'] ?? '';
     final plus = c['plus'] ?? 0;
     final minus = c['minus'] ?? 0;
@@ -925,9 +923,9 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
     final urls = (c['urls'] as List?) ?? [];
 
-    // ★ デバッグ: time が空でないか確認
+    // ★ デバッグ: posted_at が空でないか確認
     if (i < 3) {
-      debugPrint('🔍 Comment[$i]: no=$no, time="$time", has_time=${time.isNotEmpty}');
+      debugPrint('🔍 Comment[$i]: no=$no, posted_at="$posted_at", has_posted_at=${posted_at.isNotEmpty}');
     }
 
     return Container(
@@ -944,7 +942,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'No.$no  $time${c['isLocal'] == true ? ' （ローカル）' : ''}',
+            'No.$no  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
             style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
           ),
           const SizedBox(height: 8),
@@ -1092,7 +1090,7 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
           child: Container(
             height: 20,
             decoration: BoxDecoration(
-              color: CupertinoColors.systemRed,
+              color: const Color(0xFFED6D74),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(plus > 0 ? 4 : 0),
                 bottomLeft: Radius.circular(plus > 0 ? 4 : 0),

@@ -226,6 +226,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     // logd('💬 [fetchCommentsWithPagination] Parsing JSON...');
     final comments = data['comments'] as List<dynamic>? ?? [];
     final total = data['total'] as int? ?? comments.length;
+    final posted_at = data['posted_at'] as String? ?? '';
     
     // logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
     // logd('💬 [fetchCommentsWithPagination] Offset: $offset, Limit: $limit');
@@ -237,6 +238,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     return {
       'comments': comments,
       'total': total,
+      'posted_at': posted_at,
       'offset': offset,
       'limit': limit,
     };
@@ -312,10 +314,8 @@ Future<List<int>> getWatchedTopicIds() async {
 Future<void> addWatchedTopicId(
   int id, {
   String? title,
-  String? url,
   int? comments,
-  String? time,
-  String? imageUrl,
+  String? posted_at,
 }) async {
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
@@ -330,10 +330,8 @@ Future<void> addWatchedTopicId(
     final topic = {
       'id': id,
       'title': title ?? 'トピック',
-      'url': url ?? '',
       'comments': comments ?? 0,
-      'time': time ?? '',
-      'imageUrl': imageUrl,
+      'posted_at': posted_at ?? '',
       'watchedAt': DateTime.now().toIso8601String(),
     };
     jsonList.add(jsonEncode(topic));
@@ -423,7 +421,7 @@ Future<void> addClippedComment({
   required String topicTitle,
   required int commentNo,
   required String commentBody,
-  required String time,
+  required String posted_at,
   required int plus,
   required int minus,
 }) async {
@@ -435,7 +433,7 @@ Future<void> addClippedComment({
     'topicTitle': topicTitle,
     'no': commentNo,
     'body': commentBody,
-    'time': time,
+    'posted_at': posted_at,
     'plus': plus,
     'minus': minus,
     'clipDate': DateTime.now().toIso8601String(),

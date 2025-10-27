@@ -211,7 +211,9 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'コメント:? $commentDisplay ${_hasCachedComments && cacheTimeDisplay.isNotEmpty ? '(キャッシュ: $cacheTimeDisplay)' : ''}',
+                        _hasCachedComments && cacheTimeDisplay.isNotEmpty
+                            ? 'コメント: $commentDisplay (キャッシュ: $cacheTimeDisplay)'
+                            : 'コメント: $commentDisplay',
                         style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
                       ),
                     ],

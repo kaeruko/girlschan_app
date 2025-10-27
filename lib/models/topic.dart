@@ -3,8 +3,7 @@ class Topic {
   final String title;
   final String url;
   final int comments;
-  final String time;
-  final String? imageUrl;
+  final String posted_at;
   final String? thumb;
 
   Topic({
@@ -12,8 +11,7 @@ class Topic {
     required this.title,
     required this.url,
     required this.comments,
-    required this.time,
-    this.imageUrl,
+    required this.posted_at,
     this.thumb,
   });
 
@@ -23,19 +21,8 @@ class Topic {
       title: json['title'] as String? ?? '(タイトルなし)',
       url: json['url'] as String? ?? '/topics/${json['id']}/',
       comments: json['comments'] as int? ?? 0,
-      time: json['time'] as String? ?? '',
-      imageUrl: json['imageUrl'] as String? ?? json['thumb'] as String?,
+      posted_at: json['posted_at'] as String? ?? '',
       thumb: json['thumb'] as String?,
-    );
-  }
-
-  factory Topic.fromCsv(List<String> row) {
-    return Topic(
-      title: row[0],
-      url: row[1],
-      comments: int.tryParse(row[2]) ?? 0,
-      time: row[3],
-      imageUrl: row.length > 4 ? row[4] : null,
     );
   }
 }
