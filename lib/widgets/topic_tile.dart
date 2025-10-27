@@ -133,6 +133,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                 topicId: id,
                 title: title,
                 commentCount: comments,
+                posted_at: posted_at ?? '',
               ),
             ),
           );

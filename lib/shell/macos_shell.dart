@@ -80,7 +80,7 @@ class _MacShellState extends State<MacShell> {
                 SizedBox(
                   width: 260,
                   child: HistorySidebar(
-                    onSelectTopic: (id, title, count) {
+                    onSelectTopic: (id, title, count, posted_at) {
                       // 現在タブの Navigator に詳細を push
                       final nav = _tabNavKeys[_index].currentState;
                       if (nav != null) {
@@ -89,6 +89,7 @@ class _MacShellState extends State<MacShell> {
                             topicId: id,
                             title: title,
                             commentCount: count ?? 0,
+                            posted_at: posted_at, 
                           ),
                         ));
                       }

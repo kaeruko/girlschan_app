@@ -16,6 +16,7 @@ class TopicDetailScreen extends StatefulWidget {
   final int topicId;
   final String title;
   final int commentCount;
+  final String posted_at; // ★ 追加
 
   // ★ 追加: テスト用バイパス
   final bool enableRefresh;
@@ -27,6 +28,7 @@ class TopicDetailScreen extends StatefulWidget {
     required this.topicId,
     required this.title,
     required this.commentCount,
+    required this.posted_at, // ★ 追加
     this.enableRefresh = true,
     this.testingBypassInit = false,
     this.testingInitialComments,

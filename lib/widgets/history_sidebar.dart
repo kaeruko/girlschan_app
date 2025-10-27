@@ -57,9 +57,10 @@ class _HistorySidebarState extends State<HistorySidebar> {
           final id = t['id'] as int;
           final title = (t['title'] as String?) ?? 'タイトル不明';
           final comments = (t['comments'] is int) ? t['comments'] as int : null;
+          final posted_at = (t['posted_at'] as String?) ?? '';
           return CupertinoButton(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            onPressed: () => widget.onSelectTopic(id, title, comments),
+            onPressed: () => widget.onSelectTopic(id, title, comments, posted_at),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Column(

@@ -155,7 +155,7 @@
       final topicTitle = clip['topicTitle'] as String;
       final commentBody = clip['body'] as String;
       final commentNo = clip['no'] as int;
-      final time = clip['time'] as String;
+      final posted_at = clip['posted_at'] as String;
       final plus = clip['plus'] as int;
       final minus = clip['minus'] as int;
       final topicId = clip['topicId'] as int;
@@ -168,6 +168,7 @@
                 topicId: topicId,
                 title: topicTitle,
                 commentCount: 0,
+                posted_at: posted_at, 
               ),
             ),
           ).then((_) {
@@ -211,7 +212,7 @@
                 children: [
                   Expanded(
                     child: Text(
-                      'No.$commentNo • $time • ＋$plus −$minus',
+                      'No.$commentNo • $posted_at • ＋$plus −$minus',
                       style: const TextStyle(
                         fontSize: 12,
                         color: CupertinoColors.secondaryLabel,
