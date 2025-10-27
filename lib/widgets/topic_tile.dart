@@ -87,11 +87,12 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
 
     String commentDisplay;
     if (_hasCachedComments) {
-      final savedText = _savedCommentNo > 0 ? '$_savedCommentNo $posted_at' : '0 $posted_at';
+      final savedText = _savedCommentNo > 0 ? '$_savedCommentNo' : '0';
       commentDisplay = '$savedText/$comments $posted_at';
     } else {
       commentDisplay = '$comments $posted_at';
     }
+    // print('commentDisplay: $commentDisplay savedText=$_savedCommentNo');
 
     // キャッシュ作成日時のフォーマット
     String cacheTimeDisplay = '';

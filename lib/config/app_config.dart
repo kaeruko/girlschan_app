@@ -22,7 +22,6 @@ class AppConfig {
     try {
       final response = await _fetchApiBaseFromGoogleDrive();
       apiBase = response.trim();
-      apiBase = 'http://192.168.40.171:5050/';
     } catch (e) {
       logd('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
       apiBase = 'http://192.168.40.171:5050/';

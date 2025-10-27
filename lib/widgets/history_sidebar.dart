@@ -3,7 +3,7 @@ import '../services/api_service.dart';
 import '../utils/log.dart';
 
 class HistorySidebar extends StatefulWidget {
-  final void Function(int topicId, String title, int? commentCount) onSelectTopic;
+  final void Function(int topicId, String title, int? commentCount, String posted_at) onSelectTopic;
 
   const HistorySidebar({super.key, required this.onSelectTopic});
 
