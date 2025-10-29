@@ -1,17 +1,20 @@
+// --- UI専用: TopicDetailScreen ---
+// ロジックは controller, measurer, widgets/measure_size へ分離
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/comment.dart';
 import '../services/api_service.dart';
-import '../services/cache_service.dart';
-import '../utils/log.dart';
 import '../utils/platform_helper.dart';
+import '../widgets/measure_size.dart';
+import '../utils/variable_list_measurer.dart';
+import '../controllers/topic_detail_controller.dart';
 import 'comment_post_webview.dart';
 import 'image_viewer_page.dart';
 
+/// トピック詳細画面 (UI専用)
+/// ロジックは TopicDetailController, VariableListMeasurer, MeasureSize へ分離
 class TopicDetailScreen extends StatefulWidget {
   final int topicId;
   final String title;
@@ -39,393 +42,15 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
-  List<dynamic> _allComments = [];            // サーバ同期済み + ローカル投稿を含む最新の「表示用」ソース
-  bool _loading = true;
-  bool _loadingMore = false;
-  bool _isWatched = false;
-  int _totalComments = 0;
-
-  static const int _commentsPerPage = 500;
-  static const double _kItemExtent = 150.0; // 推定アイテム高さを統一
-  final ScrollController _scrollController = ScrollController();
-  int _savedCommentNo = 0;        // ★ 修正: ピクセル位置→コメントNo
-  Set<int> _clippedCommentNos = {};
-  int _savedSyncedCount = 0;      // 保存しておいた「サーバ同期済み件数」
-  bool _needsDeferredRestore = false; // 差分取得後に再ジャンプが必要か
-  bool _isRestoringScroll = false; // スクロール復現中フラグ
-
-  // ★ 追加: 最下部到達時の自動差分取得用
+  late final TopicDetailController _vm;
+  final _sc = ScrollController();
+  final _meas = VariableListMeasurer(fallbackHeight: 150.0);
   Timer? _autoThrottle;
-  DateTime? _lastSync;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // ★ 追加: テストバイパス
-    if (widget.testingBypassInit) {
-      _allComments = (widget.testingInitialComments ?? const [])
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-      _totalComments = _allComments.length;
-      _loading = false;
-      // 復元や差分同期など一切走らせない
-      return;
-    }
-
-    // logd('initState: topicId=${widget.topicId}, title=${widget.title}');
-    _load();
-
-    // ★ 追加: 最下部到達時の自動差分取得リスナー
-    _scrollController.addListener(() {
-      final pos = _scrollController.position;
-      if (pos.pixels >= pos.maxScrollExtent - 80) {
-        // スロットル: 1秒以内に複数回呼ばれないようにする
-        if (_autoThrottle?.isActive ?? false) return;
-        _autoThrottle = Timer(const Duration(seconds: 1), () {});
-        _fetchDeltaFromServer(); // 差分API呼び出し
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _saveScrollPosition();
-    _autoThrottle?.cancel(); // ★ 追加: Timer をキャンセル
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  // =========================================
-  // ユーティリティ
-  // =========================================
-
-  // 「サーバ同期済み」件数（ローカル投稿は除外） // ★ 修正
-  int _serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
-
-  // ★ 追加: 最終同期時刻の表示用文字列
-  String get _lastSyncDisplay {
-    final d = _lastSync;
-    if (d == null) return '—';
-    final hh = d.hour.toString().padLeft(2, '0');
-    final mm = d.minute.toString().padLeft(2, '0');
-    return '$hh:$mm';
-  }
-
-  // スクロール復現 // ★ 修正: ピクセル位置→コメントNo
-  void _restoreScrollAfterBuild() {
-    logd('🟦 _restoreScrollAfterBuild: called, _savedCommentNo=$_savedCommentNo');
-    if (_savedCommentNo <= 0) {
-      logd('� スクロール復現: 保存位置なし');
-      _isRestoringScroll = false;
-      return;
-    }
-
-    _isRestoringScroll = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      logd('🟦 postFrameCallback1: _allComments.length=${_allComments.length}');
-      // 保存されたNoのコメントがリスト内のどのインデックスか探す
-      int targetIndex = -1;
-      for (int i = 0; i < _allComments.length; i++) {
-        if ((_allComments[i]['no'] as int?) == _savedCommentNo) {
-          targetIndex = i;
-          break;
-        }
-      }
-
-      logd('🟦 targetIndex=$targetIndex for _savedCommentNo=$_savedCommentNo');
-      if (targetIndex < 0) {
-        logd('� スクロール復現: コメントNo($_savedCommentNo)が見つかりません');
-        _isRestoringScroll = false;
-        return;
-      }
-
-      // ListView.builder内でのコメント位置を計算
-      // アイテム高さを _kItemExtent と仮定（ヘッダー等込み）
-      final estimatedOffset = targetIndex * _kItemExtent;
-      logd('🟦 estimatedOffset=$estimatedOffset');
-
-      if (!_scrollController.hasClients) {
-        logd('🟥 _scrollController.hasClients==false');
-        _isRestoringScroll = false;
-        return;
-      }
-
-      // さらに1フレーム待ってから復元（ビルド完全終了まで待つ）
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        logd('🟦 postFrameCallback2: hasClients=${_scrollController.hasClients}');
-        if (_scrollController.hasClients) {
-          final max2 = _scrollController.position.maxScrollExtent;
-          final jump2 = estimatedOffset.clamp(0.0, max2);
-          logd('🟦 jumpTo: jump2=$jump2, max2=$max2');
-          _scrollController.jumpTo(jump2);
-          logd('📍 スクロール復現完了: commentNo=$_savedCommentNo index=$targetIndex offset=$jump2 max=$max2');
-          _isRestoringScroll = false;
-        } else {
-          logd('🟥 postFrameCallback2: hasClients==false');
-        }
-      });
-    });
-  }
-
-
-  // =========================================
-  // 差分取得（サーバから offset 以降を取ってマージ） // ★ 修正: 新規
-  // =========================================
-  // 差分取得（サーバから offset 以降を取ってマージ）
-  Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
-    if (_loadingMore) return;
-    setState(() => _loadingMore = true);
-
-    try {
-      final offset = overrideOffset ?? _serverSyncedCount();
-
-      // ← api_service を使う
-      final page = await fetchCommentsWithPagination(
-        widget.topicId,
-        offset: offset,
-        limit: _commentsPerPage,
-      );
-
-      var newComments = (page['comments'] as List<dynamic>? ?? []);
-      
-      final total = (page['total'] as int?) ?? _totalComments;
-
-      final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
-      final mergedRemote  = _mergeComments(existingRemote, newComments);
-      final locals        = _allComments.where((c) => c['isLocal'] == true).toList();
-
-      setState(() {
-        _totalComments  = total;
-        _allComments    = [...mergedRemote, ...locals];
-        _lastSync = DateTime.now(); // ★ 追加: 最終同期時刻を更新
-      });
-
-      await CacheService.saveList('comments_${widget.topicId}', mergedRemote);
-
-      // 復元待ち && 目標件数に到達したらもう一度 jump
-      if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
-        _needsDeferredRestore = false;
-        logd('📍 差分取得後のスクロール復現: ${_serverSyncedCount()}/${_savedSyncedCount}件');
-        _restoreScrollAfterBuild();
-      }
-    } catch (e) {
-      debugPrint('❌ 差分取得エラー: $e');
-    } finally {
-      if (mounted) setState(() => _loadingMore = false);
-    }
-  }
-
-  // =========================================
-  // スクロール位置保存
-  // =========================================
-  Future<void> _saveScrollPosition() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_scrollController.hasClients) {
-      // 現在のスクロール位置に最も近いコメントのNoを取得
-      int commentNo = 0;
-      final current = _scrollController.offset;
-      
-      // シンプルな推定: (offset / 平均アイテム高さ) でアイテムインデックスを推定
-      // ただしここでは、_allComments内のコメントのNoを保存する
-      if (_allComments.isNotEmpty && current > 0) {
-        // 表示中のコメント一覧から、現在位置に近いNoを推定
-        final estimatedIndex = (current / _kItemExtent).floor().clamp(0, _allComments.length - 1);
-        if (estimatedIndex < _allComments.length) {
-          commentNo = _allComments[estimatedIndex]['no'] as int? ?? 0;
-        }
-      }
-      
-      await prefs.setInt('scroll_${widget.topicId}', commentNo);
-      await prefs.setInt('synced_${widget.topicId}', _serverSyncedCount());
-      // logd('💾 スクロール位置保存: commentNo=$commentNo synced=${_serverSyncedCount()}');
-    }
-  }
-
-  Future<void> _loadScrollPosition() async {
-    final prefs = await SharedPreferences.getInstance();
-    _savedCommentNo = prefs.getInt('scroll_${widget.topicId}') ?? 0;
-    _savedSyncedCount = prefs.getInt('synced_${widget.topicId}') ?? 0;
-    logd('📖 スクロール位置読み込み: commentNo=$_savedCommentNo synced=$_savedSyncedCount');
-  }
-
-
-  // =========================================
-  // ローカル投稿
-  // =========================================
-
-  Future<List<Map<String, dynamic>>> _loadLocalComments() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'local_comments_${widget.topicId}';
-    final stored = prefs.getStringList(key) ?? [];
-    final list = stored.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-    // 読み出し時にも isLocal を立てておく // ★ 修正
-    for (final c in list) {
-      c['isLocal'] = true;
-    }
-    return list;
-  }
-
-  // =========================================
-  // Pull to refresh（差分同期に変更） // ★ 修正
-  // =========================================
-  Future<void> fetchComments() async {
-    logd('Pull-to-Refresh: start');
-    await _fetchDeltaFromServer();
-    logd('Pull-to-Refresh: done');
-    if (!mounted) return;
-    // PlatformHelper.showSnackBar(context, '最新データに同期しました');
-  }
-
-  // =========================================
-  // コメントをマージ（重複排除） ※既存の関数を無改変で利用
-  // =========================================
-  List<dynamic> _mergeComments(List<dynamic> existing, List<dynamic> newComments) {
-    final commentMap = <int, dynamic>{};
-    for (var comment in existing) {
-      final no = comment['no'] as int?;
-      if (no != null) commentMap[no] = comment;
-    }
-    for (var comment in newComments) {
-      final no = comment['no'] as int?;
-      if (no != null) commentMap[no] = comment; // 上書き
-    }
-    final sorted = commentMap.values.toList();
-    sorted.sort((a, b) {
-      final noA = (a['no'] as int?) ?? 0;
-      final noB = (b['no'] as int?) ?? 0;
-      return noA.compareTo(noB);
-    });
-    return sorted;
-  }
-
-  // =========================================
-  // 初期化
-  // =========================================
-  Future<void> _load() async {
-    await _loadScrollPosition();
-
-    // 履歴状態とクリップ状態を取得
-    final watchedIds = await getWatchedTopicIds();
-    final clips = await getClippedComments();
-
-    setState(() {
-      _isWatched = watchedIds.contains(widget.topicId);
-      _clippedCommentNos = clips
-          .where((c) => c['topicId'] == widget.topicId)
-          .map<int>((c) => c['no'] as int)
-          .toSet();
-    });
-
-    // 履歴に自動追加
-    if (!_isWatched) {
-      await addWatchedTopicId(
-        widget.topicId,
-        title: widget.title,
-        comments: widget.commentCount,
-        posted_at: widget.posted_at,
-      );
-      setState(() => _isWatched = true);
-    }
-
-    // キャッシュ読み出し
-    final cacheKey     = 'comments_${widget.topicId}';
-    final cachedRemote = await CacheService.loadList(cacheKey);
-
-    if (cachedRemote.isNotEmpty) {
-      final locals = await _loadLocalComments();
-      setState(() {
-        _allComments        = [...cachedRemote, ...locals];
-        // ★ 修正: キャッシュの件数を一時的に表示する（あとで API 呼び出しで上書き）
-        _totalComments      = cachedRemote.length;
-        _loading            = false;
-      });
-
-      _restoreScrollAfterBuild();
-      return;
-    } else {
-      // キャッシュ無し → 初回ページ取得後に保存値まで取り切って復元
-      await _fetchFirstPage();
-      _restoreScrollAfterBuild();
-    }
-  }
-
-  // 最初のページ取得（キャッシュ保存 + ローカル投稿合成 + 復元）
-  Future<void> _fetchFirstPage() async {
-    try {
-      // ← api_service を使う
-      final page = await fetchCommentsWithPagination(
-        widget.topicId,
-        offset: 0,
-        limit: _commentsPerPage,
-      );
-      final newComments = (page['comments'] as List<dynamic>? ?? []).toList();
-      final total = (page['total'] as int?) ?? newComments.length;
-
-      debugPrint('🚀 初期読み込み: ${newComments.length}/$total件');
-
-      _allComments = newComments;
-      _totalComments = total;
-
-      await CacheService.saveList('comments_${widget.topicId}', _allComments);
-
-      final locals = await _loadLocalComments();
-      setState(() {
-        _allComments = [..._allComments, ...locals];
-        _loading = false;
-      });
-
-      _restoreScrollAfterBuild();
-    } catch (e) {
-      debugPrint('API Error: $e');
-      setState(() => _loading = false);
-      if (mounted) {
-        PlatformHelper.showSnackBar(context, '通信に失敗しました');
-      }
-    }
-  }
-
-
-  // =========================================
-  // クリップ / アンカー関連（データソースを _allComments に変更） // ★ 修正
-  // =========================================
-  Future<void> _toggleClip(Map<String, dynamic> comment) async {
-    final no = comment['no'] as int;
-    final isClipped = _clippedCommentNos.contains(no);
-
-    if (isClipped) {
-      await removeClippedComment(widget.topicId, no);
-      _clippedCommentNos.remove(no);
-      // PlatformHelper.showSnackBar(context, 'クリップを解除しました');
-    } else {
-      await addClippedComment(
-        topicId: widget.topicId,
-        topicTitle: widget.title,
-        commentNo: no,
-        commentBody: comment['body'] ?? '',
-        posted_at: comment['posted_at'] ?? '',
-        plus: comment['plus'] ?? 0,
-        minus: comment['minus'] ?? 0,
-      );
-      _clippedCommentNos.add(no);
-      // PlatformHelper.showSnackBar(context, 'クリップに保存しました');
-    }
-    setState(() {});
-  }
-
-  dynamic _getCommentByNo(int no) {
-    try {
-      return _allComments.firstWhere((c) => c['no'] == no); // ★ 修正
-    } catch (e) {
-      return {};
-    }
-  }
 
   // ===== アンカープレビュー =====
   void _showAnchorPreview(int no) {
     debugPrint('👀 アンカープレビュー: No.$no');
-    final comment = _getCommentByNo(no);
-    
+    final comment = _vm.getCommentByNo(no);
     if (comment.isEmpty) {
       PlatformHelper.showSnackBar(context, 'コメントが見つかりません');
       return;
@@ -547,16 +172,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                           CupertinoButton(
                             padding: const EdgeInsets.all(4),
                             onPressed: () async {
-                              await _toggleClip(comment);
+                              await _vm.toggleClip(comment);
                               if (mounted) {
                                 Navigator.pop(context);
                               }
                             },
                             child: Icon(
-                              _clippedCommentNos.contains(comment['no'])
+                              _vm.clippedNos.contains(comment['no'])
                                   ? CupertinoIcons.heart_fill
                                   : CupertinoIcons.heart,
-                              color: _clippedCommentNos.contains(comment['no'])
+                              color: _vm.clippedNos.contains(comment['no'])
                                   ? CupertinoColors.systemRed
                                   : CupertinoColors.secondaryLabel,
                               size: 22,
@@ -582,7 +207,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       child: Wrap(
         spacing: 4,
         children: anchors.map((no) {
-          final referencedComment = _getCommentByNo(no);
+          final referencedComment = _vm.getCommentByNo(no);
           final isAvailable = referencedComment.isNotEmpty;
 
           return GestureDetector(
@@ -811,34 +436,14 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   @override
   Widget build(BuildContext context) {
-    final remoteCount = _serverSyncedCount();
-    final localCount = _allComments.length - remoteCount;
-
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              widget.title,
-              style: const TextStyle(fontSize: 16),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'コメント: ${widget.commentCount}',
-                  style: const TextStyle(fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
+            Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text('コメント: ${widget.commentCount}', style: const TextStyle(fontSize: 11)),
           ],
         ),
         trailing: CupertinoButton(
@@ -849,50 +454,50 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       ),
       child: SafeArea(
         bottom: false,
-        child: _buildCommentsList(context),
+        child: _vm.loading
+            ? Center(child: PlatformHelper.buildLoadingIndicator())
+            : NotificationListener<ScrollEndNotification>(
+                onNotification: (_) { _saveScrollPosition(); return false; },
+                child: _buildRefreshableList(context),
+              ),
       ),
     );
   }
 
-  Widget _buildCommentsList(BuildContext context) {
-    return _loading
-        ? Center(child: PlatformHelper.buildLoadingIndicator())
-        : NotificationListener<ScrollEndNotification>(
-            onNotification: (_) {
-              _saveScrollPosition();
-              return false;
-            },
-            child: _buildRefreshableList(context),
-          );
-  }
-
   Widget _buildRefreshableList(BuildContext context) {
+    final items = _vm.comments;
+    _meas.ensureCapacity(items.length);
+
     return CupertinoScrollbar(
-      controller: _scrollController,
+      controller: _sc,
       child: CustomScrollView(
-        controller: _scrollController,
+        controller: _sc,
         primary: false,
         slivers: [
-          // ★ 変更: テスト時はRefreshControlを無効化できるように
           if (widget.enableRefresh)
-            CupertinoSliverRefreshControl(
-              onRefresh: fetchComments,
-            ),
+            CupertinoSliverRefreshControl(onRefresh: () => _vm.fetchDelta()),
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) {
-                if (i == _allComments.length) {
-                  if (_loadingMore) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CupertinoActivityIndicator(),
-                    );
-                  }
-                  return const SizedBox.shrink();
+                if (i == items.length) {
+                  return _vm.loadingMore
+                      ? const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CupertinoActivityIndicator(),
+                        )
+                      : const SizedBox.shrink();
                 }
-                return _buildCommentItem(context, _allComments[i], i);
+                final c = items[i];
+                final no = c['no'] as int? ?? -1;
+                return MeasureSize(
+                  onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _sc),
+                  child: Container(
+                    key: _meas.keyForNo(no),
+                    child: _buildCommentItem(context, c, i),
+                  ),
+                );
               },
-              childCount: _allComments.length + (_loadingMore ? 1 : 0),
+              childCount: items.length + (_vm.loadingMore ? 1 : 0),
             ),
           ),
         ],
@@ -909,6 +514,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final anchors = List<int>.from(c['anchors'] ?? []);
     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
     final urls = (c['urls'] as List?) ?? [];
+    // クリップ状態もcontroller経由で参照できるようにする（今後）
 
     // ★ デバッグ: posted_at が空でないか確認
     if (i < 3) {
@@ -1018,13 +624,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: () async {
-                  await _toggleClip(c);
+                  await _vm.toggleClip(c);
                 },
                 child: Icon(
-                  _clippedCommentNos.contains(no)
+                  _vm.clippedNos.contains(no)
                       ? CupertinoIcons.heart_fill
                       : CupertinoIcons.heart,
-                  color: _clippedCommentNos.contains(no)
+                  color: _vm.clippedNos.contains(no)
                       ? CupertinoColors.systemRed
                       : CupertinoColors.secondaryLabel,
                   size: 22,
@@ -1053,75 +659,113 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-  // ignore: unused_element
-  Future<void> _removeFromWatch() async {
-    await removeWatchedTopicId(widget.topicId);
-    PlatformHelper.showSnackBar(context, '履歴から削除しました');
-    setState(() => _isWatched = false);
-  }
-
   /// プラス・マイナスを表示する横長の棒グラフを作成
   Widget _buildPlusMinusGraph(int plus, int minus) {
     final total = plus + minus;
-
-    // 合計が0の場合は表示しない
-    if (total == 0) {
-      return const SizedBox.shrink();
-    }
-
+    if (total == 0) return const SizedBox.shrink();
     return Row(
       children: [
         // プラスの棒（ピンク）
-        Expanded(
-          flex: plus,
-          child: Container(
-            height: 20,
-            decoration: BoxDecoration(
-              color: const Color(0xFFED6D74),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(plus > 0 ? 4 : 0),
-                bottomLeft: Radius.circular(plus > 0 ? 4 : 0),
+        if (plus > 0)
+          Expanded(
+            flex: plus,
+            child: Container(
+              height: 20,
+              decoration: BoxDecoration(
+                color: const Color(0xFFED6D74),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  bottomLeft: Radius.circular(4),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                plus.toString(),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white),
               ),
             ),
-            alignment: Alignment.center,
-            child: plus > 0
-                ? Text(
-                    plus.toString(),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: CupertinoColors.white,
-                    ),
-                  )
-                : null,
           ),
-        ),
         // マイナスの棒（灰色）
-        Expanded(
-          flex: minus,
-          child: Container(
-            height: 20,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey3,
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(minus > 0 ? 4 : 0),
-                bottomRight: Radius.circular(minus > 0 ? 4 : 0),
+        if (minus > 0)
+          Expanded(
+            flex: minus,
+            child: Container(
+              height: 20,
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemGrey3,
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(4),
+                  bottomRight: Radius.circular(4),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                minus.toString(),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white),
               ),
             ),
-            alignment: Alignment.center,
-            child: minus > 0
-                ? Text(
-                    minus.toString(),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: CupertinoColors.white,
-                    ),
-                  )
-                : null,
           ),
-        ),
       ],
     );
+  }
+
+  void _saveScrollPosition() {
+    if (!_sc.hasClients || _vm.comments.isEmpty) return;
+    final idx = _meas.offsetToIndex(_sc.offset, _vm.comments.length);
+    _vm.saveScrollByIndex(idx);
+  }
+
+  void _restoreScrollAfterBuild() {
+    final savedNo = _vm.savedCommentNo;
+    if (savedNo <= 0 || _vm.comments.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_sc.hasClients) {
+        // 初フレームでまだ attach 前ならもう一度だけ試す
+        WidgetsBinding.instance.addPostFrameCallback((_) => _restoreScrollAfterBuild());
+        return;
+      }
+      final idx = _vm.comments.indexWhere((c) => c['no'] == savedNo);
+      if (idx < 0) return;
+      _meas.ensureCapacity(_vm.comments.length);
+      _meas.markRestoreTargetIndex(idx);
+      final off = _meas.indexToOffset(idx);
+      final max = _sc.position.maxScrollExtent;
+      _sc.jumpTo(off.clamp(0.0, max));
+      _meas.ensureVisibleOnce(savedNo);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _vm = TopicDetailController(
+      topicId: widget.topicId,
+      title: widget.title,
+      commentCount: widget.commentCount,
+      postedAt: widget.posted_at,
+      enableRefresh: widget.enableRefresh,
+      testingBypassInit: widget.testingBypassInit,
+      testingInitialComments: widget.testingInitialComments,
+    )..addListener(() => setState(() {}));
+
+    _vm.init().then((_) => _restoreScrollAfterBuild());
+
+    _sc.addListener(() {
+      final pos = _sc.position;
+      if (pos.pixels >= pos.maxScrollExtent - 80) {
+        if (_autoThrottle?.isActive ?? false) return;
+        _autoThrottle = Timer(const Duration(seconds: 1), () {});
+        _vm.fetchDelta();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _saveScrollPosition();
+    _autoThrottle?.cancel();
+    _sc.dispose();
+    _vm.dispose();
+    super.dispose();
   }
 }
