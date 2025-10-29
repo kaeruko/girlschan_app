@@ -1,5 +1,4 @@
-#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
-#include "Generated.xcconfig"
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"
 SUPPORTED_PLATFORMS=iphoneos iphonesimulator
 EXCLUDED_ARCHS[sdk=iphonesimulator*]=
 IPHONEOS_DEPLOYMENT_TARGET=14.0
