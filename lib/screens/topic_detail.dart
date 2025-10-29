@@ -207,35 +207,40 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     if (anchors.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
-      child: Wrap(
-        spacing: 4,
-        children: anchors.map((no) {
-          final referencedComment = _vm.getCommentByNo(no);
-          final isAvailable = referencedComment.isNotEmpty;
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Wrap(
+            spacing: 4,
+            children: anchors.map((no) {
+              final referencedComment = _vm.getCommentByNo(no);
+              final isAvailable = referencedComment.isNotEmpty;
 
-          return GestureDetector(
-            onTap: () => _showAnchorPreview(no),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isAvailable ? CupertinoColors.systemBlue.withOpacity(0.1) : CupertinoColors.systemGrey.withOpacity(0.1),
-                border: Border.all(
-                  color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
-                  width: 1,
+              return GestureDetector(
+                onTap: () => _showAnchorPreview(no),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isAvailable ? CupertinoColors.systemBlue.withOpacity(0.1) : CupertinoColors.systemGrey.withOpacity(0.1),
+                    border: Border.all(
+                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
+                      width: 1,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '>>$no',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '>>$no',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

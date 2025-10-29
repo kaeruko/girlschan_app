@@ -161,76 +161,80 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
       navigationBar: const CupertinoNavigationBar(
         middle: Text('検索'),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // 検索入力
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: CupertinoTextField(
-                controller: _searchController,
-                placeholder: '検索キーワード',
-                prefix: const Padding(
-                  padding: EdgeInsets.only(left: 8.0),
-                  child: Icon(CupertinoIcons.search, color: CupertinoColors.systemGrey),
-                ),
-                suffix: _searchController.text.isNotEmpty
-                    ? GestureDetector(
-                        onTap: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchResults = [];
-                            _currentQuery = '';
-                            _totalCount = 0;
-                            _hasMore = false;
-                          });
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.only(right: 8.0),
-                          child: Icon(CupertinoIcons.xmark_circle_fill, color: CupertinoColors.systemGrey),
-                        ),
-                      )
-                    : null,
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (v) => _performSearch(v),
-              ),
-            ),
-
-            if (canSubmit && _currentQuery.isEmpty)
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 検索入力
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: CupertinoButton(
-                    color: CupertinoColors.systemBlue,
-                    onPressed: () => _performSearch(_searchController.text),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(CupertinoIcons.search, color: CupertinoColors.white),
-                        SizedBox(width: 8),
-                        Text('検索', style: TextStyle(color: CupertinoColors.white)),
-                      ],
+                padding: const EdgeInsets.all(16.0),
+                child: CupertinoTextField(
+                  controller: _searchController,
+                  placeholder: '検索キーワード',
+                  prefix: const Padding(
+                    padding: EdgeInsets.only(left: 8.0),
+                    child: Icon(CupertinoIcons.search, color: CupertinoColors.systemGrey),
+                  ),
+                  suffix: _searchController.text.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchResults = [];
+                              _currentQuery = '';
+                              _totalCount = 0;
+                              _hasMore = false;
+                            });
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.only(right: 8.0),
+                            child: Icon(CupertinoIcons.xmark_circle_fill, color: CupertinoColors.systemGrey),
+                          ),
+                        )
+                      : null,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (v) => _performSearch(v),
+                ),
+              ),
+
+              if (canSubmit && _currentQuery.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: CupertinoButton(
+                      color: CupertinoColors.systemBlue,
+                      onPressed: () => _performSearch(_searchController.text),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(CupertinoIcons.search, color: CupertinoColors.white),
+                          SizedBox(width: 8),
+                          Text('検索', style: TextStyle(color: CupertinoColors.white)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-            if (_currentQuery.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Text(
-                  '「$_currentQuery」の検索結果: $_totalCount件',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: CupertinoColors.systemGrey,
+              if (_currentQuery.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Text(
+                    '「$_currentQuery」の検索結果: $_totalCount件',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: CupertinoColors.systemGrey,
+                    ),
                   ),
                 ),
-              ),
 
-            // 結果リスト
-            Expanded(child: _buildResultsList()),
-          ],
+              // 結果リスト
+              Expanded(child: _buildResultsList()),
+            ],
+          ),
         ),
       ),
     );
