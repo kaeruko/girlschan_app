@@ -50,7 +50,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   final ScrollController _scrollController = ScrollController();
   int _savedCommentNo = 0;        // ★ 修正: ピクセル位置→コメントNo
   Set<int> _clippedCommentNos = {};
-  // ★ 追加: 復元のための保存値
   int _savedSyncedCount = 0;      // 保存しておいた「サーバ同期済み件数」
   bool _needsDeferredRestore = false; // 差分取得後に再ジャンプが必要か
   bool _isRestoringScroll = false; // スクロール復現中フラグ
@@ -115,14 +114,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   // スクロール復現 // ★ 修正: ピクセル位置→コメントNo
   void _restoreScrollAfterBuild() {
+    logd('🟦 _restoreScrollAfterBuild: called, _savedCommentNo=$_savedCommentNo');
     if (_savedCommentNo <= 0) {
-      logd('📍 スクロール復現: 保存位置なし');
+      logd('� スクロール復現: 保存位置なし');
       _isRestoringScroll = false;
       return;
     }
-    
+
     _isRestoringScroll = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      logd('🟦 postFrameCallback1: _allComments.length=${_allComments.length}');
       // 保存されたNoのコメントがリスト内のどのインデックスか探す
       int targetIndex = -1;
       for (int i = 0; i < _allComments.length; i++) {
@@ -131,30 +132,37 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           break;
         }
       }
-      
+
+      logd('🟦 targetIndex=$targetIndex for _savedCommentNo=$_savedCommentNo');
       if (targetIndex < 0) {
-        logd('📍 スクロール復現: コメントNo($_savedCommentNo)が見つかりません');
+        logd('� スクロール復現: コメントNo($_savedCommentNo)が見つかりません');
         _isRestoringScroll = false;
         return;
       }
-      
+
       // ListView.builder内でのコメント位置を計算
       // アイテム高さを _kItemExtent と仮定（ヘッダー等込み）
       final estimatedOffset = targetIndex * _kItemExtent;
-      
+      logd('🟦 estimatedOffset=$estimatedOffset');
+
       if (!_scrollController.hasClients) {
+        logd('🟥 _scrollController.hasClients==false');
         _isRestoringScroll = false;
         return;
       }
-      
+
       // さらに1フレーム待ってから復元（ビルド完全終了まで待つ）
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        logd('🟦 postFrameCallback2: hasClients=${_scrollController.hasClients}');
         if (_scrollController.hasClients) {
           final max2 = _scrollController.position.maxScrollExtent;
           final jump2 = estimatedOffset.clamp(0.0, max2);
+          logd('🟦 jumpTo: jump2=$jump2, max2=$max2');
           _scrollController.jumpTo(jump2);
           logd('📍 スクロール復現完了: commentNo=$_savedCommentNo index=$targetIndex offset=$jump2 max=$max2');
           _isRestoringScroll = false;
+        } else {
+          logd('🟥 postFrameCallback2: hasClients==false');
         }
       });
     });
@@ -164,51 +172,49 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   // 差分取得（サーバから offset 以降を取ってマージ） // ★ 修正: 新規
   // =========================================
-// 差分取得（サーバから offset 以降を取ってマージ）
-Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
-  if (_loadingMore) return;
-  setState(() => _loadingMore = true);
+  // 差分取得（サーバから offset 以降を取ってマージ）
+  Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
+    if (_loadingMore) return;
+    setState(() => _loadingMore = true);
 
-  try {
-    final offset = overrideOffset ?? _serverSyncedCount();
+    try {
+      final offset = overrideOffset ?? _serverSyncedCount();
 
-    // ← api_service を使う
-    final page = await fetchCommentsWithPagination(
-      widget.topicId,
-      offset: offset,
-      limit: _commentsPerPage,
-    );
+      // ← api_service を使う
+      final page = await fetchCommentsWithPagination(
+        widget.topicId,
+        offset: offset,
+        limit: _commentsPerPage,
+      );
 
-    var newComments = (page['comments'] as List<dynamic>? ?? []);
-    
-    final total = (page['total'] as int?) ?? _totalComments;
+      var newComments = (page['comments'] as List<dynamic>? ?? []);
+      
+      final total = (page['total'] as int?) ?? _totalComments;
 
-    final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
-    final mergedRemote  = _mergeComments(existingRemote, newComments);
-    final locals        = _allComments.where((c) => c['isLocal'] == true).toList();
+      final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
+      final mergedRemote  = _mergeComments(existingRemote, newComments);
+      final locals        = _allComments.where((c) => c['isLocal'] == true).toList();
 
-    setState(() {
-      _totalComments  = total;
-      _allComments    = [...mergedRemote, ...locals];
-      _lastSync = DateTime.now(); // ★ 追加: 最終同期時刻を更新
-    });
+      setState(() {
+        _totalComments  = total;
+        _allComments    = [...mergedRemote, ...locals];
+        _lastSync = DateTime.now(); // ★ 追加: 最終同期時刻を更新
+      });
 
-    await CacheService.saveList('comments_${widget.topicId}', mergedRemote);
+      await CacheService.saveList('comments_${widget.topicId}', mergedRemote);
 
-    // 復元待ち && 目標件数に到達したらもう一度 jump
-    if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
-      _needsDeferredRestore = false;
-      logd('📍 差分取得後のスクロール復現: ${_serverSyncedCount()}/${_savedSyncedCount}件');
-      _restoreScrollAfterBuild();
+      // 復元待ち && 目標件数に到達したらもう一度 jump
+      if (_needsDeferredRestore && _serverSyncedCount() >= _savedSyncedCount) {
+        _needsDeferredRestore = false;
+        logd('📍 差分取得後のスクロール復現: ${_serverSyncedCount()}/${_savedSyncedCount}件');
+        _restoreScrollAfterBuild();
+      }
+    } catch (e) {
+      debugPrint('❌ 差分取得エラー: $e');
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
-  } catch (e) {
-    debugPrint('❌ 差分取得エラー: $e');
-  } finally {
-    if (mounted) setState(() => _loadingMore = false);
   }
-}
-
-
 
   // =========================================
   // スクロール位置保存
@@ -412,27 +418,6 @@ Future<void> _fetchDeltaFromServer({int? overrideOffset}) async {
       return _allComments.firstWhere((c) => c['no'] == no); // ★ 修正
     } catch (e) {
       return {};
-    }
-  }
-
-  // ignore: unused_element
-  void _jumpToComment(int no) {
-    debugPrint('🔗 アンカークリック: No.$no');
-    final index = _allComments.indexWhere((c) => c['no'] == no); // ★ 修正
-    debugPrint('📍 コメント インデックス: $index / 総数: ${_allComments.length}');
-    if (index != -1) {
-      final estimatedOffset = index * _kItemExtent;
-      debugPrint('📐 スクロール目標: $estimatedOffset');
-      _scrollController.animateTo(
-        estimatedOffset,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      ).catchError((_) {
-        _scrollController.jumpTo(estimatedOffset);
-      });
-      // PlatformHelper.showSnackBar(context, 'No.$no へ移動しました');
-    } else {
-      PlatformHelper.showSnackBar(context, 'コメントが見つかりません');
     }
   }
 

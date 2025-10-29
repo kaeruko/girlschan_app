@@ -25,7 +25,6 @@ class _MacShellState extends State<MacShell> {
   @override
   void initState() {
     super.initState();
-    // macOS では 4 タブのみ使用（検索は上バーに出さない方針）
     _effectiveTabs = widget.tabs.where((t) =>
       t.id == 'tab_new' || t.id == 'tab_popular' || t.id == 'tab_favorites' || t.id == 'tab_clips'
     ).toList();
@@ -182,7 +181,26 @@ class _MacShellState extends State<MacShell> {
             if (i < _effectiveTabs.length - 1) const SizedBox(width: 4),
           ],
           const Spacer(),
-          // 上バー右側は空（更新ボタンは各ページ内に置く）
+          // 検索アイコン追加
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            onPressed: () {
+              showCupertinoDialog(
+                context: context,
+                builder: (context) => CupertinoAlertDialog(
+                  title: const Text('検索'),
+                  content: const Text('検索画面（仮）'),
+                  actions: [
+                    CupertinoDialogAction(
+                      child: const Text('閉じる'),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: const Icon(CupertinoIcons.search, size: 22, color: CupertinoColors.activeBlue),
+          ),
         ],
       ),
     );
