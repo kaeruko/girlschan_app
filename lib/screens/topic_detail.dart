@@ -45,7 +45,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   late final TopicDetailController _vm;
   Set<int> _clippedCommentNos = {};
 
-  final _sc = ScrollController();
+  late final ScrollController _sc;
+  bool _loadingDelta = false;        // 再入禁止ガード
+  DateTime? _lastAsk;                // スパム防止の簡易スロットル
+  final _deltaThrottle = const Duration(milliseconds: 500);
+  final bool _listReversed = false;  // ListView(reverse: true) なら true に
   final _meas = VariableListMeasurer(fallbackHeight: 250.0);
   Timer? _autoThrottle;
   bool _restoring = false;
@@ -811,6 +815,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _sc = ScrollController()..addListener(_onScroll);
     _vm = TopicDetailController(
       topicId: widget.topicId,
       title: widget.title,
@@ -826,15 +831,40 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       _restoring = true;
       _restoreScrollAfterBuild();
     });
+  }
 
-    _sc.addListener(() {
-      if (_restoring) return; // 復元中は一切通信させない
-      final pos = _sc.position;
-      if (pos.pixels >= pos.maxScrollExtent - 80) {
-        // 明示アクションのみ通信したいなら何もしない
-        // 必要なら手動読み込みボタンで fetchDelta を呼ぶ
+  void _onScroll() {
+  if (!_sc.hasClients) return;
+  final m = _sc.position;
+  // ignore: avoid_print
+  print('[scroll] pixels=m.pixels}, max=${m.maxScrollExtent}, before=${m.extentBefore}, after=${m.extentAfter}');
+  // 近い将来 reverse:true に変えても壊れないように両対応
+  final nearTail = _listReversed ? (m.extentBefore < 200) : (m.extentAfter < 200);
+  if (!nearTail) return;
+  // スパム防止
+  final now = DateTime.now();
+  if (_lastAsk != null && now.difference(_lastAsk!) < _deltaThrottle) return;
+  _lastAsk = now;
+  _maybeFetchDelta();
+  }
+
+  Future<void> _maybeFetchDelta() async {
+    if (_loadingDelta) return;
+    _loadingDelta = true;
+    try {
+      await _vm.fetchDelta();
+      // “一番下に張り付く”振る舞いにしたい場合のみ
+      if (!mounted || !_sc.hasClients) return;
+      final m = _sc.position;
+      final stickyBottom = _listReversed ? (m.extentBefore < 4) : (m.extentAfter < 4);
+      if (stickyBottom) {
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+        if (!mounted || !_sc.hasClients) return;
+        _sc.jumpTo(_sc.position.maxScrollExtent);
       }
-    });
+    } finally {
+      _loadingDelta = false;
+    }
   }
 
   @override

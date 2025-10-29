@@ -31,6 +31,10 @@ class TopicDetailController extends ChangeNotifier {
   // state
   static const int commentsPerPage = 500;
 
+  int _cursor = 0;        // 直近の取得位置（次の offset として使う）
+  bool _hasMore = true;   // まだ続きを取れるか
+  bool get hasMore => _hasMore;
+
   List<dynamic> _allComments = [];
   bool _loading = true;
   bool _loadingMore = false;
@@ -113,19 +117,22 @@ class TopicDetailController extends ChangeNotifier {
 
   Future<void> fetchFirstPage() async {
     try {
-      final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage);
-      final list = (page['comments'] as List<dynamic>? ?? []).toList();
-      final total = (page['total'] as int?) ?? list.length;
+    final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage);
+    final list = (page['comments'] as List<dynamic>? ?? []).toList();
+    final total = (page['total'] as int?) ?? list.length;
 
-      _allComments = list;
-      _totalComments = total;
-      await CacheService.saveList('comments_$topicId', _allComments);
+    _allComments = list;
+    _totalComments = total;
+    _cursor = ((page['offset'] as int?) ?? 0) + list.length;
+    _hasMore = list.length == commentsPerPage;
 
-      final locals = await _loadLocalComments();
-      _allComments = [..._allComments, ...locals];
+    await CacheService.saveList('comments_$topicId', _allComments);
 
-      _loading = false;
-      notifyListeners();
+    final locals = await _loadLocalComments();
+    _allComments = [..._allComments, ...locals];
+
+    _loading = false;
+    notifyListeners();
     } catch (e) {
       _loading = false;
       notifyListeners();
@@ -133,31 +140,46 @@ class TopicDetailController extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchDelta({int? overrideOffset}) async {
-    if (_loadingMore) return;
-    _loadingMore = true;
-    notifyListeners();
+  bool _fetching = false;
+  int _lastRemoteNo = 0;
+  final Map<int, int> _byNo = {};
 
+  Future<int> fetchDelta() async {
+    if (_fetching) return 0;
+    _fetching = true;
     try {
-      final offset = overrideOffset ?? lastRemoteNo; // ← 最大noベース（OK）
-      final page = await fetchCommentsWithPagination(topicId, offset: offset, limit: commentsPerPage);
-      final newComments = (page['comments'] as List<dynamic>? ?? []);
+      final from = _lastRemoteNo > 0 ? _lastRemoteNo : lastRemoteNo;
+      final fetched = await fetchCommentsWithPagination(topicId, offset: from, limit: commentsPerPage);
+      final List<dynamic> fetchedList = (fetched['comments'] as List<dynamic>? ?? const []);
+      // ignore: avoid_print
+      print('[delta] from=$from -> fetched=${fetchedList.length}');
+      if (fetchedList.isEmpty) return 0;
 
-      final total = (page['total'] as int?) ?? _totalComments;
-      final existingRemote = _allComments.where((c) => c['isLocal'] != true).toList();
-      final mergedRemote = _merge(existingRemote, newComments);
-      final locals = _allComments.where((c) => c['isLocal'] == true).toList();
+      // 重複排除
+      final List<Map<String, dynamic>> newOnes = [];
+      for (final c in fetchedList) {
+        final no = (c['no'] as int?) ?? 0;
+        if (no <= 0) continue;
+        if (_byNo.containsKey(no)) continue;
+        newOnes.add(Map<String, dynamic>.from(c));
+      }
+      // ignore: avoid_print
+      print('[delta] added=${newOnes.length}');
+      if (newOnes.isEmpty) return 0;
 
-      _totalComments = total;
-      _allComments = [...mergedRemote, ...locals];
-      _lastSync = DateTime.now();
+      // 末尾に追加
+      _allComments.addAll(newOnes);
+      // インデックスと lastRemoteNo を更新
+      for (int i = 0; i < newOnes.length; i++) {
+        final no = newOnes[i]['no'] as int;
+        _byNo[no] = _allComments.length - newOnes.length + i;
+        if (no > _lastRemoteNo) _lastRemoteNo = no;
+      }
 
-      await CacheService.saveList('comments_$topicId', mergedRemote);
-    } catch (e) {
-      logd('❌ delta error: $e');
-    } finally {
-      _loadingMore = false;
       notifyListeners();
+      return newOnes.length;
+    } finally {
+      _fetching = false;
     }
   }
 
