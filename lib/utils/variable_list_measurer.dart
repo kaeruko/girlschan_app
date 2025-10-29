@@ -1,6 +1,16 @@
 import 'package:flutter/widgets.dart';
 
 class VariableListMeasurer {
+  /// 指定インデックスの高さを取得（範囲外ならnull）
+  double? getItemHeight(int idx) {
+    if (idx < 0 || idx >= _itemHeights.length) return null;
+    return _itemHeights[idx];
+  }
+  /// 指定インデックスが計測済みかどうか
+  bool isMeasured(int idx) {
+    if (idx < 0 || idx >= _itemHeights.length) return false;
+    return _itemHeights[idx] != fallbackHeight;
+  }
   VariableListMeasurer({this.fallbackHeight = 150.0});
 
   final double fallbackHeight;

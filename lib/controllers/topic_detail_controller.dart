@@ -65,7 +65,8 @@ class TopicDetailController extends ChangeNotifier {
 
   Future<void> saveScrollByIndex(int index) async {
     if (_allComments.isEmpty) return;
-    final no = (_allComments[index]['no'] as int?) ?? 0;
+    final safeIndex = index.clamp(0, _allComments.length - 1);
+    final no = (_allComments[safeIndex]['no'] as int?) ?? 0;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('scroll_$topicId', no);
     await prefs.setInt('synced_$topicId', serverSyncedCount());
@@ -171,14 +172,6 @@ class TopicDetailController extends ChangeNotifier {
     return mx;
   }
 
-  dynamic getCommentByNo(int no) {
-    try {
-      return _allComments.firstWhere((c) => c['no'] == no);
-    } catch (_) {
-      return {};
-    }
-  }
-
   // ==== clips ====
   Future<void> toggleClip(Map<String, dynamic> comment) async {
     final no = comment['no'] as int;
@@ -213,9 +206,15 @@ class TopicDetailController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final key = 'local_comments_$topicId';
     final stored = prefs.getStringList(key) ?? [];
-    final list = stored.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-    for (final c in list) {
-      c['isLocal'] = true;
+    final list = <Map<String, dynamic>>[];
+    for (final e in stored) {
+      try {
+        final m = jsonDecode(e) as Map<String, dynamic>;
+        m['isLocal'] = true;
+        list.add(m);
+      } catch (_) {
+        // 壊れたデータはスキップ
+      }
     }
     return list;
   }

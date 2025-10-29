@@ -46,8 +46,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Set<int> _clippedCommentNos = {};
 
   final _sc = ScrollController();
-  final _meas = VariableListMeasurer(fallbackHeight: 150.0);
+  final _meas = VariableListMeasurer(fallbackHeight: 250.0);
   Timer? _autoThrottle;
+  bool _restoring = false;
 
   // ===== アンカープレビュー =====
   void _showAnchorPreview(int no) {
@@ -467,6 +468,90 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
+  int _restoreTries = 0;
+
+  void _restoreScrollAfterBuild() {
+    final savedNo = _vm.savedCommentNo;
+    final noList = _vm.comments.map((c) => c['no']).toList();
+    final head = noList.take(10).toList();
+    final tail = noList.length > 20 ? noList.skip(noList.length - 10).toList() : [];
+    debugPrint('🟦 savedNo=$savedNo, コメントNoリスト: head=$head ... tail=$tail (total=${noList.length})');
+
+    if (!mounted || savedNo <= 0 || _vm.comments.isEmpty) {
+      _restoring = false;
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) { _restoring = false; return; }
+      if (!_sc.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _restoreScrollAfterBuild();
+        });
+        return;
+      }
+
+      // 1) savedNo or 直前no を idx に解決
+      int idx = _vm.comments.indexWhere((c) => c['no'] == savedNo);
+      if (idx < 0) {
+        int? nearestNo; int nearestIdx = -1;
+        for (int i = 0; i < _vm.comments.length; i++) {
+          final n = _vm.comments[i]['no'];
+          if (n is int && n <= savedNo) {
+            if (nearestNo == null || n > nearestNo) { nearestNo = n; nearestIdx = i; }
+          }
+        }
+        idx = nearestIdx >= 0 ? nearestIdx : 0;
+      }
+
+      _meas.ensureCapacity(_vm.comments.length);
+      _meas.markRestoreTargetIndex(idx);
+
+      // 2) まず推定でジャンプ（fallback=250 でかなり末尾寄りになる）
+      double est = _meas.indexToOffset(idx);
+      _sc.jumpTo(est.clamp(0.0, _sc.position.maxScrollExtent));
+      final targetNo = _vm.comments[idx]['no'];
+      debugPrint('🟦 推定ジャンプ: savedNo=$savedNo, idx=$idx, noAtIdx=$targetNo, offset=${_sc.offset}, maxScrollExtent=${_sc.position.maxScrollExtent}, heightAtIdx=${_meas.getItemHeight(idx)}');
+
+      // 3) ハンター式補正: 画面高ずつ前進して対象セルを build させる
+      void hunt(int tries) {
+        if (!mounted) { _restoring = false; return; }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final viewH = MediaQuery.of(context).size.height;
+          final max = _sc.position.maxScrollExtent;
+          final measured = _meas.isMeasured(idx);
+
+          // 末尾側なら一気に最下端へブースト（最後の30件は下スクロールで確実にbuild）
+          if (!measured && idx >= _vm.comments.length - 30 && _sc.offset < max - 24) {
+            _sc.jumpTo(max);
+          }
+
+          if (measured) {
+            final off = _meas.indexToOffset(idx).clamp(0.0, _sc.position.maxScrollExtent);
+            _sc.jumpTo(off);
+            _meas.ensureVisibleOnce(targetNo);
+            debugPrint('🟩 補正ジャンプ: savedNo=$savedNo, idx=$idx, noAtIdx=$targetNo, offset=$off, maxScrollExtent=${_sc.position.maxScrollExtent}, heightAtIdx=${_meas.getItemHeight(idx)}, measured=true');
+            _restoring = false;
+            return;
+          }
+
+          // これでも未計測なら、画面高の0.9倍ずつ前進して強制的に近傍をレイアウト
+          if (tries < 12) {
+            final next = (_sc.offset + viewH * 0.9).clamp(0.0, _sc.position.maxScrollExtent);
+            _sc.jumpTo(next);
+            hunt(tries + 1);
+          } else {
+            // どうしても捕まらない場合は最後に ensureVisible を試行して終了
+            _meas.ensureVisibleOnce(targetNo);
+            debugPrint('🟨 補正妥協: measured=false のまま ensureVisible を投げて終了');
+            _restoring = false;
+          }
+        });
+      }
+      hunt(0);
+    });
+  }
+
   Widget _buildRefreshableList(BuildContext context) {
     final items = _vm.comments;
     _meas.ensureCapacity(items.length);
@@ -476,6 +561,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       child: CustomScrollView(
         controller: _sc,
         primary: false,
+        cacheExtent: 1200,
         slivers: [
           if (widget.enableRefresh)
             CupertinoSliverRefreshControl(onRefresh: () => _vm.fetchDelta()),
@@ -518,11 +604,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
     final urls = (c['urls'] as List?) ?? [];
     // クリップ状態もcontroller経由で参照できるようにする（今後）
-
-    // ★ デバッグ: posted_at が空でないか確認
-    if (i < 3) {
-      debugPrint('🔍 Comment[$i]: no=$no, posted_at="$posted_at", has_posted_at=${posted_at.isNotEmpty}');
-    }
 
     return Container(
       decoration: BoxDecoration(
@@ -717,33 +798,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   void _saveScrollPosition() {
-    if (!_sc.hasClients || _vm.comments.isEmpty) return;
+  if (_restoring || !_sc.hasClients || _vm.comments.isEmpty) return;
     final idx = _meas.offsetToIndex(_sc.offset, _vm.comments.length);
     _vm.saveScrollByIndex(idx);
-  }
-
-  void _restoreScrollAfterBuild() {
-    if (!mounted) return;
-    final savedNo = _vm.savedCommentNo;
-    if (savedNo <= 0 || _vm.comments.isEmpty) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!_sc.hasClients) {
-        // 次フレームで一度だけ再試行（dispose 後は何もしない）
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _restoreScrollAfterBuild();
-        });
-        return;
-      }
-      final idx = _vm.comments.indexWhere((c) => c['no'] == savedNo);
-      if (idx < 0) return;
-      _meas.ensureCapacity(_vm.comments.length);
-      _meas.markRestoreTargetIndex(idx);
-      final off = _meas.indexToOffset(idx);
-      final max = _sc.position.maxScrollExtent;
-      _sc.jumpTo(off.clamp(0.0, max));
-      _meas.ensureVisibleOnce(savedNo);
-    });
   }
 
   @override
@@ -760,15 +817,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     )..addListener(() => setState(() {}));
 
     _vm.init().then((_) {
-      if (mounted) _restoreScrollAfterBuild();
+      if (!mounted) return;
+      _restoring = true;
+      _restoreScrollAfterBuild();
     });
 
     _sc.addListener(() {
+      if (_restoring) return; // 復元中は一切通信させない
       final pos = _sc.position;
       if (pos.pixels >= pos.maxScrollExtent - 80) {
-        if (_autoThrottle?.isActive ?? false) return;
-        _autoThrottle = Timer(const Duration(seconds: 1), () {});
-        _vm.fetchDelta();
+        // 明示アクションのみ通信したいなら何もしない
+        // 必要なら手動読み込みボタンで fetchDelta を呼ぶ
       }
     });
   }
