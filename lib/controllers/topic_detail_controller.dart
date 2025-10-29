@@ -138,7 +138,7 @@ class TopicDetailController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final offset = overrideOffset ?? serverSyncedCount();
+      final offset = overrideOffset ?? lastRemoteNo; // ← 最大noベース（OK）
       final page = await fetchCommentsWithPagination(topicId, offset: offset, limit: commentsPerPage);
       final newComments = (page['comments'] as List<dynamic>? ?? []);
 
@@ -157,6 +157,25 @@ class TopicDetailController extends ChangeNotifier {
     } finally {
       _loadingMore = false;
       notifyListeners();
+    }
+  }
+
+  /// 取得済みリモートコメントの最大noを返す（ローカル投稿は除外）
+  int get lastRemoteNo {
+    var mx = 0;
+    for (final c in _allComments) {
+      if (c['isLocal'] == true) continue;
+      final n = (c['no'] as int?) ?? 0;
+      if (n > mx) mx = n;
+    }
+    return mx;
+  }
+
+  dynamic getCommentByNo(int no) {
+    try {
+      return _allComments.firstWhere((c) => c['no'] == no);
+    } catch (_) {
+      return {};
     }
   }
 

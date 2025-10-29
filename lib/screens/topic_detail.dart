@@ -43,6 +43,8 @@ class TopicDetailScreen extends StatefulWidget {
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
   late final TopicDetailController _vm;
+  Set<int> _clippedCommentNos = {};
+
   final _sc = ScrollController();
   final _meas = VariableListMeasurer(fallbackHeight: 150.0);
   Timer? _autoThrottle;
@@ -284,7 +286,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   // URL表示ウィジェット
-  // ignore: unused_element
   Widget _buildUrlsWidget(List<dynamic> urls) {
     if (urls.isEmpty) return const SizedBox.shrink();
 
@@ -315,7 +316,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           return GestureDetector(
             onTap: () async {
               final Uri uri = Uri.parse(url);
+              if (!mounted) return;
               if (await canLaunchUrl(uri)) {
+                if (!mounted) return;
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               }
             },
@@ -595,7 +598,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   if (c['isLocal'] == true) return;
                   final commentId = 'vbox$no';
                   final success = await rateComment(widget.topicId, commentId, 1);
-                  if (success && mounted) {
+                  if (!mounted) return;
+                  if (success) {
                     setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
                   }
                 },
@@ -611,7 +615,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   if (c['isLocal'] == true) return;
                   final commentId = 'vbox$no';
                   final success = await rateComment(widget.topicId, commentId, -1);
-                  if (success && mounted) {
+                  if (!mounted) return;
+                  if (success) {
                     setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
                   }
                 },
@@ -625,6 +630,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 padding: EdgeInsets.zero,
                 onPressed: () async {
                   await _vm.toggleClip(c);
+                  if (!mounted) return;
+                  setState(() {});
                 },
                 child: Icon(
                   _vm.clippedNos.contains(no)
@@ -645,7 +652,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   Future<void> _openPostDialog() async {
     if (!mounted) return;
-    
     // 直接本家に遷移（ダイアログなし）
     await Navigator.push(
       context,
@@ -657,6 +663,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         ),
       ),
     );
+    if (!mounted) return;
   }
 
   /// プラス・マイナスを表示する横長の棒グラフを作成
@@ -716,12 +723,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   void _restoreScrollAfterBuild() {
+    if (!mounted) return;
     final savedNo = _vm.savedCommentNo;
     if (savedNo <= 0 || _vm.comments.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       if (!_sc.hasClients) {
-        // 初フレームでまだ attach 前ならもう一度だけ試す
-        WidgetsBinding.instance.addPostFrameCallback((_) => _restoreScrollAfterBuild());
+        // 次フレームで一度だけ再試行（dispose 後は何もしない）
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _restoreScrollAfterBuild();
+        });
         return;
       }
       final idx = _vm.comments.indexWhere((c) => c['no'] == savedNo);
@@ -748,7 +759,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       testingInitialComments: widget.testingInitialComments,
     )..addListener(() => setState(() {}));
 
-    _vm.init().then((_) => _restoreScrollAfterBuild());
+    _vm.init().then((_) {
+      if (mounted) _restoreScrollAfterBuild();
+    });
 
     _sc.addListener(() {
       final pos = _sc.position;
