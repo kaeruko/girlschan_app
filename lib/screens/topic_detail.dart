@@ -19,7 +19,7 @@ class TopicDetailScreen extends StatefulWidget {
   final int topicId;
   final String title;
   final int commentCount;
-  final String posted_at; // ★ 追加
+  final String posted_at;
 
   // ★ 追加: テスト用バイパス
   final bool enableRefresh;
@@ -31,7 +31,7 @@ class TopicDetailScreen extends StatefulWidget {
     required this.topicId,
     required this.title,
     required this.commentCount,
-    required this.posted_at, // ★ 追加
+    required this.posted_at,
     this.enableRefresh = true,
     this.testingBypassInit = false,
     this.testingInitialComments,
@@ -49,14 +49,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _loadingDelta = false;        // 再入禁止ガード
   DateTime? _lastAsk;                // スパム防止の簡易スロットル
   final _deltaThrottle = const Duration(milliseconds: 500);
-  final bool _listReversed = false;  // ListView(reverse: true) なら true に
   final _meas = VariableListMeasurer(fallbackHeight: 250.0);
   Timer? _autoThrottle;
   bool _restoring = false;
 
   // ===== アンカープレビュー =====
   void _showAnchorPreview(int no) {
-    debugPrint('👀 アンカープレビュー: No.$no');
     final comment = _vm.getCommentByNo(no);
     if (comment.isEmpty) {
       PlatformHelper.showSnackBar(context, 'コメントが見つかりません');
@@ -479,85 +477,53 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   int _restoreTries = 0;
 
+  double? _exactOffsetFor(GlobalKey key, {double alignment = 0}) {
+    final ctx = key.currentContext;
+    if (ctx == null) return null;
+    final ro = ctx.findRenderObject();
+    if (ro == null) return null;
+    final vp = RenderAbstractViewport.of(ro);
+    if (vp == null) return null;
+    return vp.getOffsetToReveal(ro, alignment).offset;
+  }
+
   void _restoreScrollAfterBuild() {
     final savedNo = _vm.savedCommentNo;
-    final noList = _vm.comments.map((c) => c['no']).toList();
-    final head = noList.take(10).toList();
-    final tail = noList.length > 20 ? noList.skip(noList.length - 10).toList() : [];
-    debugPrint('🟦 savedNo=$savedNo, コメントNoリスト: head=$head ... tail=$tail (total=${noList.length})');
+    if (savedNo <= 0 || _vm.comments.isEmpty) return;
 
-    if (!mounted || savedNo <= 0 || _vm.comments.isEmpty) {
-      _restoring = false;
-      return;
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!_sc.hasClients) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) { _restoring = false; return; }
-      if (!_sc.hasClients) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _restoreScrollAfterBuild();
-        });
-        return;
-      }
+      _restoring = true;
+      try {
+        // 1) 粗いジャンプ（目標の少し手前まで）→ターゲットをビルドさせる
+        final idx = _vm.comments.indexWhere((c) => c['no'] == savedNo);
+        final warmIdx = (idx > 8) ? idx - 8 : 0;
+        _meas.ensureCapacity(_vm.comments.length);
+        final rough = _meas.indexToOffset(warmIdx).clamp(0.0, _sc.position.maxScrollExtent);
+        _sc.jumpTo(rough);
 
-      // 1) savedNo or 直前no を idx に解決
-      int idx = _vm.comments.indexWhere((c) => c['no'] == savedNo);
-      if (idx < 0) {
-        int? nearestNo; int nearestIdx = -1;
-        for (int i = 0; i < _vm.comments.length; i++) {
-          final n = _vm.comments[i]['no'];
-          if (n is int && n <= savedNo) {
-            if (nearestNo == null || n > nearestNo) { nearestNo = n; nearestIdx = i; }
-          }
+        // 2) ターゲットがツリーに乗るまで数フレーム待つ
+        final key = _meas.keyForNo(savedNo);
+        for (int i = 0; i < 12; i++) { // ≒ 最大 ~200ms
+          if (key.currentContext != null) break;
+          await Future.delayed(const Duration(milliseconds: 16));
         }
-        idx = nearestIdx >= 0 ? nearestIdx : 0;
+
+        // 3) 正確なオフセットを算出して一発で合わせる（上揃え）
+        final exact = _exactOffsetFor(key, alignment: 0.0);
+        if (exact != null && _sc.hasClients) {
+          final clamped = exact.clamp(0.0, _sc.position.maxScrollExtent);
+          _sc.jumpTo(clamped);
+        }
+
+        // （任意）可視確認のため 1 回だけ ensureVisible を投げたい場合はここで
+        // if (key.currentContext != null) {
+        //   await Scrollable.ensureVisible(key.currentContext!, alignment: 0.0, duration: Duration.zero);
+        // }
+      } finally {
+        _restoring = false;
       }
-
-      _meas.ensureCapacity(_vm.comments.length);
-      _meas.markRestoreTargetIndex(idx);
-
-      // 2) まず推定でジャンプ（fallback=250 でかなり末尾寄りになる）
-      double est = _meas.indexToOffset(idx);
-      _sc.jumpTo(est.clamp(0.0, _sc.position.maxScrollExtent));
-      final targetNo = _vm.comments[idx]['no'];
-      debugPrint('🟦 推定ジャンプ: savedNo=$savedNo, idx=$idx, noAtIdx=$targetNo, offset=${_sc.offset}, maxScrollExtent=${_sc.position.maxScrollExtent}, heightAtIdx=${_meas.getItemHeight(idx)}');
-
-      // 3) ハンター式補正: 画面高ずつ前進して対象セルを build させる
-      void hunt(int tries) {
-        if (!mounted) { _restoring = false; return; }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final viewH = MediaQuery.of(context).size.height;
-          final max = _sc.position.maxScrollExtent;
-          final measured = _meas.isMeasured(idx);
-
-          // 末尾側なら一気に最下端へブースト（最後の30件は下スクロールで確実にbuild）
-          if (!measured && idx >= _vm.comments.length - 30 && _sc.offset < max - 24) {
-            _sc.jumpTo(max);
-          }
-
-          if (measured) {
-            final off = _meas.indexToOffset(idx).clamp(0.0, _sc.position.maxScrollExtent);
-            _sc.jumpTo(off);
-            _meas.ensureVisibleOnce(targetNo);
-            debugPrint('🟩 補正ジャンプ: savedNo=$savedNo, idx=$idx, noAtIdx=$targetNo, offset=$off, maxScrollExtent=${_sc.position.maxScrollExtent}, heightAtIdx=${_meas.getItemHeight(idx)}, measured=true');
-            _restoring = false;
-            return;
-          }
-
-          // これでも未計測なら、画面高の0.9倍ずつ前進して強制的に近傍をレイアウト
-          if (tries < 12) {
-            final next = (_sc.offset + viewH * 0.9).clamp(0.0, _sc.position.maxScrollExtent);
-            _sc.jumpTo(next);
-            hunt(tries + 1);
-          } else {
-            // どうしても捕まらない場合は最後に ensureVisible を試行して終了
-            _meas.ensureVisibleOnce(targetNo);
-            debugPrint('🟨 補正妥協: measured=false のまま ensureVisible を投げて終了');
-            _restoring = false;
-          }
-        });
-      }
-      hunt(0);
     });
   }
 
@@ -834,18 +800,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   void _onScroll() {
-  if (!_sc.hasClients) return;
-  final m = _sc.position;
-  // ignore: avoid_print
-  print('[scroll] pixels=m.pixels}, max=${m.maxScrollExtent}, before=${m.extentBefore}, after=${m.extentAfter}');
-  // 近い将来 reverse:true に変えても壊れないように両対応
-  final nearTail = _listReversed ? (m.extentBefore < 200) : (m.extentAfter < 200);
-  if (!nearTail) return;
-  // スパム防止
-  final now = DateTime.now();
-  if (_lastAsk != null && now.difference(_lastAsk!) < _deltaThrottle) return;
-  _lastAsk = now;
-  _maybeFetchDelta();
+    if (_restoring) return; // 復元中は一切トリガーしない
+    if (!_sc.hasClients) return;
+    final m = _sc.position;
+    print('[scroll] pixels=${m.pixels}, max=${m.maxScrollExtent}, 上側に積み上がった長さ=${m.extentBefore}, 画面の下側に残っているコンテンツの長さ=${m.extentAfter}');
+    final nearTail = (m.extentAfter < 200);
+    if (!nearTail) return;
+    // 連打防止
+    final now = DateTime.now();
+    if (_lastAsk != null && now.difference(_lastAsk!) < _deltaThrottle) return;
+    _lastAsk = now;
+    _maybeFetchDelta();
   }
 
   Future<void> _maybeFetchDelta() async {
@@ -856,11 +821,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       // “一番下に張り付く”振る舞いにしたい場合のみ
       if (!mounted || !_sc.hasClients) return;
       final m = _sc.position;
-      final stickyBottom = _listReversed ? (m.extentBefore < 4) : (m.extentAfter < 4);
+      final stickyBottom = (m.extentAfter < 4);
       if (stickyBottom) {
         await Future<void>.delayed(const Duration(milliseconds: 16));
         if (!mounted || !_sc.hasClients) return;
-        _sc.jumpTo(_sc.position.maxScrollExtent);
+        // _sc.jumpTo(_sc.position.maxScrollExtent);
       }
     } finally {
       _loadingDelta = false;
