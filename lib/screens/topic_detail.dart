@@ -140,158 +140,156 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
 
   void _showAnchorPreview(int no) {
-    final comment = _vm.getCommentByNo(no);
-    if (comment.isEmpty) {
+    final c = _vm.getCommentByNo(no);
+    if (c.isEmpty) {
       PlatformHelper.showSnackBar(context, 'コメントが見つかりません');
       return;
     }
 
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) {
-        final anchors = (comment['anchors'] as List?)?.cast<int>() ?? const <int>[];
-        final revAnchors = (comment['reverse_anchors'] as List?)?.cast<int>() ?? const <int>[];
+    // ---- 先に値をばらしておく（型も固める） ----
+    final anchors    = (c['anchors'] as List?)?.cast<int>() ?? const <int>[];
+    final revAnchors = (c['reverse_anchors'] as List?)?.cast<int>() ?? const <int>[];
+    final body       = c['body'] as String? ?? '';
+    final imgUrl     = c['image_url'] as String?;
+    final hasImage   = (imgUrl != null && imgUrl.isNotEmpty);
+    final plus       = (c['plus'] as int?) ?? 0;
+    final minus      = (c['minus'] as int?) ?? 0;
+    final noText     = (c['no']?.toString()) ?? '?';
+    final postedAt   = c['posted_at'] as String? ?? '';
 
-        return SafeArea(
-          top: false, // 下からのシートなので上だけ無効に
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.9,
-              ),
-              decoration: const BoxDecoration(
-                color: CupertinoColors.systemBackground,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: Column(
-                children: [
-                  // ヘッダー
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: CupertinoColors.separator),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'No.${comment['no']}  ${comment['posted_at'] ?? ''}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: CupertinoColors.secondaryLabel,
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.all(4),
-                          onPressed: () => Navigator.pop(context),
-                          child: const Icon(CupertinoIcons.xmark, size: 20),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 本文スクロール領域
-                  Expanded(
-                    child: CupertinoScrollbar(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (anchors.isNotEmpty) _buildAnchorText(anchors),
-                            if (revAnchors.isNotEmpty) _buildReverseAnchorText(revAnchors),
-
-                            // コメント本文
-                            Text(
-                              comment['body'] ?? '',
-                              style: const TextStyle(fontSize: 15),
-                            ),
-
-                            // 画像
-                            if (comment['image_url'] != null) ...[
-                              const SizedBox(height: 12),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    CupertinoPageRoute(
-                                      fullscreenDialog: true,
-                                      builder: (_) => ImageViewerPage(url: comment['image_url']),
-                                    ),
-                                  );
-                                },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    comment['image_url'],
-                                    height: 200,
-                                    fit: BoxFit.cover,
-                                    loadingBuilder: (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return const SizedBox(
-                                        height: 200,
-                                        child: Center(child: CupertinoActivityIndicator()),
-                                      );
-                                    },
-                                    errorBuilder: (context, error, stackTrace) => const SizedBox(
-                                      height: 200,
-                                      child: Center(
-                                        child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.systemGrey),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-
-                            const SizedBox(height: 12),
-
-                            // プラス/マイナス/クリップ
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text('＋${comment['plus'] ?? 0}',
-                                        style: const TextStyle(color: Color(0xFFED6D74))),
-                                    const SizedBox(width: 16),
-                                    Text('−${comment['minus'] ?? 0}',
-                                        style: const TextStyle(color: CupertinoColors.secondaryLabel)),
-                                  ],
-                                ),
-                                CupertinoButton(
-                                  padding: const EdgeInsets.all(4),
-                                  onPressed: () async {
-                                    await _vm.toggleClip(comment);
-                                    if (context.mounted) Navigator.pop(context);
-                                  },
-                                  child: Icon(
-                                    _vm.clippedNos.contains(comment['no'])
-                                        ? CupertinoIcons.heart_fill
-                                        : CupertinoIcons.heart,
-                                    color: _vm.clippedNos.contains(comment['no'])
-                                        ? CupertinoColors.systemRed
-                                        : CupertinoColors.secondaryLabel,
-                                    size: 22,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    // ---- ヘッダー ----
+    final header = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: CupertinoColors.separator)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'No.$noText  $postedAt',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: CupertinoColors.secondaryLabel,
             ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.all(4),
+            onPressed: () => Navigator.pop(context),
+            child: const Icon(CupertinoIcons.xmark, size: 20),
+          ),
+        ],
+      ),
+    );
+
+    // ---- 画像セクション ----
+    final imageSection = GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          CupertinoPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => ImageViewerPage(url: imgUrl!),
           ),
         );
       },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          imgUrl!,
+          height: 200,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const SizedBox(
+              height: 200,
+              child: Center(child: CupertinoActivityIndicator()),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => const SizedBox(
+            height: 200,
+            child: Center(
+              child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.systemGrey),
+            ),
+          ),
+        ),
+      ),
     );
+
+    // ---- リアクション行 ----
+    final reactionRow = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Text('＋$plus',  style: const TextStyle(color: Color(0xFFED6D74))),
+            const SizedBox(width: 16),
+            Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
+          ],
+        ),
+        CupertinoButton(
+          padding: const EdgeInsets.all(4),
+          onPressed: () async {
+            await _vm.toggleClip(c);
+            if (context.mounted) Navigator.pop(context);
+          },
+          child: Icon(
+            _vm.clippedNos.contains(c['no']) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+            color: _vm.clippedNos.contains(c['no']) ? CupertinoColors.systemRed : CupertinoColors.secondaryLabel,
+            size: 22,
+          ),
+        ),
+      ],
+    );
+
+    // ---- 本文の中身（配列で管理して条件はフラットに） ----
+    final contentChildren = <Widget>[
+      if (anchors.isNotEmpty) _buildAnchorText(anchors),
+      if (revAnchors.isNotEmpty) _buildReverseAnchorText(revAnchors),
+      Text(body, style: const TextStyle(fontSize: 15)),
+      if (hasImage) ...[
+        const SizedBox(height: 12),
+        imageSection,
+      ],
+      const SizedBox(height: 12),
+      reactionRow,
+    ];
+
+    // ---- シート全体を先に作ってから渡す ----
+    final sheet = SafeArea(
+      top: false, // 下からのシートなので上は無効
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          decoration: const BoxDecoration(
+            color: CupertinoColors.systemBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+          ),
+          child: Column(
+            children: [
+              header,
+              Expanded(
+                child: CupertinoScrollbar(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: contentChildren,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // ---- 発火 ----
+    showCupertinoModalPopup(context: context, builder: (_) => sheet);
   }
 
   Widget _buildAnchorText(List<int> anchors) {
