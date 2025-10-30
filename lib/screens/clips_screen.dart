@@ -72,7 +72,7 @@
           _clips = clips;
           _loading = false;
         });
-      } catch (e, stackTrace) {
+    } catch (e) {
         if (!mounted) return;
         setState(() {
           _loading = false;

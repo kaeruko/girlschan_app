@@ -4,7 +4,6 @@ import '../services/api_service.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
-import '../utils/log.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -139,7 +138,6 @@ class FavoritesScreenState extends State<FavoritesScreen>
                 itemCount: _watchedTopics.length,
                 itemBuilder: (context, i) {
                   final topic = _watchedTopics[i];
-                  // logd('📚 [Favorites.itemBuilder] アイテム[$i]: id=${topic['id']}, title=${topic['title']} posted_at=${topic['posted_at']} ', name: 'Favorites');
                   return TopicTile(
                     topic: topic,
                     controller: _controller,

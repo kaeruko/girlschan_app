@@ -41,7 +41,6 @@ class TopicDetailController extends ChangeNotifier {
   // state
   static const int commentsPerPage = 500;
 
-  int _cursor = 0;        // 直近の取得位置（次の offset として使う）
   bool _hasMore = true;   // まだ続きを取れるか
   bool get hasMore => _hasMore;
 
@@ -138,7 +137,6 @@ class TopicDetailController extends ChangeNotifier {
 
       _allComments = list;
       _totalComments = total;
-      _cursor = ((page['offset'] as int?) ?? 0) + list.length;
       _hasMore = list.length == commentsPerPage;
 
       await CacheService.saveList('comments_$topicId', _allComments);
@@ -267,18 +265,4 @@ class TopicDetailController extends ChangeNotifier {
     return list;
   }
 
-  List<dynamic> _merge(List<dynamic> existing, List<dynamic> add) {
-    final m = <int, dynamic>{};
-    for (final c in existing) {
-      final no = c['no'] as int?;
-      if (no != null) m[no] = c;
-    }
-    for (final c in add) {
-      final no = c['no'] as int?;
-      if (no != null) m[no] = c;
-    }
-    final out = m.values.toList();
-    out.sort((a, b) => ((a['no'] as int?) ?? 0).compareTo((b['no'] as int?) ?? 0));
-    return out;
-  }
 }

@@ -66,7 +66,6 @@ class _TopicListScreenState extends State<TopicListScreen>
       final topics = cached.cast<Map<String, dynamic>>();
       // logd('📂 [_loadFromCache] ✅ キャッシュから${topics.length}件のトピック読み込み完了', name: 'TopicList');
       for (int i = 0; i < topics.length && i < 3; i++) {
-        final topic = topics[i];
         // logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
       }
       setState(() {
@@ -102,7 +101,6 @@ class _TopicListScreenState extends State<TopicListScreen>
       final list = topics.cast<Map<String, dynamic>>();
       // logd('🌐 [fetchFromServer] ✅ API取得完了: ${list.length}件のトピック', name: 'TopicList');
       for (int i = 0; i < list.length && i < 3; i++) {
-        final topic = list[i];
         // logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
       }
       

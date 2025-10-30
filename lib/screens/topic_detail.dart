@@ -7,13 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/comment.dart';
 import '../services/api_service.dart';
 import '../utils/platform_helper.dart';
-import '../widgets/measure_size.dart';
-import '../utils/variable_list_measurer.dart';
 import '../controllers/topic_detail_controller.dart';
 import 'comment_post_webview.dart';
 import 'image_viewer_page.dart';
-import 'package:flutter/rendering.dart';
-import '../scroll/anchored_scroll_coordinator.dart';
 
 class TopicDetailScreen extends StatefulWidget {
   final int topicId;
@@ -42,25 +38,12 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
+  // _scroll関連の未定義変数を削除
   late final TopicDetailController _vm;
-  Set<int> _clippedCommentNos = {};
-  final VariableListMeasurer _meas = VariableListMeasurer();
-  bool _restoring = false;
-
-  // ================== State フィールド追加 ==================
-  // スクロール位置は Coordinator に集約
-  final AnchoredScrollCoordinator _scroll = AnchoredScrollCoordinator();
 
   @override
   void initState() {
     super.initState();
-    _scroll.sc.addListener(() {
-      _scroll.onScrollSave(
-        measurer: _meas,
-        totalCount: _vm.comments.length,
-        save: (index, frac) => _vm.saveScrollByIndexAndFraction(index, frac),
-      );
-    });
     _vm = TopicDetailController(
       topicId: widget.topicId,
       title: widget.title,
@@ -80,13 +63,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   @override
   void dispose() {
-  _scroll.dispose();
-  _vm.removeListener(_onVmChanged);
-  _vm.dispose();
-  super.dispose();
+    _vm.removeListener(_onVmChanged);
+    _vm.dispose();
+    super.dispose();
   }
-
-  // ...（以降、既存の全メソッド・ウィジェットビルダー・build等をクラス内にそのまま残す）...
 
 
   void _showAnchorPreview(int no) {
@@ -484,39 +464,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   // UI
   // =========================================
-  // ================== build 差し替え（リスト部） ==================
   @override
   Widget build(BuildContext context) {
     final comments = _vm.comments;
-    final savedNo  = _vm.savedCommentNo;
-
-    final bundle = _scroll.buildAnchoredSlivers(
-      items: comments,
-      savedNo: savedNo,
-      indexByNo: _vm.indexByNo,
-      // 1 行のビルダー（必要なら MeasureSize で高さ計測を継続）
-      itemBuilder: (ctx, i) {
-        _meas.ensureCapacity(comments.length);
-        final c  = comments[i];
-        final no = c['no'] as int? ?? -1;
-        return MeasureSize(
-          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _scroll.sc),
-          child: Container(
-            key: _meas.keyForNo(no),
-            child: _buildCommentItem(context, c, i),
-          ),
-        );
-      },
-      // RefreshControlはここに入れない（centerより前＝reverse側になるため）
-    );
-
-    // 初回 1 フレーム後にアンカー内の局所位置だけ微調整
-    _scroll.maybeScheduleLocalAdjust(
-      usingCenter: bundle.usingCenter,
-      savedFraction: _vm.savedLocalFraction,
-    );
-
-
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: Column(
@@ -537,28 +487,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         bottom: false,
         child: _vm.loading
             ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : (() {
-                final slivers = <Widget>[
-                  if (widget.enableRefresh && !bundle.usingCenter)
-                    CupertinoSliverRefreshControl(
-                      onRefresh: () async { await _vm.fetchDelta(); },
-                    ),
-                  ...bundle.slivers,
-                ];
-                return CustomScrollView(
-                  controller: _scroll.sc,
-                  center: bundle.usingCenter ? _scroll.centerKey : null,
-                  slivers: slivers,
-                );
-              })(),
+            : ListView.builder(
+                itemCount: comments.length,
+                itemBuilder: (context, i) => _buildCommentItem(context, comments[i], i),
+              ),
       ),
     );
-  }
-
-  // コメント1行のUI（既存の実装に置き換え）
-  Widget _buildRow(Map<String, dynamic> c) {
-    // 例: return CommentTile(comment: c);
-    return _buildCommentItem(context, c, _vm.indexByNo[c['no']] ?? 0);
   }
 
   // ================== 局所オフセットの微調整 ==================

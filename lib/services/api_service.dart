@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../utils/log.dart';
@@ -285,7 +284,7 @@ Future<List<Map<String, dynamic>>> getWatchedTopics() async {
       } else {
         // logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
       }
-    } catch (e, st) {
+  } catch (e) {
       // logd('📋 [getWatchedTopics] ❌ Error processing topic $topicId: $e');
       // logd('📋 [getWatchedTopics] Stack trace: $st');
     }

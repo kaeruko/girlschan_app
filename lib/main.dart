@@ -5,7 +5,6 @@ import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
 import 'utils/platform_helper.dart';
 import 'utils/log.dart';
-import 'services/api_service.dart';
 import 'services/cache_service.dart';
 
 void main() async {
