@@ -46,6 +46,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   final AnchoredScrollCoordinator _scroll = AnchoredScrollCoordinator();
   final VariableListMeasurer _meas = VariableListMeasurer();
 
+  // ★ 追加
+  final _sc = ScrollController();
+  bool _loadingMore = false;
+  static const double _loadMoreThreshold = 300; // 末尾から300pxでロード
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +63,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       testingBypassInit: widget.testingBypassInit,
       testingInitialComments: widget.testingInitialComments,
     )..addListener(_onVmChanged);
+
+    // ★ 追加: 末尾ロード用のリスナ
+    _sc.addListener(_onScrollBottomLoad);
+
     _vm.init();
     // スクロール保存をここで配線
     _scroll.sc.addListener(_onScrollSave);
@@ -88,7 +97,45 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     _scroll.dispose();
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
+
+    // ★ 追加
+    _sc.removeListener(_onScrollBottomLoad);
+    _sc.dispose();
+
     super.dispose();
+  }
+
+  // ★ 追加: 末尾で差分取得
+  void _onScrollBottomLoad() {
+    if (!_sc.hasClients || _loadingMore) return;
+    final pos = _sc.position;
+    if (!pos.hasPixels) return;
+
+    // 末尾に近づいたら取得
+    if (pos.extentAfter <= _loadMoreThreshold) {
+      final keepPinned = (pos.pixels >= pos.maxScrollExtent - 4);
+      _fetchMoreDelta(keepPinned: keepPinned);
+    }
+  }
+
+  // ★ 追加: 差分取得して、張り付き維持
+  Future<void> _fetchMoreDelta({bool keepPinned = false}) async {
+    if (_loadingMore) return;
+    _loadingMore = true;
+    try {
+      final added = await _vm.fetchDelta(); // VM側で二重実行はガード済み
+      if (!mounted) return;
+
+      if (keepPinned && (added > 0)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_sc.hasClients) return;
+          _sc.jumpTo(_sc.position.maxScrollExtent);
+        });
+      }
+      setState(() {}); // （必要ならフッタースピナーの描画などに使う）
+    } finally {
+      _loadingMore = false;
+    }
   }
 
 
@@ -490,38 +537,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final comments = _vm.comments;
-    final savedNo  = _vm.savedCommentNo;
-
-    final bundle = _scroll.buildAnchoredSlivers(
-      items: comments,
-      savedNo: savedNo,
-      indexByNo: _vm.indexByNo,
-      itemBuilder: (ctx, i) {
-        _meas.ensureCapacity(comments.length);
-        final c  = comments[i];
-        final no = c['no'] as int? ?? -1;
-        return MeasureSize(
-          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _scroll.sc),
-          child: Container(
-            key: _meas.keyForNo(no),
-            child: _buildCommentItem(context, c, i),
-          ),
-        );
-      },
-    );
-
-    // フラクション復元（center利用時のみ1フレーム後に微調整）
-    _scroll.maybeScheduleLocalAdjust(
-      usingCenter: bundle.usingCenter,
-      savedFraction: _vm.savedLocalFraction.isFinite
-          ? _vm.savedLocalFraction.clamp(0.0, 1.0)
-          : 0.0,
-    );
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        // 自動の戻るに頼らず明示しておくと確実
-        leading: const CupertinoNavigationBarBackButton(),
         middle: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
@@ -538,14 +556,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       ),
       child: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          controller: _scroll.sc,
-          center: bundle.usingCenter ? _scroll.centerKey : null,
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-          slivers: [
-            ...bundle.slivers,
-          ],
-        ),
+        child: _vm.loading
+            ? Center(child: PlatformHelper.buildLoadingIndicator())
+            : ListView.builder(
+                controller: _sc, // ★ 追加
+                itemCount: comments.length, /* + (_loadingMore ? 1 : 0) */
+                itemBuilder: (context, i) {
+                  // 末尾スピナーを出したい場合はコメントアウト解除
+                  if (_loadingMore && i == comments.length) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CupertinoActivityIndicator()),
+                    );
+                  }
+                  return _buildCommentItem(context, comments[i], i);
+                },
+              ),
       ),
     );
   }
