@@ -661,25 +661,47 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       },
     );
 
-
     final match = bundle.slivers.where((w) => w.key == bundle.centerKey).length;
     debugPrint('[center-check] using=${bundle.usingCenter} match=$match'); // ← match は必ず 1
 
     if (wantCenter && bundle.usingCenter) {
+      // アンカー行内の微調整（0でもOK）
       _scroll.maybeScheduleLocalAdjust(
         usingCenter: true,
         savedFraction: _vm.savedLocalFraction,
       );
 
+      // ★★ ここでは handover を計算しない！（まだ計測が0の可能性）
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (_sc.hasClients) {
-          setState(() {
-            _centerConsumed = true;      // ← centerモード終了（通常リストへ）
-            // これで _onScrollSave のガードが外れる
-          });
-          _vm.clearScrollFractionOnly(); // ← fractionだけ消す（一覧の履歴表示は残す）
-        }
+        if (!mounted || !_sc.hasClients) return;
+
+        // 計測が入った直後のフレームで base を計算
+        final double base = _meas.indexToOffset(anchorIndex);
+        final double local = _sc.offset;
+        final double handoverGlobal = base + local;
+
+        debugPrint('[handover-pre] anchorIndex=$anchorIndex base=$base local=$local → g=$handoverGlobal');
+
+        // もしまだ base==0 で anchorIndex>0 なら、フォールバック（平均高さ）で保険
+        final double safeGlobal = (anchorIndex > 0 && base == 0.0)
+            ? (_meas.fallbackHeight * anchorIndex + local)
+            : handoverGlobal;
+
+        // 通常リストへ切替
+        setState(() {
+          _centerConsumed = true;
+          _vm.clearScrollFractionOnly();
+        });
+
+        // 切替後のフレームで jumpTo
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_sc.hasClients) return;
+          final max = _sc.position.maxScrollExtent;
+          final target = safeGlobal.clamp(0.0, max);
+          _sc.jumpTo(target);
+          debugPrint('[handover] anchorIndex=$anchorIndex '
+                    'base=$base local=$local → target=$target / max=$max');
+        });
       });
     }
 
