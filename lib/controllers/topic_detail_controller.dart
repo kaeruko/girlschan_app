@@ -9,6 +9,16 @@ import '../services/cache_service.dart';
 import '../utils/log.dart';
 
 class TopicDetailController extends ChangeNotifier {
+  // --- スクロール復元用に追加 ---
+  // int savedCommentNo = 0;           // ←getter/setterに統一のため削除
+  double savedLocalFraction = 0.0;  // そのアイテム内の位置（0.0〜1.0）
+
+  // no -> index の逆引き（UIが高速に anchorIndex を求めるため）
+  final Map<int, int> _indexByNo = {};
+  Map<int, int> get indexByNo => _indexByNo;
+
+  // 可変高さメジャーを UI から参照できるよう公開（_measが存在する場合）
+  // VariableListMeasurer get measurer => _meas;
   TopicDetailController({
     required this.topicId,
     required this.title,
@@ -54,26 +64,29 @@ class TopicDetailController extends ChangeNotifier {
   int get totalComments => _totalComments;
   Set<int> get clippedNos => _clippedNos;
   int get savedCommentNo => _savedCommentNo;
+  set savedCommentNo(int value) => _savedCommentNo = value;
   int get savedSyncedCount => _savedSyncedCount;
   DateTime? get lastSync => _lastSync;
 
   int serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
 
-  // ==== persist scroll ====
-  Future<void> loadScrollPosition() async {
+  // ==== persist scroll（新方式） ====
+  Future<void> saveScrollByIndexAndFraction(int index, double fraction) async {
+    if (_allComments.isEmpty) return;
+    final safe = index.clamp(0, _allComments.length - 1);
+    final no = (_allComments[safe]['no'] as int?) ?? 0;
     final prefs = await SharedPreferences.getInstance();
-    _savedCommentNo = prefs.getInt('scroll_$topicId') ?? 0;
-    _savedSyncedCount = prefs.getInt('synced_$topicId') ?? 0;
-    logd('📖 loadScroll: no=$_savedCommentNo synced=$_savedSyncedCount');
+    final f = fraction.isFinite ? fraction.clamp(0.0, 1.0) : 0.0;
+    await prefs.setInt('scroll_$topicId', no);
+    await prefs.setDouble('scroll_frac_$topicId', f);
+  _savedCommentNo = no;
+    savedLocalFraction = f;
   }
 
-  Future<void> saveScrollByIndex(int index) async {
-    if (_allComments.isEmpty) return;
-    final safeIndex = index.clamp(0, _allComments.length - 1);
-    final no = (_allComments[safeIndex]['no'] as int?) ?? 0;
+  Future<void> _loadSavedScroll() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('scroll_$topicId', no);
-    await prefs.setInt('synced_$topicId', serverSyncedCount());
+  _savedCommentNo = prefs.getInt('scroll_$topicId') ?? 0;
+    savedLocalFraction = prefs.getDouble('scroll_frac_$topicId') ?? 0.0;
   }
 
   // ==== init ====
@@ -81,12 +94,13 @@ class TopicDetailController extends ChangeNotifier {
     if (testingBypassInit) {
       _allComments = (testingInitialComments ?? const []).map((e) => Map<String, dynamic>.from(e)).toList();
       _totalComments = _allComments.length;
+      _rebuildIndexByNo();
       _loading = false;
       notifyListeners();
       return;
     }
 
-    await loadScrollPosition();
+    await _loadSavedScroll();
 
     // 履歴・クリップ
     final watched = await getWatchedTopicIds();
@@ -106,6 +120,7 @@ class TopicDetailController extends ChangeNotifier {
       final locals = await _loadLocalComments();
       _allComments = [...cached, ...locals];
       _totalComments = cached.length;
+      _rebuildIndexByNo();
       _loading = false;
       notifyListeners();
       return;
@@ -117,22 +132,23 @@ class TopicDetailController extends ChangeNotifier {
 
   Future<void> fetchFirstPage() async {
     try {
-    final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage);
-    final list = (page['comments'] as List<dynamic>? ?? []).toList();
-    final total = (page['total'] as int?) ?? list.length;
+      final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage);
+      final list = (page['comments'] as List<dynamic>? ?? []).toList();
+      final total = (page['total'] as int?) ?? list.length;
 
-    _allComments = list;
-    _totalComments = total;
-    _cursor = ((page['offset'] as int?) ?? 0) + list.length;
-    _hasMore = list.length == commentsPerPage;
+      _allComments = list;
+      _totalComments = total;
+      _cursor = ((page['offset'] as int?) ?? 0) + list.length;
+      _hasMore = list.length == commentsPerPage;
 
-    await CacheService.saveList('comments_$topicId', _allComments);
+      await CacheService.saveList('comments_$topicId', _allComments);
 
-    final locals = await _loadLocalComments();
-    _allComments = [..._allComments, ...locals];
+      final locals = await _loadLocalComments();
+      _allComments = [..._allComments, ...locals];
+      _rebuildIndexByNo();
 
-    _loading = false;
-    notifyListeners();
+      _loading = false;
+      notifyListeners();
     } catch (e) {
       _loading = false;
       notifyListeners();
@@ -169,6 +185,7 @@ class TopicDetailController extends ChangeNotifier {
 
       // 末尾に追加
       _allComments.addAll(newOnes);
+      _rebuildIndexByNo();
       // インデックスと lastRemoteNo を更新
       for (int i = 0; i < newOnes.length; i++) {
         final no = newOnes[i]['no'] as int;
@@ -181,6 +198,15 @@ class TopicDetailController extends ChangeNotifier {
     } finally {
       _fetching = false;
     }
+  }
+  // --- コメント配列を更新したときに no->index を再構築 ---
+  void _rebuildIndexByNo() {
+    _indexByNo
+      ..clear()
+      ..addEntries(_allComments.asMap().entries.map((e) {
+        final no = (e.value['no'] as int?) ?? -1;
+        return MapEntry(no, e.key);
+      }));
   }
 
   /// 取得済みリモートコメントの最大noを返す（ローカル投稿は除外）
