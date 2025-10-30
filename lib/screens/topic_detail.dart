@@ -8,6 +8,9 @@ import '../models/comment.dart';
 import '../services/api_service.dart';
 import '../utils/platform_helper.dart';
 import '../controllers/topic_detail_controller.dart';
+import '../scroll/anchored_scroll_coordinator.dart';
+import '../utils/variable_list_measurer.dart';
+import '../widgets/measure_size.dart';
 import 'comment_post_webview.dart';
 import 'image_viewer_page.dart';
 
@@ -38,8 +41,10 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
-  // _scroll関連の未定義変数を削除
   late final TopicDetailController _vm;
+  // スクロール復元用
+  final AnchoredScrollCoordinator _scroll = AnchoredScrollCoordinator();
+  final VariableListMeasurer _meas = VariableListMeasurer();
 
   @override
   void initState() {
@@ -54,6 +59,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       testingInitialComments: widget.testingInitialComments,
     )..addListener(_onVmChanged);
     _vm.init();
+    // スクロール保存をここで配線
+    _scroll.sc.addListener(_onScrollSave);
+  }
+
+  void _onScrollSave() {
+    // totalCount は「画面で扱う総アイテム数」。ローカル追記ぶんを含む現在長を使うのが安全
+    final totalCount = _vm.comments.length;
+    _scroll.onScrollSave(
+      measurer: _meas,
+      totalCount: totalCount,
+      save: (index, frac) {
+        // frac の安全化（∞/NaN は 0 に潰す）
+        final f = (frac.isFinite) ? frac.clamp(0.0, 1.0) : 0.0;
+        _vm.saveScrollByIndexAndFraction(index, f);
+      },
+    );
   }
 
   void _onVmChanged() {
@@ -63,6 +84,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   @override
   void dispose() {
+    _scroll.sc.removeListener(_onScrollSave);
+    _scroll.dispose();
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
     super.dispose();
@@ -467,31 +490,41 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final comments = _vm.comments;
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text('コメント: ${widget.commentCount}', style: const TextStyle(fontSize: 11)),
-          ],
-        ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _openPostDialog,
-          child: const Icon(CupertinoIcons.add),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: _vm.loading
-            ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : ListView.builder(
-                itemCount: comments.length,
-                itemBuilder: (context, i) => _buildCommentItem(context, comments[i], i),
-              ),
-      ),
+    final savedNo  = _vm.savedCommentNo;
+
+    final bundle = _scroll.buildAnchoredSlivers(
+      items: comments,
+      savedNo: savedNo,
+      indexByNo: _vm.indexByNo,
+      itemBuilder: (ctx, i) {
+        _meas.ensureCapacity(comments.length);
+        final c  = comments[i];
+        final no = c['no'] as int? ?? -1;
+        return MeasureSize(
+          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _scroll.sc),
+          child: Container(
+            key: _meas.keyForNo(no),
+            child: _buildCommentItem(context, c, i),
+          ),
+        );
+      },
+    );
+
+    // フラクション復元（center利用時のみ1フレーム後に微調整）
+    _scroll.maybeScheduleLocalAdjust(
+      usingCenter: bundle.usingCenter,
+      savedFraction: _vm.savedLocalFraction.isFinite
+          ? _vm.savedLocalFraction.clamp(0.0, 1.0)
+          : 0.0,
+    );
+
+    return CustomScrollView(
+      controller: _scroll.sc,
+      center: bundle.usingCenter ? _scroll.centerKey : null,
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        ...bundle.slivers,
+      ],
     );
   }
 
