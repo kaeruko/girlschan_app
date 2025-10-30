@@ -41,22 +41,22 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
-  // ================== アンカーテキスト ==================
   late final TopicDetailController _vm;
-  // スクロール復元用
+
+  // 復元フラグ
   bool _centerConsumed = false;
+
+  // ① 先に ScrollController
+  final _sc = ScrollController();
+
+  // ② 1回だけ Coordinator を作る（_sc を渡す）
   late final AnchoredScrollCoordinator _scroll =
       AnchoredScrollCoordinator(controller: _sc);
 
   final VariableListMeasurer _meas = VariableListMeasurer();
 
-  // ★ 追加
-  final _sc = ScrollController();
-
-  late final AnchoredScrollCoordinator _scroll =
-      AnchoredScrollCoordinator(controller: _sc);
   bool _loadingMore = false;
-  static const double _loadMoreThreshold = 300; // 末尾から300pxでロード
+  static const double _loadMoreThreshold = 300;
 
   @override
   void initState() {
@@ -78,6 +78,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   void _onScrollSave() {
+    // ★ 復元が終わるまで保存しない（上書き防止）
+    if (!_centerConsumed) return;
     if (!_sc.hasClients) return;
     _scroll.onScrollSave(
       measurer: _meas,
@@ -620,39 +622,67 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Widget build(BuildContext context) {
     final items = _vm.comments;
 
+    // 復元したいときだけ center 方式にする（1フレーム限定）
     final wantCenter = (_vm.savedCommentNo > 0) && !_centerConsumed;
     final savedNo    = wantCenter ? _vm.savedCommentNo : 0;
 
+    // ① 先に willUseCenter を自前で判定（bundle を作る前）
+    final idxMap = _vm.indexByNo;
+    final anchorIndex = (savedNo > 0)
+        ? (idxMap[savedNo] ?? items.indexWhere((e) => (e['no'] as int?) == savedNo))
+        : -1;
+    final willUseCenter =
+        savedNo > 0 && anchorIndex >= 0 && anchorIndex < items.length;
+
+    // ② willUseCenter を itemBuilder 内で使う（bundle は参照しない）
     final bundle = _scroll.buildAnchoredSlivers(
       items: items,
       savedNo: savedNo,
-      indexByNo: _vm.indexByNo, // int -> int を返す関数
+      indexByNo: (no) => idxMap[no] ?? -1,
       itemBuilder: (ctx, i) {
         _meas.ensureCapacity(items.length);
         final c  = items[i];
         final no = c['no'] as int? ?? -1;
+
+        // ← 復元フレームは自動補正を殺す
+        final suppressAdjust = willUseCenter && !_centerConsumed;
+
         return MeasureSize(
-          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _sc),
-          child: Container(key: _meas.keyForNo(no), child: _buildCommentItem(context, c, i)),
+          onChange: (sz) => _meas.onItemSize(
+            i,
+            sz.height,
+            sc: suppressAdjust ? null : _sc, // ★ここがポイント
+          ),
+          child: Container(
+            key: _meas.keyForNo(no),
+            child: _buildCommentItem(context, c, i),
+          ),
         );
       },
     );
 
-    final centerKey = bundle.usingCenter ? bundle.centerKey : null;
 
-    if (bundle.usingCenter && wantCenter) {
+    final match = bundle.slivers.where((w) => w.key == bundle.centerKey).length;
+    debugPrint('[center-check] using=${bundle.usingCenter} match=$match'); // ← match は必ず 1
+
+    if (wantCenter && bundle.usingCenter) {
       _scroll.maybeScheduleLocalAdjust(
         usingCenter: true,
         savedFraction: _vm.savedLocalFraction,
       );
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (_sc.hasClients) {
-          setState(() => _centerConsumed = true);
-          _vm.clearScrollFractionOnly();
+          setState(() {
+            _centerConsumed = true;      // ← centerモード終了（通常リストへ）
+            // これで _onScrollSave のガードが外れる
+          });
+          _vm.clearScrollFractionOnly(); // ← fractionだけ消す（一覧の履歴表示は残す）
         }
       });
     }
+
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -678,7 +708,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 controller: _sc,
                 child: CustomScrollView(
                   controller: _sc,
-                  center: centerKey, // ← bundleのkeyをそのまま渡す
+                  center: bundle.usingCenter ? bundle.centerKey : null, // ← これが超重要
                   physics: const BouncingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
                   ),

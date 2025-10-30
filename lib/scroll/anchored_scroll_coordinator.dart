@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart' show RenderBox;
 import 'package:flutter/widgets.dart';
 import '../utils/variable_list_measurer.dart';
 
@@ -34,9 +35,9 @@ class AnchoredScrollCoordinator {
   final Duration _saveInterval;
 
   AnchoredScrollBundle buildAnchoredSlivers({
-    required List items,                         // {'no': int, ...}
-    required int savedNo,                        // 0なら復元なし
-    required int Function(int no) indexByNo,     // no -> index
+    required List items,
+    required int savedNo,
+    required int Function(int no) indexByNo,
     required Widget Function(BuildContext ctx, int index) itemBuilder,
     List<Widget> leadingSlivers = const [],
   }) {
@@ -45,7 +46,6 @@ class AnchoredScrollCoordinator {
     int findIndexByNo(int no) {
       final idx = indexByNo(no);
       if (idx >= 0 && idx < items.length) return idx;
-      // 念のためフォールバック
       return items.indexWhere((c) => (c['no'] as int?) == no);
     }
 
@@ -55,14 +55,13 @@ class AnchoredScrollCoordinator {
 
     if (usingCenter && _anchorItemKey == null) {
       _anchorItemKey = GlobalKey();
-      _restored = false; // 新アンカーで再調整許可
+      _restored = false;
     }
 
     final slivers = <Widget>[];
     slivers.addAll(leadingSlivers);
 
     if (!usingCenter) {
-      // 復元なしはフルリスト1本
       slivers.add(
         SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -77,7 +76,7 @@ class AnchoredScrollCoordinator {
       return AnchoredScrollBundle(slivers: slivers, usingCenter: false, centerKey: null);
     }
 
-    // A側（アンカーより前）
+    // A 側（アンカーより前）
     slivers.add(
       SliverList(
         delegate: SliverChildBuilderDelegate(
@@ -90,12 +89,10 @@ class AnchoredScrollCoordinator {
       ),
     );
 
-    // ★ centerダミー（必ず1個だけ）
-    slivers.add(SliverToBoxAdapter(key: _centerKey));
-
-    // B側（アンカー含む後半）
+    // B 側（アンカー含む後半）← ★ここに center key を付ける
     slivers.add(
       SliverList(
+        key: _centerKey, // ← これを center: に渡す
         delegate: SliverChildBuilderDelegate(
           (ctx, i) {
             final idx = anchorIndex + i;
@@ -119,6 +116,8 @@ class AnchoredScrollCoordinator {
       centerKey: _centerKey,
     );
   }
+
+
 
   // 1フレーム後に行内フラクションだけ微調整
   void maybeScheduleLocalAdjust({
