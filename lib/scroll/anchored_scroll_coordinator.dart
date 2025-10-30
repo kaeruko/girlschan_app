@@ -1,14 +1,16 @@
 import 'package:flutter/widgets.dart';
-// TODO: あなたのプロジェクトのパスに合わせて import を調整
 import '../utils/variable_list_measurer.dart';
 
-class AnchoredSliverBundle {
-  const AnchoredSliverBundle({required this.slivers, required this.usingCenter});
+class AnchoredScrollBundle {
+  AnchoredScrollBundle({
+    required this.slivers,
+    required this.usingCenter,
+    this.centerKey,
+  });
   final List<Widget> slivers;
   final bool usingCenter;
+  final Key? centerKey; // usingCenter=true のときだけ非null
 }
-
-/// 「アンカー分割 + 局所オフセット保存/復元」をカプセル化
 
 class AnchoredScrollCoordinator {
   AnchoredScrollCoordinator({
@@ -18,85 +20,69 @@ class AnchoredScrollCoordinator {
         _ownsController = controller == null,
         _saveInterval = saveInterval;
 
-  // 公開: UI 側で使うコントローラと center key
   final ScrollController sc;
   final bool _ownsController;
+
+  // centerはダミーBoxを必ず1個だけ挟む
+  final GlobalKey _centerKey = GlobalKey();
   GlobalKey get centerKey => _centerKey;
 
-  // 内部状態
-  final GlobalKey _centerKey = GlobalKey();
   GlobalKey? _anchorItemKey;
   bool _restored = false;
   int _currentAnchorIndex = 0;
   DateTime? _lastSaveAt;
   final Duration _saveInterval;
 
-  /// アンカー分割した Sliver 群を構築。
-  /// - items: List<Map> で 'no' を持っている想定
-  /// - savedNo: 復元対象の no
-  /// - indexByNo: no -> index の逆引き
-  /// - itemBuilder: index を渡すと 1 行を返すビルダー
-  /// - leadingSlivers: RefreshControl などアンカーより前に置く Sliver（任意）
-  AnchoredSliverBundle buildAnchoredSlivers({
-    required List items,
-    required int savedNo,
-    required Map<int, int> indexByNo,
+  AnchoredScrollBundle buildAnchoredSlivers({
+    required List items,                         // {'no': int, ...}
+    required int savedNo,                        // 0なら復元なし
+    required int Function(int no) indexByNo,     // no -> index
     required Widget Function(BuildContext ctx, int index) itemBuilder,
     List<Widget> leadingSlivers = const [],
   }) {
     final hasAnchor = savedNo > 0 && items.isNotEmpty;
 
     int findIndexByNo(int no) {
-      final i = indexByNo[no];
-      if (i != null) return i;
-      // フォールバック: 線形検索
+      final idx = indexByNo(no);
+      if (idx >= 0 && idx < items.length) return idx;
+      // 念のためフォールバック
       return items.indexWhere((c) => (c['no'] as int?) == no);
     }
 
     final anchorIndex = hasAnchor ? findIndexByNo(savedNo) : -1;
     final usingCenter = hasAnchor && anchorIndex >= 0 && anchorIndex < items.length;
-
     _currentAnchorIndex = usingCenter ? anchorIndex : 0;
 
-    // debugLabelはprivateなので、identity/hashCodeで比較するだけにする
-    if (usingCenter &&
-        (_anchorItemKey == null)) {
+    if (usingCenter && _anchorItemKey == null) {
       _anchorItemKey = GlobalKey();
-      _restored = false; // 新しいアンカーになったら再調整
+      _restored = false; // 新アンカーで再調整許可
     }
 
     final slivers = <Widget>[];
     slivers.addAll(leadingSlivers);
 
-    // A: アンカーより前
-    if (usingCenter) {
+    if (!usingCenter) {
+      // 復元なしはフルリスト1本
       slivers.add(
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (ctx, i) => itemBuilder(ctx, i),
-            childCount: anchorIndex,
+            childCount: items.length,
             addAutomaticKeepAlives: false,
             addRepaintBoundaries: true,
             addSemanticIndexes: false,
           ),
         ),
       );
+      return AnchoredScrollBundle(slivers: slivers, usingCenter: false, centerKey: null);
     }
 
-    // B: アンカーを含む側（center）
+    // A側（アンカーより前）
     slivers.add(
       SliverList(
-        key: usingCenter ? _centerKey : null,
         delegate: SliverChildBuilderDelegate(
-          (ctx, i) {
-            final idx = usingCenter ? (anchorIndex + i) : i;
-            final isAnchor = usingCenter && idx == anchorIndex;
-            return KeyedSubtree(
-              key: isAnchor ? _anchorItemKey : ValueKey(items[idx]['no']),
-              child: itemBuilder(ctx, idx),
-            );
-          },
-          childCount: usingCenter ? (items.length - anchorIndex) : items.length,
+          (ctx, i) => itemBuilder(ctx, i),
+          childCount: anchorIndex,
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
           addSemanticIndexes: false,
@@ -104,10 +90,37 @@ class AnchoredScrollCoordinator {
       ),
     );
 
-    return AnchoredSliverBundle(slivers: slivers, usingCenter: usingCenter);
+    // ★ centerダミー（必ず1個だけ）
+    slivers.add(SliverToBoxAdapter(key: _centerKey));
+
+    // B側（アンカー含む後半）
+    slivers.add(
+      SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (ctx, i) {
+            final idx = anchorIndex + i;
+            final isAnchor = idx == anchorIndex;
+            return KeyedSubtree(
+              key: isAnchor ? _anchorItemKey : ValueKey(items[idx]['no']),
+              child: itemBuilder(ctx, idx),
+            );
+          },
+          childCount: items.length - anchorIndex,
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: true,
+          addSemanticIndexes: false,
+        ),
+      ),
+    );
+
+    return AnchoredScrollBundle(
+      slivers: slivers,
+      usingCenter: true,
+      centerKey: _centerKey,
+    );
   }
 
-  /// 初回 1 フレーム後に「アンカーの中の局所位置」だけ微調整
+  // 1フレーム後に行内フラクションだけ微調整
   void maybeScheduleLocalAdjust({
     required bool usingCenter,
     required double savedFraction,
@@ -117,30 +130,32 @@ class AnchoredScrollCoordinator {
       final box = _anchorItemKey?.currentContext?.findRenderObject() as RenderBox?;
       if (box == null || !sc.hasClients) return;
       final frac = savedFraction.isFinite ? savedFraction.clamp(0.0, 1.0) : 0.0;
-      sc.jumpTo(sc.offset + box.size.height * frac);
+      final before = sc.offset;
+      final jump = box.size.height * frac;
+      sc.jumpTo(before + jump);
+      // debug
+      // ignore: avoid_print
+      print('[maybeScheduleLocalAdjust] anchorIndex=$_currentAnchorIndex, '
+            'frac=$frac, before=$before, jump=$jump, after=${before + jump}');
       _restored = true;
     });
   }
 
-  /// スクロール中に index + fraction を保存
-  /// measurer の API 名はあなたの実装に合わせてください。
+  // スクロール位置保存（index+fraction）
   void onScrollSave({
     required VariableListMeasurer measurer,
     required void Function(int index, double fraction) save,
     required int totalCount,
   }) {
     if (!sc.hasClients) return;
-
-    // スパム防止
     final now = DateTime.now();
     if (_lastSaveAt != null && now.difference(_lastSaveAt!) < _saveInterval) return;
     _lastSaveAt = now;
 
-    // center 利用時は「B側先頭からの距離」→全体距離に直す
+    // B側先頭からの距離 -> 全体オフセットに直す
     final baseOffset = measurer.indexToOffset(_currentAnchorIndex);
     final globalOffset = sc.offset + baseOffset;
 
-    // あなたの VariableListMeasurer に合わせて呼び分け
     final topIndex = measurer.offsetToIndex(globalOffset, totalCount);
     final rowTop   = measurer.indexToOffset(topIndex);
     final h        = (measurer.getItemHeight(topIndex) ?? measurer.fallbackHeight);
@@ -150,9 +165,6 @@ class AnchoredScrollCoordinator {
   }
 
   void dispose() {
-    if (_ownsController) {
-      sc.dispose();
-    }
-    // そのほか内部のクリーンアップがあればここで
+    if (_ownsController) sc.dispose();
   }
 }

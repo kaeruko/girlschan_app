@@ -41,8 +41,10 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
+  // ================== アンカーテキスト ==================
   late final TopicDetailController _vm;
   // スクロール復元用
+  bool _centerConsumed = false;
   late final AnchoredScrollCoordinator _scroll =
       AnchoredScrollCoordinator(controller: _sc);
 
@@ -50,6 +52,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   // ★ 追加
   final _sc = ScrollController();
+
+  late final AnchoredScrollCoordinator _scroll =
+      AnchoredScrollCoordinator(controller: _sc);
   bool _loadingMore = false;
   static const double _loadMoreThreshold = 300; // 末尾から300pxでロード
 
@@ -137,7 +142,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       return;
     }
 
-    // 値を先にばらす（全部null安全）
     final anchors    = (c['anchors'] as List?)?.cast<int>() ?? const <int>[];
     final revAnchors = (c['reverse_anchors'] as List?)?.cast<int>() ?? const <int>[];
     final body       = c['body'] as String? ?? '';
@@ -150,8 +154,93 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
     showCupertinoModalPopup(
       context: context,
-      builder: (modalCtx) { // ← これを使って閉じる
-        // ヘッダー
+      builder: (modalCtx) {
+        // ローカル関数：アンカーのバッジ
+        Widget anchorChips(List<int> list) {
+          if (list.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Wrap(
+                  spacing: 4,
+                  children: list.map((n) {
+                    final ok = _vm.getCommentByNo(n).isNotEmpty;
+                    return GestureDetector(
+                      onTap: () => _showAnchorPreview(n),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: ok
+                              ? CupertinoColors.systemBlue.withOpacity(0.1)
+                              : CupertinoColors.systemGrey.withOpacity(0.1),
+                          border: Border.all(
+                            color: ok ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '>>$n',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: ok ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // ローカル関数：逆アンカーのバッジ
+        Widget revAnchorChips(List<int> list) {
+          if (list.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 4,
+                    children: list.take(5).map((n) {
+                      return GestureDetector(
+                        onTap: () => _showAnchorPreview(n),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemOrange.withOpacity(0.1),
+                            border: Border.all(color: CupertinoColors.systemOrange, width: 1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '<<$n',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.systemOrange,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                if (list.length > 5)
+                  Text(
+                    ' +${list.length - 5}件',
+                    style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                  ),
+              ],
+            ),
+          );
+        }
+
         final header = Container(
           padding: const EdgeInsets.all(12),
           decoration: const BoxDecoration(
@@ -170,14 +259,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               ),
               CupertinoButton(
                 padding: const EdgeInsets.all(4),
-                onPressed: () => Navigator.pop(modalCtx), // ← modalCtx で閉じる
+                onPressed: () => Navigator.pop(modalCtx),
                 child: const Icon(CupertinoIcons.xmark, size: 20),
               ),
             ],
           ),
         );
 
-        // 画像セクションは「必要なときだけ」作る（imgUrl! を使わない）
         Widget? imageSection;
         if (hasImage) {
           imageSection = GestureDetector(
@@ -185,7 +273,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               Navigator.of(modalCtx).push(
                 CupertinoPageRoute(
                   fullscreenDialog: true,
-                  builder: (_) => ImageViewerPage(url: imgUrl!), // ここでだけ ! を使う
+                  builder: (_) => ImageViewerPage(url: imgUrl!),
                 ),
               );
             },
@@ -202,7 +290,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                     child: Center(child: CupertinoActivityIndicator()),
                   );
                 },
-                errorBuilder: (context, error, stackTrace) => const SizedBox(
+                errorBuilder: (context, error, stack) => const SizedBox(
                   height: 200,
                   child: Center(
                     child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.systemGrey),
@@ -213,7 +301,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           );
         }
 
-        // リアクション行
         final reactionRow = Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -229,7 +316,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               onPressed: () async {
                 await _vm.toggleClip(c);
                 if (!modalCtx.mounted) return;
-                Navigator.pop(modalCtx); // ← modalCtx で確実に閉じる
+                Navigator.pop(modalCtx);
               },
               child: Icon(
                 _vm.clippedNos.contains(c['no']) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
@@ -242,20 +329,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           ],
         );
 
-        // 本文ブロック
-        final contentChildren = <Widget>[
-          if (anchors.isNotEmpty) _buildAnchorText(anchors),
-          if (revAnchors.isNotEmpty) _buildReverseAnchorText(revAnchors),
-          Text(body, style: const TextStyle(fontSize: 15)),
-          if (imageSection != null) ...[
-            const SizedBox(height: 12),
-            imageSection,
-          ],
-          const SizedBox(height: 12),
-          reactionRow,
-        ];
-
-        // シート本体
         return SafeArea(
           top: false,
           child: Align(
@@ -277,7 +350,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                         padding: const EdgeInsets.all(12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: contentChildren,
+                          children: [
+                            if (anchors.isNotEmpty) anchorChips(anchors),
+                            if (revAnchors.isNotEmpty) revAnchorChips(revAnchors),
+                            Text(body, style: const TextStyle(fontSize: 15)),
+                            if (imageSection != null) ...[
+                              const SizedBox(height: 12),
+                              imageSection,
+                            ],
+                            const SizedBox(height: 12),
+                            reactionRow,
+                          ],
                         ),
                       ),
                     ),
@@ -290,6 +373,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       },
     );
   }
+
 
 
   Widget _buildAnchorText(List<int> anchors) {
@@ -534,40 +618,41 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   @override
   Widget build(BuildContext context) {
-    final items   = _vm.comments;
-    final savedNo = _vm.savedCommentNo;
+    final items = _vm.comments;
+
+    final wantCenter = (_vm.savedCommentNo > 0) && !_centerConsumed;
+    final savedNo    = wantCenter ? _vm.savedCommentNo : 0;
 
     final bundle = _scroll.buildAnchoredSlivers(
       items: items,
       savedNo: savedNo,
-      indexByNo: _vm.indexByNo,
+      indexByNo: _vm.indexByNo, // int -> int を返す関数
       itemBuilder: (ctx, i) {
         _meas.ensureCapacity(items.length);
         final c  = items[i];
         final no = c['no'] as int? ?? -1;
         return MeasureSize(
-          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _sc), // ★ _sc
-          child: Container(
-            key: _meas.keyForNo(no),
-            child: _buildCommentItem(context, c, i),
-          ),
+          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _sc),
+          child: Container(key: _meas.keyForNo(no), child: _buildCommentItem(context, c, i)),
         );
       },
     );
 
-    _scroll.maybeScheduleLocalAdjust(
-      usingCenter: bundle.usingCenter,
-      savedFraction: _vm.savedLocalFraction.isFinite
-          ? _vm.savedLocalFraction.clamp(0.0, 1.0)
-          : 0.0,
-    );
-    if (bundle.usingCenter) {
+    final centerKey = bundle.usingCenter ? bundle.centerKey : null;
+
+    if (bundle.usingCenter && wantCenter) {
+      _scroll.maybeScheduleLocalAdjust(
+        usingCenter: true,
+        savedFraction: _vm.savedLocalFraction,
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // ここで savedNo を 0 にして次ビルドから通常モード（昇順ひと続き）へ
-        // ignore: discarded_futures
-        _vm.consumeSavedScroll();
+        if (!mounted) return;
+        if (_sc.hasClients) {
+          setState(() => _centerConsumed = true);
+          _vm.clearScrollFractionOnly();
+        }
       });
-  }
+    }
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -589,11 +674,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         bottom: false,
         child: _vm.loading
             ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : CupertinoScrollbar(                    // ★ スクロールバーも同じ _sc を使える
+            : CupertinoScrollbar(
                 controller: _sc,
                 child: CustomScrollView(
-                  controller: _sc,                   // ★ 統一
-                  center: bundle.usingCenter ? _scroll.centerKey : null,
+                  controller: _sc,
+                  center: centerKey, // ← bundleのkeyをそのまま渡す
                   physics: const BouncingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
                   ),
@@ -603,7 +688,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       ),
     );
   }
-
   // ================== 局所オフセットの微調整 ==================
 
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
@@ -809,4 +893,4 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-}
+  }

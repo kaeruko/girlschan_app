@@ -67,17 +67,16 @@ class TopicDetailController extends ChangeNotifier {
 
   int serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
 
-  Future<void> consumeSavedScroll() async {
-    if (savedCommentNo == 0) return;
-    savedCommentNo = 0;
+  // 既存のローカルキー関数（君の方針に合わせて）:
+  String _kScrollNo(int id)   => 'scroll_$id';
+  String _kScrollFrac(int id) => 'scroll_frac_$id';
+
+  // ★ 追加：フラクションだけ消す
+  Future<void> clearScrollFractionOnly() async {
     savedLocalFraction = 0.0;
-
     final prefs = await SharedPreferences.getInstance();
-    // 実際のキー名に合わせて
-    await prefs.remove('scroll_$topicId');
-    await prefs.remove('scroll_frac_$topicId');
+    await prefs.remove(_kScrollFrac(topicId));
   }
-
 
   // ==== persist scroll（新方式） ====
   Future<void> saveScrollByIndexAndFraction(int index, double fraction) async {
@@ -88,14 +87,17 @@ class TopicDetailController extends ChangeNotifier {
     final f = fraction.isFinite ? fraction.clamp(0.0, 1.0) : 0.0;
     await prefs.setInt('scroll_$topicId', no);
     await prefs.setDouble('scroll_frac_$topicId', f);
-  _savedCommentNo = no;
+    _savedCommentNo = no;
     savedLocalFraction = f;
   }
 
   Future<void> _loadSavedScroll() async {
     final prefs = await SharedPreferences.getInstance();
-  _savedCommentNo = prefs.getInt('scroll_$topicId') ?? 0;
-    savedLocalFraction = prefs.getDouble('scroll_frac_$topicId') ?? 0.0;
+    final loadedNo = prefs.getInt('scroll_$topicId') ?? 0;
+    final loadedFrac = prefs.getDouble('scroll_frac_$topicId') ?? 0.0;
+      logd('[loadSavedScroll] scroll_${topicId}=$loadedNo, scroll_frac_${topicId}=$loadedFrac');
+    _savedCommentNo = loadedNo;
+    savedLocalFraction = loadedFrac;
   }
 
   // ==== init ====
@@ -109,7 +111,8 @@ class TopicDetailController extends ChangeNotifier {
       return;
     }
 
-    await _loadSavedScroll();
+  await _loadSavedScroll();
+    logd('[init] after _loadSavedScroll: savedCommentNo=$_savedCommentNo, savedLocalFraction=$savedLocalFraction');
 
     // 履歴・クリップ
     final watched = await getWatchedTopicIds();
