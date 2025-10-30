@@ -534,7 +534,31 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // =========================================
   @override
   Widget build(BuildContext context) {
-    final comments = _vm.comments;
+    final items   = _vm.comments;
+    final savedNo = _vm.savedCommentNo;
+
+    final bundle = _scroll.buildAnchoredSlivers(
+      items: items,
+      savedNo: savedNo,
+      indexByNo: _vm.indexByNo,
+      itemBuilder: (ctx, i) {
+        _meas.ensureCapacity(items.length);
+        final c  = items[i];
+        final no = c['no'] as int? ?? -1;
+        return MeasureSize(
+          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _scroll.sc),
+          child: Container(key: _meas.keyForNo(no), child: _buildCommentItem(context, c, i)),
+        );
+      },
+    );
+
+    // 行内フラクションの微調整（1フレーム後に内部で実行）
+    _scroll.maybeScheduleLocalAdjust(
+      usingCenter: bundle.usingCenter,
+      savedFraction: _vm.savedLocalFraction.isFinite
+          ? _vm.savedLocalFraction.clamp(0.0, 1.0)
+          : 0.0,
+    );
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -556,19 +580,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         bottom: false,
         child: _vm.loading
             ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : ListView.builder(
-                controller: _sc, // ★ 追加
-                itemCount: comments.length, /* + (_loadingMore ? 1 : 0) */
-                itemBuilder: (context, i) {
-                  // 末尾スピナーを出したい場合はコメントアウト解除
-                  if (_loadingMore && i == comments.length) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Center(child: CupertinoActivityIndicator()),
-                    );
-                  }
-                  return _buildCommentItem(context, comments[i], i);
-                },
+            : CustomScrollView(
+                controller: _scroll.sc,
+                center: bundle.usingCenter ? _scroll.centerKey : null,
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                slivers: [...bundle.slivers],
               ),
       ),
     );
