@@ -172,6 +172,7 @@ class _TopicListScreenState extends State<TopicListScreen>
                           final topic = _topics[index];
                           // logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
                           return TopicTile(
+                            key: ValueKey<int>(topic['id'] as int), // ★ これ必須
                             topic: topic,
                             controller: _controller,
                             showThumb: true,                      // 一覧はサムネ表示

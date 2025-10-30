@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -11,7 +10,7 @@ class CacheService {
   static Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
-    
+
     try {
       final dir = await getApplicationSupportDirectory();
       // logd('');
@@ -19,13 +18,13 @@ class CacheService {
       // logd('💾 キャッシュサービス初期化');
       // logd('============================================');
       // logd('📂 キャッシュディレクトリ: ${dir.path}');
-      
+
       // ディレクトリが存在しなければ作成
       if (!await dir.exists()) {
         await dir.create(recursive: true);
         // logd('📂 ディレクトリを新規作成しました');
       }
-      
+
       // ディレクトリ内のファイル一覧を表示
       final files = dir.listSync();
       // logd('📂 キャッシュファイル数: ${files.length}');
@@ -45,13 +44,13 @@ class CacheService {
       // logd('❌ キャッシュ初期化エラー: $e');
     }
   }
-  
+
   static Future<File> _file(String name) async {
     final dir = await getApplicationSupportDirectory();
     // logd('📂 キャッシュディレクトリ: ${dir.path}');
     return File('${dir.path}/$name.json');
   }
-  
+
   /// List キャッシュ用（コメント配列など）
   static Future<List<dynamic>> loadList(String name) async {
     try {
@@ -145,7 +144,9 @@ class CacheService {
     try {
       final file = await _file(name);
       final exists = await file.exists();
-      // print('💾 [CacheService.exists] Checking: $name -> exists: $exists (path: ${file.path})');
+      // デバッグログ: キャッシュ存在確認
+      // ignore: avoid_print
+      // print('[CacheService] exists: $name -> $exists (path: [36m${file.path}[0m)');
       return exists;
     } catch (e) {
       // logd('❌ Cache exists check error: $e');
@@ -159,6 +160,9 @@ class CacheService {
       final file = await _file(name);
       if (await file.exists()) {
         final stat = file.statSync();
+        // デバッグログ: キャッシュ更新日時取得
+        // ignore: avoid_print
+        // print('[CacheService] getModifiedTime: $name -> ${stat.modified} (path: [36m${file.path}[0m)');
         return stat.modified;
       }
     } catch (e) {
@@ -170,23 +174,14 @@ class CacheService {
   static Future<void> clear(String name) async {
     try {
       final file = await _file(name);
-      if (await file.exists()) await file.delete();
-    } catch (e) {
-      logd('Cache clear error: $e');
-    }
-  }
-
-  static Future<void> clearAll() async {
-    try {
-      final dir = await getApplicationSupportDirectory();
-      final files = dir.listSync();
-      for (var file in files) {
-        if (file is File && file.path.endsWith('.json')) {
-          await file.delete();
-        }
+      if (await file.exists()) {
+        await file.delete();
+        // デバッグログ: キャッシュ削除
+        // ignore: avoid_print
+        // print('[CacheService] clear: $name 削除 (path: [36m${file.path}[0m)');
       }
     } catch (e) {
-      logd('Clear all cache error: $e');
+      logd('Cache clear error: $e');
     }
   }
 }

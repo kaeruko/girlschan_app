@@ -41,7 +41,23 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   void initState() {
     super.initState();
     widget.controller.register(this);
-    refreshCacheState();
+    refreshCacheState(); // 初回
+  }
+
+  @override
+  void didUpdateWidget(covariant TopicTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldId = oldWidget.topic['id'] as int;
+    final newId = widget.topic['id'] as int;
+    if (oldId != newId) {
+      setState(() {
+        _hasCachedComments = false;
+        _savedCommentNo = 0;
+        _cacheModifiedTime = null;
+      });
+      // ignore: discarded_futures
+      refreshCacheState();
+    }
   }
 
   @override
@@ -53,17 +69,16 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   @override
   Future<void> refreshCacheState() async {
     final id = widget.topic['id'] as int;
-    // logd('🔍 [TopicTile.refreshCacheState] id=$id', name: 'TopicTile');
 
     final hasCached = await CacheService.exists('comments_$id');
 
     int saved = 0;
     DateTime? modifiedTime;
-    
+
     if (hasCached) {
       final prefs = await SharedPreferences.getInstance();
       saved = prefs.getInt('scroll_$id') ?? 0;
-      // キャッシュ作成日時を取得
+      // build() 内ではなくここで await
       modifiedTime = await CacheService.getModifiedTime('comments_$id');
     }
 
@@ -85,35 +100,33 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final posted_at = widget.topic['posted_at'] as String? ?? '';
     final thumb = widget.topic['thumb'] as String?;
 
-    String commentDisplay;
-    if (_hasCachedComments) {
-      final savedText = _savedCommentNo > 0 ? '$_savedCommentNo' : '0';
-      commentDisplay = '$savedText/$comments $posted_at';
-    } else {
-      commentDisplay = '$comments $posted_at';
-    }
-    // print('commentDisplay: $commentDisplay savedText=$_savedCommentNo');
 
-    // キャッシュ作成日時のフォーマット
+    // ① 必ず初期化しておく（未初期化エラー対策）
+    String commentDisplay = '$comments $posted_at';
+
+    // ② ここで cacheTimeDisplay を定義・計算（この行より下で使えるスコープに置く）
     String cacheTimeDisplay = '';
     if (_cacheModifiedTime != null) {
       final now = DateTime.now();
       final diff = now.difference(_cacheModifiedTime!);
-      
       if (diff.inMinutes < 1) {
         cacheTimeDisplay = '今';
-      } else if (diff.inHours < 1) {
+      } else if (diff.inMinutes < 60) {
         cacheTimeDisplay = '${diff.inMinutes}分前';
-      } else if (diff.inDays < 1) {
+      } else if (diff.inHours < 24) {
         cacheTimeDisplay = '${diff.inHours}時間前';
-      } else if (diff.inDays == 1) {
-        cacheTimeDisplay = '昨日';
-      } else if (diff.inDays < 7) {
-        cacheTimeDisplay = '${diff.inDays}日前';
       } else {
-        // それ以上古い場合は日付で表示
         cacheTimeDisplay = '${_cacheModifiedTime!.month}/${_cacheModifiedTime!.day}';
       }
+    }
+
+    if (_hasCachedComments) {
+      final savedText = _savedCommentNo > 0 ? '$_savedCommentNo' : '0';
+      commentDisplay = '$savedText/$comments $posted_at';
+      // デバッグログは任意
+      // print('[TopicTile] 履歴アリ: id=$id ... cacheTime=$_cacheModifiedTime');
+    } else {
+      // print('[TopicTile] 履歴ナシ: id=$id ...');
     }
 
     final blue = CupertinoColors.systemBlue;
