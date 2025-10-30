@@ -507,12 +507,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           ),
         );
       },
-      leadingSlivers: [
-        if (widget.enableRefresh)
-          CupertinoSliverRefreshControl(
-            onRefresh: () async { await _vm.fetchDelta(); },
-          ),
-      ],
+      // RefreshControlはここに入れない（centerより前＝reverse側になるため）
     );
 
     // 初回 1 フレーム後にアンカー内の局所位置だけ微調整
@@ -542,11 +537,20 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         bottom: false,
         child: _vm.loading
             ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : CustomScrollView(
-                controller: _scroll.sc,
-                center: bundle.usingCenter ? _scroll.centerKey : null,
-                slivers: bundle.slivers,
-              ),
+            : (() {
+                final slivers = <Widget>[
+                  if (widget.enableRefresh && !bundle.usingCenter)
+                    CupertinoSliverRefreshControl(
+                      onRefresh: () async { await _vm.fetchDelta(); },
+                    ),
+                  ...bundle.slivers,
+                ];
+                return CustomScrollView(
+                  controller: _scroll.sc,
+                  center: bundle.usingCenter ? _scroll.centerKey : null,
+                  slivers: slivers,
+                );
+              })(),
       ),
     );
   }
