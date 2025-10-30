@@ -518,13 +518,35 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           : 0.0,
     );
 
-    return CustomScrollView(
-      controller: _scroll.sc,
-      center: bundle.usingCenter ? _scroll.centerKey : null,
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      slivers: [
-        ...bundle.slivers,
-      ],
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        // 自動の戻るに頼らず明示しておくと確実
+        leading: const CupertinoNavigationBarBackButton(),
+        middle: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text('コメント: ${widget.commentCount}', style: const TextStyle(fontSize: 11)),
+          ],
+        ),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _openPostDialog,
+          child: const Icon(CupertinoIcons.add),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          controller: _scroll.sc,
+          center: bundle.usingCenter ? _scroll.centerKey : null,
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          slivers: [
+            ...bundle.slivers,
+          ],
+        ),
+      ),
     );
   }
 
