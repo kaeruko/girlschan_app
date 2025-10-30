@@ -13,6 +13,7 @@ import '../controllers/topic_detail_controller.dart';
 import 'comment_post_webview.dart';
 import 'image_viewer_page.dart';
 import 'package:flutter/rendering.dart';
+import '../scroll/anchored_scroll_coordinator.dart';
 
 class TopicDetailScreen extends StatefulWidget {
   final int topicId;
@@ -47,19 +48,19 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _restoring = false;
 
   // ================== State フィールド追加 ==================
-  late final ScrollController _sc;
-  final _centerKey = GlobalKey();       // B側（アンカー含む側）の key
-  GlobalKey? _anchorItemKey;            // アンカー行に付ける key
-  bool _restored = false;               // 局所オフセットの微調整を一度だけ実施
-  int _currentAnchorIndex = 0;          // center 使用時、A側の件数（保存時の補正に使う）
-
-  DateTime? _lastSaveAt;                // スクロール保存のスロットル
-  final _saveInterval = const Duration(milliseconds: 500);
+  // スクロール位置は Coordinator に集約
+  final AnchoredScrollCoordinator _scroll = AnchoredScrollCoordinator();
 
   @override
   void initState() {
     super.initState();
-    _sc = ScrollController()..addListener(_onScroll);
+    _scroll.sc.addListener(() {
+      _scroll.onScrollSave(
+        measurer: _meas,
+        totalCount: _vm.comments.length,
+        save: (index, frac) => _vm.saveScrollByIndexAndFraction(index, frac),
+      );
+    });
     _vm = TopicDetailController(
       topicId: widget.topicId,
       title: widget.title,
@@ -79,11 +80,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   @override
   void dispose() {
-    _vm.removeListener(_onVmChanged);
-    _sc.removeListener(_onScroll);
-    _sc.dispose();
-    _vm.dispose();
-    super.dispose();
+  _scroll.dispose();
+  _vm.removeListener(_onVmChanged);
+  _vm.dispose();
+  super.dispose();
   }
 
   // ...（以降、既存の全メソッド・ウィジェットビルダー・build等をクラス内にそのまま残す）...
@@ -488,65 +488,39 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final comments = _vm.comments;
-    final savedNo = _vm.savedCommentNo;
-    final hasAnchor = savedNo > 0 && comments.isNotEmpty;
+    final savedNo  = _vm.savedCommentNo;
 
-    // no -> index は Controller 側の逆引きを優先、なければ線形検索
-    int findIndexByNo(int no) {
-      final m = _vm.indexByNo;
-      final i = m[no];
-      if (i != null) return i;
-      return comments.indexWhere((c) => (c['no'] as int?) == no);
-    }
-
-    final anchorIndex = hasAnchor ? findIndexByNo(savedNo) : -1;
-    final usingCenter = hasAnchor && anchorIndex >= 0 && anchorIndex < comments.length;
-
-    // 保存時の補正用に保持（center を使っている間は _sc.offset が「B側先頭から」の座標になるため）
-    _currentAnchorIndex = usingCenter ? anchorIndex : 0;
-
-    // アンカー行用の key を用意（保存 no が変わったら作り直し）
-      if (usingCenter && _anchorItemKey == null) {
-          _anchorItemKey = GlobalKey();
-          _restored = false; // 新しいアンカーになったらもう一度だけ微調整
-      }
-
-    // Sliver 構成：A（アンカーより前） + B（アンカーを含む側＝center）
-    final slivers = <Widget>[
-      if (usingCenter)
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, i) => _buildRow(comments[i]),
-            childCount: anchorIndex,
-            addAutomaticKeepAlives: false,
-            addRepaintBoundaries: true,
-            addSemanticIndexes: false,
+    final bundle = _scroll.buildAnchoredSlivers(
+      items: comments,
+      savedNo: savedNo,
+      indexByNo: _vm.indexByNo,
+      // 1 行のビルダー（必要なら MeasureSize で高さ計測を継続）
+      itemBuilder: (ctx, i) {
+        _meas.ensureCapacity(comments.length);
+        final c  = comments[i];
+        final no = c['no'] as int? ?? -1;
+        return MeasureSize(
+          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _scroll.sc),
+          child: Container(
+            key: _meas.keyForNo(no),
+            child: _buildCommentItem(context, c, i),
           ),
-        ),
+        );
+      },
+      leadingSlivers: [
+        if (widget.enableRefresh)
+          CupertinoSliverRefreshControl(
+            onRefresh: () async { await _vm.fetchDelta(); },
+          ),
+      ],
+    );
 
-      SliverList(
-        key: usingCenter ? _centerKey : null,
-        delegate: SliverChildBuilderDelegate(
-          (context, i) {
-            final index = usingCenter ? (anchorIndex + i) : i;
-            final isAnchor = usingCenter && index == anchorIndex;
-            return KeyedSubtree(
-              key: isAnchor ? _anchorItemKey : ValueKey(comments[index]['no']),
-              child: _buildRow(comments[index]),
-            );
-          },
-          childCount: usingCenter ? (comments.length - anchorIndex) : comments.length,
-          addAutomaticKeepAlives: false,
-          addRepaintBoundaries: true,
-          addSemanticIndexes: false,
-        ),
-      ),
-    ];
+    // 初回 1 フレーム後にアンカー内の局所位置だけ微調整
+    _scroll.maybeScheduleLocalAdjust(
+      usingCenter: bundle.usingCenter,
+      savedFraction: _vm.savedLocalFraction,
+    );
 
-    // 初回の 1 フレーム後に “アンカーの中での局所オフセット” だけ微調整
-    if (usingCenter && !_restored) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _adjustAnchorLocalOffset());
-    }
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -569,9 +543,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         child: _vm.loading
             ? Center(child: PlatformHelper.buildLoadingIndicator())
             : CustomScrollView(
-                controller: _sc,
-                center: usingCenter ? _centerKey : null, // ← これがポイント
-                slivers: slivers,
+                controller: _scroll.sc,
+                center: bundle.usingCenter ? _scroll.centerKey : null,
+                slivers: bundle.slivers,
               ),
       ),
     );
@@ -584,134 +558,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   // ================== 局所オフセットの微調整 ==================
-  void _adjustAnchorLocalOffset() {
-    if (!mounted || !_sc.hasClients) return;
-    final box = _anchorItemKey?.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-
-    final frac = _vm.savedLocalFraction.clamp(0.0, 1.0);
-    final dy = box.size.height * frac;
-
-    // center にしたことで “アンカー行が先頭に来ている” 前提で、行内の位置だけをずらす
-    _sc.jumpTo(_sc.offset + dy);
-    _restored = true;
-  }
-
-  // ================== スクロール保存（index と 比率） ==================
-  void _onScroll() {
-    if (!_sc.hasClients) return;
-
-    // スパム防止（0.5秒に1回保存）
-    final now = DateTime.now();
-    if (_lastSaveAt != null && now.difference(_lastSaveAt!) < _saveInterval) return;
-    _lastSaveAt = now;
-
-    // center を使っている間は、_sc.offset は「B側先頭からの距離」。
-    // 「全体リストの先頭からの距離」に直すため、A側のオフセットを足す。
-  final baseOffset = _meas.indexToOffset(_currentAnchorIndex);
-  final globalOffset = _sc.offset + baseOffset;
-
-  final topIndex = _meas.offsetToIndex(globalOffset, _vm.comments.length);
-  final rowTop  = _meas.indexToOffset(topIndex);
-  final h       = _meas.getItemHeight(topIndex) ?? _meas.fallbackHeight;
-  final frac    = h <= 0 ? 0.0 : ((globalOffset - rowTop) / h).clamp(0.0, 1.0);
-
-  _vm.saveScrollByIndexAndFraction(topIndex, frac);
-  }
-
-  int _restoreTries = 0;
-
-  double? _exactOffsetFor(GlobalKey key, {double alignment = 0}) {
-    final ctx = key.currentContext;
-    if (ctx == null) return null;
-    final ro = ctx.findRenderObject();
-    if (ro == null) return null;
-    final vp = RenderAbstractViewport.of(ro);
-    if (vp == null) return null;
-    return vp.getOffsetToReveal(ro, alignment).offset;
-  }
-
-  void _restoreScrollAfterBuild() {
-    final savedNo = _vm.savedCommentNo;
-    if (savedNo <= 0 || _vm.comments.isEmpty) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!_sc.hasClients) return;
-
-      _restoring = true;
-      try {
-        // 1) 粗いジャンプ（目標の少し手前まで）→ターゲットをビルドさせる
-        final idx = _vm.comments.indexWhere((c) => c['no'] == savedNo);
-        final warmIdx = (idx > 8) ? idx - 8 : 0;
-        _meas.ensureCapacity(_vm.comments.length);
-        final rough = _meas.indexToOffset(warmIdx).clamp(0.0, _sc.position.maxScrollExtent);
-        _sc.jumpTo(rough);
-
-        // 2) ターゲットがツリーに乗るまで数フレーム待つ
-        final key = _meas.keyForNo(savedNo);
-        for (int i = 0; i < 12; i++) { // ≒ 最大 ~200ms
-          if (key.currentContext != null) break;
-          await Future.delayed(const Duration(milliseconds: 16));
-        }
-
-        // 3) 正確なオフセットを算出して一発で合わせる（上揃え）
-        final exact = _exactOffsetFor(key, alignment: 0.0);
-        if (exact != null && _sc.hasClients) {
-          final clamped = exact.clamp(0.0, _sc.position.maxScrollExtent);
-          _sc.jumpTo(clamped);
-        }
-
-        // （任意）可視確認のため 1 回だけ ensureVisible を投げたい場合はここで
-        // if (key.currentContext != null) {
-        //   await Scrollable.ensureVisible(key.currentContext!, alignment: 0.0, duration: Duration.zero);
-        // }
-      } finally {
-        _restoring = false;
-      }
-    });
-  }
-
-  Widget _buildRefreshableList(BuildContext context) {
-    final items = _vm.comments;
-    _meas.ensureCapacity(items.length);
-
-    return CupertinoScrollbar(
-      controller: _sc,
-      child: CustomScrollView(
-        controller: _sc,
-        primary: false,
-        cacheExtent: 1200,
-        slivers: [
-          if (widget.enableRefresh)
-            CupertinoSliverRefreshControl(onRefresh: () async { await _vm.fetchDelta(); }),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                if (i == items.length) {
-                  return _vm.loadingMore
-                      ? const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: CupertinoActivityIndicator(),
-                        )
-                      : const SizedBox.shrink();
-                }
-                final c = items[i];
-                final no = c['no'] as int? ?? -1;
-                return MeasureSize(
-                  onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _sc),
-                  child: Container(
-                    key: _meas.keyForNo(no),
-                    child: _buildCommentItem(context, c, i),
-                  ),
-                );
-              },
-              childCount: items.length + (_vm.loadingMore ? 1 : 0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
     final no = c['no'] ?? '-';
