@@ -9,13 +9,18 @@ class AnchoredSliverBundle {
 }
 
 /// 「アンカー分割 + 局所オフセット保存/復元」をカプセル化
+
 class AnchoredScrollCoordinator {
   AnchoredScrollCoordinator({
+    ScrollController? controller,
     Duration saveInterval = const Duration(milliseconds: 500),
-  }) : _saveInterval = saveInterval;
+  })  : sc = controller ?? ScrollController(),
+        _ownsController = controller == null,
+        _saveInterval = saveInterval;
 
   // 公開: UI 側で使うコントローラと center key
-  final ScrollController sc = ScrollController();
+  final ScrollController sc;
+  final bool _ownsController;
   GlobalKey get centerKey => _centerKey;
 
   // 内部状態
@@ -144,5 +149,10 @@ class AnchoredScrollCoordinator {
     save(topIndex, frac);
   }
 
-  void dispose() => sc.dispose();
+  void dispose() {
+    if (_ownsController) {
+      sc.dispose();
+    }
+    // そのほか内部のクリーンアップがあればここで
+  }
 }

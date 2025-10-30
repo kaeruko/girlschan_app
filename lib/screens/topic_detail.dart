@@ -43,7 +43,9 @@ class TopicDetailScreen extends StatefulWidget {
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
   late final TopicDetailController _vm;
   // スクロール復元用
-  final AnchoredScrollCoordinator _scroll = AnchoredScrollCoordinator();
+  late final AnchoredScrollCoordinator _scroll =
+      AnchoredScrollCoordinator(controller: _sc);
+
   final VariableListMeasurer _meas = VariableListMeasurer();
 
   // ★ 追加
@@ -64,23 +66,19 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       testingInitialComments: widget.testingInitialComments,
     )..addListener(_onVmChanged);
 
-    // ★ 追加: 末尾ロード用のリスナ
+    // ★ 1本のコントローラに全部ぶら下げる
+    _sc.addListener(_onScrollSave);
     _sc.addListener(_onScrollBottomLoad);
-
     _vm.init();
-    // スクロール保存をここで配線
-    _scroll.sc.addListener(_onScrollSave);
   }
 
   void _onScrollSave() {
-    // totalCount は「画面で扱う総アイテム数」。ローカル追記ぶんを含む現在長を使うのが安全
-    final totalCount = _vm.comments.length;
+    if (!_sc.hasClients) return;
     _scroll.onScrollSave(
       measurer: _meas,
-      totalCount: totalCount,
+      totalCount: _vm.comments.length,
       save: (index, frac) {
-        // frac の安全化（∞/NaN は 0 に潰す）
-        final f = (frac.isFinite) ? frac.clamp(0.0, 1.0) : 0.0;
+        final f = frac.isFinite ? frac.clamp(0.0, 1.0) : 0.0;
         _vm.saveScrollByIndexAndFraction(index, f);
       },
     );
@@ -93,46 +91,39 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   @override
   void dispose() {
-    _scroll.sc.removeListener(_onScrollSave);
-    _scroll.dispose();
-    _vm.removeListener(_onVmChanged);
-    _vm.dispose();
-
-    // ★ 追加
+    _sc.removeListener(_onScrollSave);
     _sc.removeListener(_onScrollBottomLoad);
     _sc.dispose();
-
+    _scroll.dispose();       // 外部注入なので中では dispose されない（安全）
+    _vm.removeListener(_onVmChanged);
+    _vm.dispose();
     super.dispose();
   }
 
-  // ★ 追加: 末尾で差分取得
   void _onScrollBottomLoad() {
-    if (!_sc.hasClients || _loadingMore) return;
+    if (_loadingMore || !_sc.hasClients) return;
     final pos = _sc.position;
     if (!pos.hasPixels) return;
-
-    // 末尾に近づいたら取得
     if (pos.extentAfter <= _loadMoreThreshold) {
       final keepPinned = (pos.pixels >= pos.maxScrollExtent - 4);
       _fetchMoreDelta(keepPinned: keepPinned);
     }
   }
 
-  // ★ 追加: 差分取得して、張り付き維持
   Future<void> _fetchMoreDelta({bool keepPinned = false}) async {
     if (_loadingMore) return;
     _loadingMore = true;
     try {
-      final added = await _vm.fetchDelta(); // VM側で二重実行はガード済み
+      final added = await _vm.fetchDelta();
       if (!mounted) return;
-
       if (keepPinned && (added > 0)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!_sc.hasClients) return;
-          _sc.jumpTo(_sc.position.maxScrollExtent);
+          if (_sc.hasClients) {
+            _sc.jumpTo(_sc.position.maxScrollExtent);
+          }
         });
       }
-      setState(() {}); // （必要ならフッタースピナーの描画などに使う）
+      setState(() {});
     } finally {
       _loadingMore = false;
     }
@@ -555,19 +546,28 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         final c  = items[i];
         final no = c['no'] as int? ?? -1;
         return MeasureSize(
-          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _scroll.sc),
-          child: Container(key: _meas.keyForNo(no), child: _buildCommentItem(context, c, i)),
+          onChange: (sz) => _meas.onItemSize(i, sz.height, sc: _sc), // ★ _sc
+          child: Container(
+            key: _meas.keyForNo(no),
+            child: _buildCommentItem(context, c, i),
+          ),
         );
       },
     );
 
-    // 行内フラクションの微調整（1フレーム後に内部で実行）
     _scroll.maybeScheduleLocalAdjust(
       usingCenter: bundle.usingCenter,
       savedFraction: _vm.savedLocalFraction.isFinite
           ? _vm.savedLocalFraction.clamp(0.0, 1.0)
           : 0.0,
     );
+    if (bundle.usingCenter) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // ここで savedNo を 0 にして次ビルドから通常モード（昇順ひと続き）へ
+        // ignore: discarded_futures
+        _vm.consumeSavedScroll();
+      });
+  }
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -589,11 +589,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         bottom: false,
         child: _vm.loading
             ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : CustomScrollView(
-                controller: _scroll.sc,
-                center: bundle.usingCenter ? _scroll.centerKey : null,
-                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                slivers: [...bundle.slivers],
+            : CupertinoScrollbar(                    // ★ スクロールバーも同じ _sc を使える
+                controller: _sc,
+                child: CustomScrollView(
+                  controller: _sc,                   // ★ 統一
+                  center: bundle.usingCenter ? _scroll.centerKey : null,
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+                  slivers: [...bundle.slivers],
+                ),
               ),
       ),
     );

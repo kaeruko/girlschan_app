@@ -9,8 +9,6 @@ import '../services/cache_service.dart';
 import '../utils/log.dart';
 
 class TopicDetailController extends ChangeNotifier {
-  // --- スクロール復元用に追加 ---
-  // int savedCommentNo = 0;           // ←getter/setterに統一のため削除
   double savedLocalFraction = 0.0;  // そのアイテム内の位置（0.0〜1.0）
 
   // no -> index の逆引き（UIが高速に anchorIndex を求めるため）
@@ -68,6 +66,18 @@ class TopicDetailController extends ChangeNotifier {
   DateTime? get lastSync => _lastSync;
 
   int serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
+
+  Future<void> consumeSavedScroll() async {
+    if (savedCommentNo == 0) return;
+    savedCommentNo = 0;
+    savedLocalFraction = 0.0;
+
+    final prefs = await SharedPreferences.getInstance();
+    // 実際のキー名に合わせて
+    await prefs.remove('scroll_$topicId');
+    await prefs.remove('scroll_frac_$topicId');
+  }
+
 
   // ==== persist scroll（新方式） ====
   Future<void> saveScrollByIndexAndFraction(int index, double fraction) async {
