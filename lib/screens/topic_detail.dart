@@ -718,15 +718,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       // ★ 復元中は保存・delta取得を抑止
       _restoringNow = true;
 
-      // --- 粗合わせ: centerが効いている間に概算globalを作る ---
-      final double local = _sc.hasClients ? _sc.offset : 0.0;
-      double base  = _meas.indexToOffset(anchorIndex);
-      // ★ base が 0（= 未初期化）なら確実に近傍へ寄せるため fallback を使う
-      if (base == 0.0 && anchorIndex > 0) {
-        base = _meas.fallbackHeight * anchorIndex;
-      }
-      final double coarseTarget = base + local;
-      // 前置補正ターゲットを指定（前方の未計測が埋まるたびに自動微修正）
+      // 粗合わせは「手前バイアス」を使う
       _meas.markRestoreTargetIndex(anchorIndex);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -736,10 +728,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         // 2) 次フレームで概算位置へ jump（※ここで対象行がビルドされる）
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!_sc.hasClients) return;
+          // base を再計算（通常リスト座標系で）
+          double base = _meas.indexToOffset(anchorIndex);
+          if (base == 0.0 && anchorIndex > 0) {
+            base = _meas.fallbackHeight * anchorIndex;
+          }
+          final vp = _sc.position.viewportDimension;        // 画面高さ
+          final prelead = vp * 0.60;                        // ← 手前へ 60% バイアス
           final max = _sc.position.maxScrollExtent;
-          final target = coarseTarget.clamp(0.0, max);
+          final target = (base - prelead).clamp(0.0, max);  // ← アンカーを画面内に入れる
           _sc.jumpTo(target);
-          debugPrint('[handover] coarseJump base=$base local=$local → target=$target / max=$max');
+          debugPrint('[handover] coarseJump(base=$base, prelead=$prelead) → $target / max=$max');
 
           // 3) 精合わせ（ensureVisible）＋ 行内フラクション微調整
           await _refineToSaved(savedNo, anchorIndex);
@@ -1011,12 +1010,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
 
   Future<void> _refineToSaved(int savedNo, int anchorIndex) async {
-    for (var attempt = 0; attempt < 10; attempt++) {
+  for (var attempt = 0; attempt < 24; attempt++) { // 少し粘る（~400ms）
       final ctx = (_meas.keyForNo(savedNo) as GlobalKey).currentContext;
       if (ctx != null) {
         await Scrollable.ensureVisible(
           ctx,
-          alignment: 0.0,
+          alignment: 0.0, // 行頭を上端に
           duration: Duration.zero,
           alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
         );
@@ -1041,8 +1040,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         approx = _meas.fallbackHeight * anchorIndex;
       }
       if (_sc.hasClients) {
+        final vp = _sc.position.viewportDimension;
         final max = _sc.position.maxScrollExtent;
-        _sc.jumpTo(approx.clamp(0.0, max));
+        final target = (approx - vp * 0.60).clamp(0.0, max); // ← 常に手前へ
+        _sc.jumpTo(target);
       }
       await Future.delayed(const Duration(milliseconds: 16));
     }
