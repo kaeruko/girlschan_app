@@ -638,7 +638,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final items = _vm.comments;
-
+    // ★ 追加：indexToOffset が概算（fallback）でも正しく計算できるように前もって初期化
+    _meas.ensureCapacity(items.length);
     // 復元したいときだけ center 方式にする（1フレーム限定）
     final wantCenter = (_vm.savedCommentNo > 0) && !_centerConsumed;
     final savedNo    = wantCenter ? _vm.savedCommentNo : 0;
@@ -714,14 +715,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         savedFraction: _vm.savedLocalFraction,
       );
 
-
-
       // ★ 復元中は保存・delta取得を抑止
       _restoringNow = true;
 
       // --- 粗合わせ: centerが効いている間に概算globalを作る ---
       final double local = _sc.hasClients ? _sc.offset : 0.0;
-      final double base  = _meas.indexToOffset(anchorIndex);
+      double base  = _meas.indexToOffset(anchorIndex);
+      // ★ base が 0（= 未初期化）なら確実に近傍へ寄せるため fallback を使う
+      if (base == 0.0 && anchorIndex > 0) {
+        base = _meas.fallbackHeight * anchorIndex;
+      }
       final double coarseTarget = base + local;
       // 前置補正ターゲットを指定（前方の未計測が埋まるたびに自動微修正）
       _meas.markRestoreTargetIndex(anchorIndex);
@@ -776,6 +779,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   child: CustomScrollView(
                     controller: _sc,
                     center: bundle.usingCenter ? bundle.centerKey : null, // ← 重要
+                    cacheExtent: 1200.0, // 任意: 近傍を先読み
                     physics: const BouncingScrollPhysics(
                       parent: AlwaysScrollableScrollPhysics(),
                     ),
@@ -1006,20 +1010,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
 
-
   Future<void> _refineToSaved(int savedNo, int anchorIndex) async {
-    // リトライしつつ context を待つ（最大6回）
-    for (_ensureRetry = 0; _ensureRetry < 6; _ensureRetry++) {
+    for (var attempt = 0; attempt < 10; attempt++) {
       final ctx = (_meas.keyForNo(savedNo) as GlobalKey).currentContext;
       if (ctx != null) {
-        // 先頭を合わせる（アニメ無し）
         await Scrollable.ensureVisible(
           ctx,
           alignment: 0.0,
           duration: Duration.zero,
           alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
         );
-        // 行内フラクション→px
         final box = ctx.findRenderObject() as RenderBox?;
         final h = box?.size.height ?? 0.0;
         if (h > 0 && _vm.savedLocalFraction > 0) {
@@ -1029,25 +1029,28 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           debugPrint('[handover:refine] no=$savedNo h=$h frac=${_vm.savedLocalFraction} → +$localPx');
         }
         await _vm.clearScrollFractionOnly();
+        _meas.markRestoreTargetIndex(null);
         _restoringNow = false;
-        _ensureRetry = 0;
-        _forceSaveNow(); // 復元直後の正しい位置で1回だけ保存
+        _forceSaveNow();  // 復元直後の正しい位置で1回だけ保存
         return;
       }
-      // まだ生成されていない → 少し待って再試行
-      await Future.delayed(const Duration(milliseconds: 16));
-      // 前置補正で prefix が更新されている可能性もあるので軽く寄せる
-      final approx = _meas.indexToOffset(anchorIndex);
+
+      // ★ まだビルドされていなければ「近傍へ寄せる」ジャンプを継続
+      double approx = _meas.indexToOffset(anchorIndex);
+      if (approx == 0.0 && anchorIndex > 0) {
+        approx = _meas.fallbackHeight * anchorIndex;
+      }
       if (_sc.hasClients) {
         final max = _sc.position.maxScrollExtent;
         _sc.jumpTo(approx.clamp(0.0, max));
       }
+      await Future.delayed(const Duration(milliseconds: 16));
     }
+
     debugPrint('[handover:refine] give up (context not ready)');
-    // 失敗時でも上書き保存は避けるため、ここでは savedFraction を消さない
+    // 失敗時は上書き保存しない／フラクションも消さない
     _restoringNow = false;
   }
-
 
 
 }
