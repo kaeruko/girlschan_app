@@ -43,8 +43,14 @@ class TopicDetailScreen extends StatefulWidget {
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
   late final TopicDetailController _vm;
 
+  bool _restoringNow = false; // 復元中フラグ（保存やdeltaの抑止に使う）
+  int _ensureRetry = 0;
   // 復元フラグ
   bool _centerConsumed = false;
+  // 復元不要ケースの一度きり初期化フラグ
+  bool _didPrimeSave = false;
+  // 初回プライム保存の保留フラグ
+  bool _primePendingSave = false;
 
   // ① 先に ScrollController
   final _sc = ScrollController();
@@ -57,6 +63,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   bool _loadingMore = false;
   static const double _loadMoreThreshold = 300;
+
+  // ← 追加: まだ items に無い savedNo を保持する保留中アンカー
+  int? _pendingAnchorNo;
 
   @override
   void initState() {
@@ -79,7 +88,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   void _onScrollSave() {
     // ★ 復元が終わるまで保存しない（上書き防止）
-    if (!_centerConsumed) return;
+    if (!_centerConsumed) return;        // 復元中は書かない
+    if (_restoringNow) return;           // 正確スナップ中も書かない
     if (!_sc.hasClients) return;
     _scroll.onScrollSave(
       measurer: _meas,
@@ -93,11 +103,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   void _onVmChanged() {
     if (!mounted) return;
+    // ★初回プライム保存の保留消化
+    if (_primePendingSave && !_vm.loading && _vm.comments.isNotEmpty) {
+      _primePendingSave = false;
+      _forceSaveNow();
+    }
     setState(() {});                 // comments 更新で再描画
   }
 
   @override
   void dispose() {
+    _forceSaveNow(); // 画面閉じ際の最終保存
     _sc.removeListener(_onScrollSave);
     _sc.removeListener(_onScrollBottomLoad);
     _sc.dispose();
@@ -108,6 +124,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   void _onScrollBottomLoad() {
+    if (!_centerConsumed || _restoringNow) return; // 復元完了まで delta 取らない
     if (_loadingMore || !_sc.hasClients) return;
     final pos = _sc.position;
     if (!pos.hasPixels) return;
@@ -626,13 +643,39 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final wantCenter = (_vm.savedCommentNo > 0) && !_centerConsumed;
     final savedNo    = wantCenter ? _vm.savedCommentNo : 0;
 
+    // ★ここから追記：復元不要（savedNo==0）なら、初回だけ保存を有効化して即保存
+    if (!_vm.loading && !wantCenter && !_centerConsumed && !_didPrimeSave) {
+      _didPrimeSave = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _centerConsumed = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (_vm.comments.isEmpty) {
+            _primePendingSave = true;   // ★保留
+          } else {
+            _forceSaveNow();
+          }
+        });
+      });
+    }
+
     // ① 先に willUseCenter を自前で判定（bundle を作る前）
     final idxMap = _vm.indexByNo;
+    final haveAnchorNow = (savedNo > 0) &&
+        ((idxMap[savedNo] != null) ||
+         items.indexWhere((e) => (e['no'] as int?) == savedNo) >= 0);
+
+    // ここがポイント：今はまだ無い → 保留＆取得依頼
+    if (wantCenter && !haveAnchorNow) {
+      _pendingAnchorNo ??= savedNo;     // 1回だけセット
+      _vm.ensureContainsNo(savedNo);    // 下で追加するVMメソッドを呼ぶ
+    }
+
     final anchorIndex = (savedNo > 0)
         ? (idxMap[savedNo] ?? items.indexWhere((e) => (e['no'] as int?) == savedNo))
         : -1;
-    final willUseCenter =
-        savedNo > 0 && anchorIndex >= 0 && anchorIndex < items.length;
+    final willUseCenter = wantCenter && haveAnchorNow && !_centerConsumed;
 
     // ② willUseCenter を itemBuilder 内で使う（bundle は参照しない）
     final bundle = _scroll.buildAnchoredSlivers(
@@ -644,17 +687,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         final c  = items[i];
         final no = c['no'] as int? ?? -1;
 
-        // ← 復元フレームは自動補正を殺す
-        final suppressAdjust = willUseCenter && !_centerConsumed;
+        // willUseCenterに合わせて補正を殺す
+        final suppressAdjust = willUseCenter;
 
         return MeasureSize(
           onChange: (sz) => _meas.onItemSize(
             i,
             sz.height,
-            sc: suppressAdjust ? null : _sc, // ★ここがポイント
+            sc: suppressAdjust ? null : _sc,
           ),
           child: Container(
-            key: _meas.keyForNo(no),
+            key: _meas.keyForNo(no), // ← GlobalKey を Container へ移す（RenderObject あり）
             child: _buildCommentItem(context, c, i),
           ),
         );
@@ -671,40 +714,35 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         savedFraction: _vm.savedLocalFraction,
       );
 
-      // ★★ ここでは handover を計算しない！（まだ計測が0の可能性）
+
+
+      // ★ 復元中は保存・delta取得を抑止
+      _restoringNow = true;
+
+      // --- 粗合わせ: centerが効いている間に概算globalを作る ---
+      final double local = _sc.hasClients ? _sc.offset : 0.0;
+      final double base  = _meas.indexToOffset(anchorIndex);
+      final double coarseTarget = base + local;
+      // 前置補正ターゲットを指定（前方の未計測が埋まるたびに自動微修正）
+      _meas.markRestoreTargetIndex(anchorIndex);
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_sc.hasClients) return;
-
-        // 計測が入った直後のフレームで base を計算
-        final double base = _meas.indexToOffset(anchorIndex);
-        final double local = _sc.offset;
-        final double handoverGlobal = base + local;
-
-        debugPrint('[handover-pre] anchorIndex=$anchorIndex base=$base local=$local → g=$handoverGlobal');
-
-        // もしまだ base==0 で anchorIndex>0 なら、フォールバック（平均高さ）で保険
-        final double safeGlobal = (anchorIndex > 0 && base == 0.0)
-            ? (_meas.fallbackHeight * anchorIndex + local)
-            : handoverGlobal;
-
-        // 通常リストへ切替
-        setState(() {
-          _centerConsumed = true;
-          _vm.clearScrollFractionOnly();
-        });
-
-        // 切替後のフレームで jumpTo
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // 1) center解除
+        setState(() => _centerConsumed = true);
+        // 2) 次フレームで概算位置へ jump（※ここで対象行がビルドされる）
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!_sc.hasClients) return;
           final max = _sc.position.maxScrollExtent;
-          final target = safeGlobal.clamp(0.0, max);
+          final target = coarseTarget.clamp(0.0, max);
           _sc.jumpTo(target);
-          debugPrint('[handover] anchorIndex=$anchorIndex '
-                    'base=$base local=$local → target=$target / max=$max');
+          debugPrint('[handover] coarseJump base=$base local=$local → target=$target / max=$max');
+
+          // 3) 精合わせ（ensureVisible）＋ 行内フラクション微調整
+          await _refineToSaved(savedNo, anchorIndex);
         });
       });
     }
-
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -726,15 +764,23 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         bottom: false,
         child: _vm.loading
             ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : CupertinoScrollbar(
-                controller: _sc,
-                child: CustomScrollView(
+            : NotificationListener<ScrollEndNotification>(
+                onNotification: (n) {
+                  if (_restoringNow) return false; // 復元完了までフラッシュ禁止
+                  // 直前に予約された位置を即書き込み
+                  _vm.flushPendingScrollSave();
+                  return false;
+                },
+                child: CupertinoScrollbar(
                   controller: _sc,
-                  center: bundle.usingCenter ? bundle.centerKey : null, // ← これが超重要
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
+                  child: CustomScrollView(
+                    controller: _sc,
+                    center: bundle.usingCenter ? bundle.centerKey : null, // ← 重要
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    slivers: [...bundle.slivers],
                   ),
-                  slivers: [...bundle.slivers],
                 ),
               ),
       ),
@@ -945,4 +991,63 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
+  // 強制保存ヘルパー
+  void _forceSaveNow() {
+    if (!_sc.hasClients) return;
+    if (_vm.comments.isEmpty) return; 
+    _scroll.onScrollSave(
+      measurer: _meas,
+      totalCount: _vm.comments.length,
+      save: (index, frac) {
+        final f = frac.isFinite ? frac.clamp(0.0, 1.0) : 0.0;
+        _vm.saveScrollByIndexAndFraction(index, f);
+      },
+    );
   }
+
+
+
+  Future<void> _refineToSaved(int savedNo, int anchorIndex) async {
+    // リトライしつつ context を待つ（最大6回）
+    for (_ensureRetry = 0; _ensureRetry < 6; _ensureRetry++) {
+      final ctx = (_meas.keyForNo(savedNo) as GlobalKey).currentContext;
+      if (ctx != null) {
+        // 先頭を合わせる（アニメ無し）
+        await Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.0,
+          duration: Duration.zero,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+        );
+        // 行内フラクション→px
+        final box = ctx.findRenderObject() as RenderBox?;
+        final h = box?.size.height ?? 0.0;
+        if (h > 0 && _vm.savedLocalFraction > 0) {
+          final localPx = (_vm.savedLocalFraction.clamp(0.0, 0.9999)) * h;
+          final max = _sc.position.maxScrollExtent;
+          _sc.jumpTo((_sc.offset + localPx).clamp(0.0, max));
+          debugPrint('[handover:refine] no=$savedNo h=$h frac=${_vm.savedLocalFraction} → +$localPx');
+        }
+        await _vm.clearScrollFractionOnly();
+        _restoringNow = false;
+        _ensureRetry = 0;
+        _forceSaveNow(); // 復元直後の正しい位置で1回だけ保存
+        return;
+      }
+      // まだ生成されていない → 少し待って再試行
+      await Future.delayed(const Duration(milliseconds: 16));
+      // 前置補正で prefix が更新されている可能性もあるので軽く寄せる
+      final approx = _meas.indexToOffset(anchorIndex);
+      if (_sc.hasClients) {
+        final max = _sc.position.maxScrollExtent;
+        _sc.jumpTo(approx.clamp(0.0, max));
+      }
+    }
+    debugPrint('[handover:refine] give up (context not ready)');
+    // 失敗時でも上書き保存は避けるため、ここでは savedFraction を消さない
+    _restoringNow = false;
+  }
+
+
+
+}

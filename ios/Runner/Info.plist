@@ -6,6 +6,13 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>デバッグ機能のためローカルネットワークに接続します。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dartVmService._tcp</string>
+	</array>
+
 	<key>CFBundleDisplayName</key>
 	<string>がるちゃんあぷり</string>
 	<key>CFBundleExecutable</key>

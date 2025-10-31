@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -8,12 +9,46 @@ import '../services/cache_service.dart';
 // 既存の watch/clip ユーティリティを import
 import '../utils/log.dart';
 
+
 class TopicDetailController extends ChangeNotifier {
   double savedLocalFraction = 0.0;  // そのアイテム内の位置（0.0〜1.0）
 
   // no -> index の逆引き（UIが高速に anchorIndex を求めるため）
   final Map<int, int> _indexByNo = {};
   Map<int, int> get indexByNo => _indexByNo;
+
+  // ---- 保存凍結とデバウンス ----
+  DateTime _mutatingUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _saveDebounce;
+  int? _pendingIndex;
+  double? _pendingFraction;
+
+  void _freezeSaving([Duration d = const Duration(milliseconds: 350)]) {
+    final now = DateTime.now();
+    _mutatingUntil = now.add(d);
+  }
+
+  bool get _savingFrozen => DateTime.now().isBefore(_mutatingUntil);
+
+  /// 指定Noが入るまで差分取得を繰り返す（最大8回）
+  Future<void> ensureContainsNo(int no) async {
+    // すでに入っていれば何もしない
+    if (indexByNo[no] != null ||
+        comments.indexWhere((e) => (e['no'] as int?) == no) >= 0) {
+      return;
+    }
+    // 無限ループ防止で上限を決める
+    const int maxRounds = 8;
+    for (int r = 0; r < maxRounds; r++) {
+      final added = await fetchDelta();
+      if (added <= 0) break;
+      if (indexByNo[no] != null ||
+          comments.indexWhere((e) => (e['no'] as int?) == no) >= 0) {
+        break;
+      }
+    }
+    notifyListeners();
+  }
 
   // 可変高さメジャーを UI から参照できるよう公開（_measが存在する場合）
   // VariableListMeasurer get measurer => _meas;
@@ -78,17 +113,73 @@ class TopicDetailController extends ChangeNotifier {
     await prefs.remove(_kScrollFrac(topicId));
   }
 
-  // ==== persist scroll（新方式） ====
+  // ==== persist scroll（新方式：凍結＋デバウンス付き） ====
   Future<void> saveScrollByIndexAndFraction(int index, double fraction) async {
+    // 最新候補を溜める（スクロール中の大量イベントを圧縮）
+    _pendingIndex = index;
+    _pendingFraction = fraction;
+
+    // 既存の確定予約があれば取り消し
+    _saveDebounce?.cancel();
+
+    // 負の遅延を回避
+    Duration extra = const Duration(milliseconds: 80);
+    Duration base  = const Duration(milliseconds: 120);
+    if (_savingFrozen) {
+      final remain = _mutatingUntil.difference(DateTime.now());
+      base = (remain.isNegative ? Duration.zero : remain) + extra;
+    }
+
+    // 予約
+    _saveDebounce = Timer(base, () async {
+      final i = _pendingIndex;
+      final f = _pendingFraction;
+      _pendingIndex = null;
+      _pendingFraction = null;
+      if (i == null || f == null) return;
+
+      if (_allComments.isEmpty) return;
+      final safe = i.clamp(0, _allComments.length - 1);
+      final no = (_allComments[safe]['no'] as int?) ?? 0;
+
+      final prefs = await SharedPreferences.getInstance();
+      final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
+      await prefs.setInt('scroll_$topicId', no);
+      await prefs.setDouble('scroll_frac_$topicId', ff);
+
+      _savedCommentNo = no;
+      savedLocalFraction = ff;
+
+      // ★コミットログ（これで保存→復元の整合が追える）
+      logd('[saveScroll] topic=$topicId no=$no index=$safe frac=$ff');
+    });
+
+    // ★スケジュールログ（必要なら）
+    logd('[saveScroll] schedule idx=$index frac=$fraction '
+         'delay=${base.inMilliseconds}ms frozen=$_savingFrozen');
+  }
+
+  // ★未確定分を即書き込むフラッシュ
+  Future<void> flushPendingScrollSave() async {
+    _saveDebounce?.cancel();
+    final i = _pendingIndex;
+    final f = _pendingFraction;
+    _pendingIndex = null;
+    _pendingFraction = null;
+    if (i == null || f == null) return;
+
     if (_allComments.isEmpty) return;
-    final safe = index.clamp(0, _allComments.length - 1);
+    final safe = i.clamp(0, _allComments.length - 1);
     final no = (_allComments[safe]['no'] as int?) ?? 0;
+
     final prefs = await SharedPreferences.getInstance();
-    final f = fraction.isFinite ? fraction.clamp(0.0, 1.0) : 0.0;
+    final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
     await prefs.setInt('scroll_$topicId', no);
-    await prefs.setDouble('scroll_frac_$topicId', f);
+    await prefs.setDouble('scroll_frac_$topicId', ff);
+
     _savedCommentNo = no;
-    savedLocalFraction = f;
+    savedLocalFraction = ff;
+    logd('[saveScroll:flush] topic=$topicId no=$no index=$safe frac=$ff');
   }
 
   Future<void> _loadSavedScroll() async {
@@ -111,7 +202,7 @@ class TopicDetailController extends ChangeNotifier {
       return;
     }
 
-  await _loadSavedScroll();
+    await _loadSavedScroll();
     logd('[init] after _loadSavedScroll: savedCommentNo=$_savedCommentNo, savedLocalFraction=$savedLocalFraction');
 
     // 履歴・クリップ
@@ -133,6 +224,7 @@ class TopicDetailController extends ChangeNotifier {
       _allComments = [...cached, ...locals];
       _totalComments = cached.length;
       _rebuildIndexByNo();
+      _freezeSaving(); // ★ここを追加（レイアウト安定まで保存を遅延）
       _loading = false;
       notifyListeners();
       return;
@@ -158,6 +250,7 @@ class TopicDetailController extends ChangeNotifier {
       _allComments = [..._allComments, ...locals];
       _rebuildIndexByNo();
 
+      _freezeSaving();
       _loading = false;
       notifyListeners();
     } catch (e) {
@@ -203,6 +296,7 @@ class TopicDetailController extends ChangeNotifier {
         _byNo[no] = _allComments.length - newOnes.length + i;
         if (no > _lastRemoteNo) _lastRemoteNo = no;
       }
+      _freezeSaving();
 
       notifyListeners();
       return newOnes.length;
@@ -212,12 +306,18 @@ class TopicDetailController extends ChangeNotifier {
   }
   // --- コメント配列を更新したときに no->index を再構築 ---
   void _rebuildIndexByNo() {
-    _indexByNo
-      ..clear()
-      ..addEntries(_allComments.asMap().entries.map((e) {
-        final no = (e.value['no'] as int?) ?? -1;
-        return MapEntry(no, e.key);
-      }));
+    _indexByNo.clear();
+    _byNo.clear();                 // ★ 初回ページも含めて dedupe 用に埋め直す
+
+    for (int i = 0; i < _allComments.length; i++) {
+      final no = (_allComments[i]['no'] as int?) ?? -1;
+      if (no <= 0) continue;
+      _indexByNo[no] = i;
+      _byNo[no] = i;               // ★ これが重要。fetchDelta の重複判定が効く
+    }
+
+    // ついでに lastRemoteNo も最新に合わせておくと安全
+    _lastRemoteNo = lastRemoteNo;
   }
 
   /// 取得済みリモートコメントの最大noを返す（ローカル投稿は除外）
@@ -276,6 +376,13 @@ class TopicDetailController extends ChangeNotifier {
       }
     }
     return list;
+  }
+
+  @override
+  void dispose() {
+    flushPendingScrollSave(); // デバウンス中の未確定分を即コミット
+    _saveDebounce?.cancel();
+    super.dispose();
   }
 
 }
