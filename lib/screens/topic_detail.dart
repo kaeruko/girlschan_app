@@ -1,9 +1,11 @@
 // --- UI専用: TopicDetailScreen ---
 // ロジックは controller, measurer, widgets/measure_size へ分離
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math' as math;
 import '../models/comment.dart';
 import '../services/api_service.dart';
 import '../utils/platform_helper.dart';
@@ -44,6 +46,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   late final TopicDetailController _vm;
 
   bool _restoringNow = false; // 復元中フラグ（保存やdeltaの抑止に使う）
+  bool _restoredOnce = false;     // ★ 復元が一度でも成功したか
+  bool _userScrolled = false;     // ★ ユーザーが指でスクロールしたか
   int _ensureRetry = 0;
   // 復元フラグ
   bool _centerConsumed = false;
@@ -87,10 +91,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   void _onScrollSave() {
-    // ★ 復元が終わるまで保存しない（上書き防止）
-    if (!_centerConsumed) return;        // 復元中は書かない
-    if (_restoringNow) return;           // 正確スナップ中も書かない
-    if (!_sc.hasClients) return;
+  // ★ 復元が終わるまで保存しない（上書き防止）
+  if (!_centerConsumed) return;        // 復元中は書かない
+  if (_restoringNow) return;           // 正確スナップ中も書かない
+  if (!_sc.hasClients) return;
+  // ★ 復元未完了かつユーザー未操作の間は保存しない（265 上書き事故を防ぐ）
+  if (!_restoredOnce && !_userScrolled) return;
     _scroll.onScrollSave(
       measurer: _meas,
       totalCount: _vm.comments.length,
@@ -718,29 +724,26 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       // ★ 復元中は保存・delta取得を抑止
       _restoringNow = true;
 
-      // 粗合わせは「手前バイアス」を使う
+      // 粗合わせは「手前マージン」を使う
       _meas.markRestoreTargetIndex(anchorIndex);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        // 1) center解除
         setState(() => _centerConsumed = true);
-        // 2) 次フレームで概算位置へ jump（※ここで対象行がビルドされる）
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!_sc.hasClients) return;
-          // base を再計算（通常リスト座標系で）
-          double base = _meas.indexToOffset(anchorIndex);
-          if (base == 0.0 && anchorIndex > 0) {
-            base = _meas.fallbackHeight * anchorIndex;
-          }
-          final vp = _sc.position.viewportDimension;        // 画面高さ
-          final prelead = vp * 0.60;                        // ← 手前へ 60% バイアス
+          // ★ 安全マージン（行数）を計算：画面高 / 推定行高 × 1.5 を下限40〜上限100に丸め
+          final vp = _sc.position.viewportDimension;
+          final est = _meas.getItemHeight(math.max(0, anchorIndex - 1)) ?? _meas.fallbackHeight;
+          final marginItems = math.min(100, math.max(40, ((vp / est) * 1.5).round()));
+          final preIndex = math.max(0, anchorIndex - marginItems);
+          double base = _meas.indexToOffset(preIndex);
+          if (base == 0.0 && preIndex > 0) base = est * preIndex;
           final max = _sc.position.maxScrollExtent;
-          final target = (base - prelead).clamp(0.0, max);  // ← アンカーを画面内に入れる
+          final target = base.clamp(0.0, max); // アンカーはこの後の精合わせで確実に入れる
           _sc.jumpTo(target);
-          debugPrint('[handover] coarseJump(base=$base, prelead=$prelead) → $target / max=$max');
+          debugPrint('[handover] coarseJump(preIndex=$preIndex, margin=$marginItems, est=$est) → $target / max=$max');
 
-          // 3) 精合わせ（ensureVisible）＋ 行内フラクション微調整
           await _refineToSaved(savedNo, anchorIndex);
         });
       });
@@ -773,16 +776,24 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   _vm.flushPendingScrollSave();
                   return false;
                 },
-                child: CupertinoScrollbar(
-                  controller: _sc,
-                  child: CustomScrollView(
+                child: NotificationListener<UserScrollNotification>( // ★ 追加
+                  onNotification: (u) {
+                    if (!_userScrolled && u.direction != ScrollDirection.idle) {
+                      _userScrolled = true;   // 以降は保存許可
+                    }
+                    return false;
+                  },
+                  child: CupertinoScrollbar(
                     controller: _sc,
-                    center: bundle.usingCenter ? bundle.centerKey : null, // ← 重要
-                    cacheExtent: 1200.0, // 任意: 近傍を先読み
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
+                    child: CustomScrollView(
+                      controller: _sc,
+                      center: bundle.usingCenter ? bundle.centerKey : null, // ← 重要
+                      cacheExtent: 1200.0, // 任意: 近傍を先読み
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
+                      slivers: [...bundle.slivers],
                     ),
-                    slivers: [...bundle.slivers],
                   ),
                 ),
               ),
@@ -1010,7 +1021,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
 
   Future<void> _refineToSaved(int savedNo, int anchorIndex) async {
-  for (var attempt = 0; attempt < 24; attempt++) { // 少し粘る（~400ms）
+    for (var attempt = 0; attempt < 32; attempt++) { // 少し粘る（~500ms）
       final ctx = (_meas.keyForNo(savedNo) as GlobalKey).currentContext;
       if (ctx != null) {
         await Scrollable.ensureVisible(
@@ -1030,20 +1041,26 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         await _vm.clearScrollFractionOnly();
         _meas.markRestoreTargetIndex(null);
         _restoringNow = false;
+        _restoredOnce = true;              // ★ 復元成功 → 以降は保存許可
         _forceSaveNow();  // 復元直後の正しい位置で1回だけ保存
         return;
       }
 
-      // ★ まだビルドされていなければ「近傍へ寄せる」ジャンプを継続
-      double approx = _meas.indexToOffset(anchorIndex);
-      if (approx == 0.0 && anchorIndex > 0) {
-        approx = _meas.fallbackHeight * anchorIndex;
-      }
-      if (_sc.hasClients) {
+      // ★ インデックス差から段階的に寄せる（過大/過小の両方に強い）
+      final total = _vm.comments.length;
+      final approxIndex = _meas.offsetToIndex(_sc.offset, total);
+      final delta = anchorIndex - approxIndex; // 正なら「下へ」足りてない
+      if (delta.abs() <= 2) {
+        // ほぼ着いた → もう一度 ensureVisible を待つ
+      } else {
         final vp = _sc.position.viewportDimension;
+        final stepUnit = _meas.getItemHeight(approxIndex) ?? _meas.fallbackHeight;
+        // 1〜2画面ぶんずつ寄せる（上限 2.5 画面）
+        final rawStep = delta * stepUnit;
+        final maxStep = vp * 2.5;
+        final step = rawStep.clamp(-maxStep, maxStep).toDouble();
         final max = _sc.position.maxScrollExtent;
-        final target = (approx - vp * 0.60).clamp(0.0, max); // ← 常に手前へ
-        _sc.jumpTo(target);
+        _sc.jumpTo((_sc.offset + step).clamp(0.0, max));
       }
       await Future.delayed(const Duration(milliseconds: 16));
     }
@@ -1051,6 +1068,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     debugPrint('[handover:refine] give up (context not ready)');
     // 失敗時は上書き保存しない／フラクションも消さない
     _restoringNow = false;
+    // ★ 復元に失敗したセッションでは、ユーザーが指で動かすまでは保存されない（Aのガードが効く）
   }
 
 
