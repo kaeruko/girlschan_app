@@ -296,6 +296,8 @@ class TopicDetailController extends ChangeNotifier {
         _byNo[no] = _allComments.length - newOnes.length + i;
         if (no > _lastRemoteNo) _lastRemoteNo = no;
       }
+      // ★ 追加: キャッシュ保存
+      await CacheService.saveList('comments_$topicId', _allComments);
       _freezeSaving();
 
       notifyListeners();

@@ -34,17 +34,26 @@ class VariableListMeasurer {
     }
   }
 
+  // リストのある行の実測高さが分かった瞬間に、復元ターゲット位置までスクロールを追従させるためのフック
   void onItemSize(int index, double height, {ScrollController? sc}) {
     if (index < 0 || index >= _itemHeights.length) return;
     if ((height - _itemHeights[index]).abs() < 0.5) return;
     _itemHeights[index] = height;
     _dirty = true;
 
-    if (_restoreTargetIndex != null && sc != null && sc.hasClients && index <= _restoreTargetIndex!) {
+    // ★ スナップショットを取る
+    final target = _restoreTargetIndex;
+
+    if (target != null && sc != null && sc.hasClients && index <= target) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final off = indexToOffset(_restoreTargetIndex!);
+        // ★ 実行時にも再チェック
+        if (target == null) return;
+        if (!sc.hasClients) return;
+        final off = indexToOffset(target);
         final max = sc.position.maxScrollExtent;
-        sc.jumpTo(off.clamp(0.0, max));
+        final clamped = off.clamp(0.0, max);
+        // try/catchでさらに安全にしてもOK
+        sc.jumpTo(clamped);
       });
     }
   }

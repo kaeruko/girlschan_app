@@ -74,12 +74,16 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
 
     int saved = 0;
     DateTime? modifiedTime;
+    int? cachedCount;
 
     if (hasCached) {
       final prefs = await SharedPreferences.getInstance();
       saved = prefs.getInt('scroll_$id') ?? 0;
       // build() 内ではなくここで await
       modifiedTime = await CacheService.getModifiedTime('comments_$id');
+      // ★キャッシュからコメント数を取得
+      final cachedList = await CacheService.loadList('comments_$id');
+      cachedCount = cachedList.length;
     }
 
     if (!mounted) return;
@@ -87,6 +91,10 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       _hasCachedComments = hasCached;
       _savedCommentNo = saved;
       _cacheModifiedTime = modifiedTime;
+      // ★キャッシュがあればwidget.topic['comments']も更新
+      if (cachedCount != null && cachedCount > 0) {
+        widget.topic['comments'] = cachedCount;
+      }
     });
   }
 
