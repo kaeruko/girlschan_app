@@ -78,6 +78,7 @@ class VariableListMeasurer {
 
   int offsetToIndex(double offset, int itemCount) {
     _rebuildPrefixIfNeeded();
+    if (itemCount <= 0) return 0;
     int lo = 0, hi = _prefix.length - 1;
     while (lo < hi) {
       final mid = (lo + hi + 1) >> 1;
@@ -87,7 +88,10 @@ class VariableListMeasurer {
         hi = mid - 1;
       }
     }
-    return lo.clamp(0, (itemCount - 1).clamp(0, 1 << 30));
+    final maxIdx = itemCount - 1;
+    if (lo < 0) return 0;
+    if (lo > maxIdx) return maxIdx;
+    return lo;
   }
 
   GlobalKey keyForNo(int no) => _itemKeys.putIfAbsent(no, () => GlobalKey(debugLabel: 'cno_$no'));

@@ -27,6 +27,9 @@ dependencies:
   webview_flutter: ^4.13.0
   webview_flutter_wkwebview: ^3.23.1
 
+  # 可変高さリストの最適化
+  super_sliver_list: ^0.4.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

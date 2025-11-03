@@ -1,6 +1,8 @@
 import 'package:flutter/rendering.dart' show RenderBox;
 import 'package:flutter/widgets.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 import '../utils/variable_list_measurer.dart';
+import '../screens/_super_sliver_list_sample_helpers.dart';
 
 class AnchoredScrollBundle {
   AnchoredScrollBundle({
@@ -61,16 +63,23 @@ class AnchoredScrollCoordinator {
     final slivers = <Widget>[];
     slivers.addAll(leadingSlivers);
 
+    // 可変高さリスト対応: _meas を外部から渡すか、ここで生成する必要あり（仮実装）
+    final _meas = _Measurer(items.length);
     if (!usingCenter) {
       slivers.add(
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (ctx, i) => itemBuilder(ctx, i),
+        SuperSliverList(
+          listController: ListController(), // 必要に応じて外部から渡す
+          sliver: SliverChildBuilderDelegate(
+            (ctx, i) => MeasureSize(
+              onChange: (sz) => _meas.onItemSize(i, sz.height),
+              child: itemBuilder(ctx, i),
+            ),
             childCount: items.length,
             addAutomaticKeepAlives: false,
             addRepaintBoundaries: true,
             addSemanticIndexes: false,
           ),
+          estimateExtent: (i) => _meas.getItemHeight(i) ?? _meas.fallbackHeight,
         ),
       );
       return AnchoredScrollBundle(slivers: slivers, usingCenter: false, centerKey: null);
@@ -78,28 +87,37 @@ class AnchoredScrollCoordinator {
 
     // A 側（アンカーより前）
     slivers.add(
-      SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (ctx, i) => itemBuilder(ctx, i),
+      SuperSliverList(
+        listController: ListController(),
+        sliver: SliverChildBuilderDelegate(
+          (ctx, i) => MeasureSize(
+            onChange: (sz) => _meas.onItemSize(i, sz.height),
+            child: itemBuilder(ctx, i),
+          ),
           childCount: anchorIndex,
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
           addSemanticIndexes: false,
         ),
+        estimateExtent: (i) => _meas.getItemHeight(i) ?? _meas.fallbackHeight,
       ),
     );
 
     // B 側（アンカー含む後半）← ★ここに center key を付ける
     slivers.add(
-      SliverList(
+      SuperSliverList(
         key: _centerKey, // ← これを center: に渡す
-        delegate: SliverChildBuilderDelegate(
+        listController: ListController(),
+        sliver: SliverChildBuilderDelegate(
           (ctx, i) {
             final idx = anchorIndex + i;
             final isAnchor = idx == anchorIndex;
             return KeyedSubtree(
               key: isAnchor ? _anchorItemKey : ValueKey(items[idx]['no']),
-              child: itemBuilder(ctx, idx),
+              child: MeasureSize(
+                onChange: (sz) => _meas.onItemSize(idx, sz.height),
+                child: itemBuilder(ctx, idx),
+              ),
             );
           },
           childCount: items.length - anchorIndex,
@@ -107,6 +125,7 @@ class AnchoredScrollCoordinator {
           addRepaintBoundaries: true,
           addSemanticIndexes: false,
         ),
+        estimateExtent: (i) => _meas.getItemHeight(anchorIndex + i) ?? _meas.fallbackHeight,
       ),
     );
 

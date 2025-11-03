@@ -1,16 +1,13 @@
 // --- UI専用: TopicDetailScreen ---
-// ロジックは controller, measurer, widgets/measure_size へ分離
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:math' as math;
+
 import '../models/comment.dart';
 import '../services/api_service.dart';
 import '../utils/platform_helper.dart';
 import '../controllers/topic_detail_controller.dart';
-import '../scroll/anchored_scroll_coordinator.dart';
 import '../utils/variable_list_measurer.dart';
 import '../widgets/measure_size.dart';
 import 'comment_post_webview.dart';
@@ -22,7 +19,6 @@ class TopicDetailScreen extends StatefulWidget {
   final int commentCount;
   final String posted_at;
 
-  // ★ 追加: テスト用バイパス
   final bool enableRefresh;
   final bool testingBypassInit;
   final List<Map<String, dynamic>>? testingInitialComments;
@@ -43,33 +39,18 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
+  // ========== フィールド群 ==========
   late final TopicDetailController _vm;
+  static const int _pageSize = 10;
+  final PageController _pc = PageController();
+  final Map<int, ScrollController> _pageScroll = {};             // page -> ScrollController
+  final Map<int, VariableListMeasurer> _pageMeas = {};           // page -> measurer
+  int _currentPage = 0;
 
-  bool _restoringNow = false; // 復元中フラグ（保存やdeltaの抑止に使う）
-  bool _restoredOnce = false;     // ★ 復元が一度でも成功したか
-  bool _userScrolled = false;     // ★ ユーザーが指でスクロールしたか
-  int _ensureRetry = 0;
-  // 復元フラグ
-  bool _centerConsumed = false;
-  // 復元不要ケースの一度きり初期化フラグ
-  bool _didPrimeSave = false;
-  // 初回プライム保存の保留フラグ
-  bool _primePendingSave = false;
-
-  // ① 先に ScrollController
-  final _sc = ScrollController();
-
-  // ② 1回だけ Coordinator を作る（_sc を渡す）
-  late final AnchoredScrollCoordinator _scroll =
-      AnchoredScrollCoordinator(controller: _sc);
-
-  final VariableListMeasurer _meas = VariableListMeasurer();
-
-  bool _loadingMore = false;
-  static const double _loadMoreThreshold = 300;
-
-  // ← 追加: まだ items に無い savedNo を保持する保留中アンカー
-  int? _pendingAnchorNo;
+  bool _restoring = false;          // 復元中は保存/ロードを止める
+  bool _restoredOnce = false;       // 一度でも復元が成功したか
+  bool _loadingMore = false;        // 末尾ページの追加ロード中
+  static const double _loadMoreThreshold = 300; // 末尾付近の閾値
 
   @override
   void initState() {
@@ -84,81 +65,302 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       testingInitialComments: widget.testingInitialComments,
     )..addListener(_onVmChanged);
 
-    // ★ 1本のコントローラに全部ぶら下げる
-    _sc.addListener(_onScrollSave);
-    _sc.addListener(_onScrollBottomLoad);
     _vm.init();
-  }
-
-  void _onScrollSave() {
-  // ★ 復元が終わるまで保存しない（上書き防止）
-  if (!_centerConsumed) return;        // 復元中は書かない
-  if (_restoringNow) return;           // 正確スナップ中も書かない
-  if (!_sc.hasClients) return;
-  // ★ 復元未完了かつユーザー未操作の間は保存しない（265 上書き事故を防ぐ）
-  if (!_restoredOnce && !_userScrolled) return;
-    _scroll.onScrollSave(
-      measurer: _meas,
-      totalCount: _vm.comments.length,
-      save: (index, frac) {
-        final f = frac.isFinite ? frac.clamp(0.0, 1.0) : 0.0;
-        _vm.saveScrollByIndexAndFraction(index, f);
-      },
-    );
-  }
-
-  void _onVmChanged() {
-    if (!mounted) return;
-    // ★初回プライム保存の保留消化
-    if (_primePendingSave && !_vm.loading && _vm.comments.isNotEmpty) {
-      _primePendingSave = false;
-      _forceSaveNow();
-    }
-    setState(() {});                 // comments 更新で再描画
   }
 
   @override
   void dispose() {
-    _forceSaveNow(); // 画面閉じ際の最終保存
-    _sc.removeListener(_onScrollSave);
-    _sc.removeListener(_onScrollBottomLoad);
-    _sc.dispose();
-    _scroll.dispose();       // 外部注入なので中では dispose されない（安全）
+    // 現在ページの位置を保存
+    _saveFromPage(_currentPage);
+
+    // ページ用 ScrollController を全部 dispose
+    for (final sc in _pageScroll.values) {
+      sc.dispose();
+    }
+    _pc.dispose();
+
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
     super.dispose();
   }
 
-  void _onScrollBottomLoad() {
-    if (!_centerConsumed || _restoringNow) return; // 復元完了まで delta 取らない
-    if (_loadingMore || !_sc.hasClients) return;
-    final pos = _sc.position;
-    if (!pos.hasPixels) return;
-    if (pos.extentAfter <= _loadMoreThreshold) {
-      final keepPinned = (pos.pixels >= pos.maxScrollExtent - 4);
-      _fetchMoreDelta(keepPinned: keepPinned);
+  // ==== VM更新 ====
+  void _onVmChanged() {
+    if (!mounted) return;
+    setState(() {});
+    // 初回データ到着後は復元を試みる
+    if (!_restoredOnce && !_vm.loading) {
+      _scheduleTryRestore();
     }
   }
 
-  Future<void> _fetchMoreDelta({bool keepPinned = false}) async {
+  // ========== 2) 追加: ページングのヘルパー ==========
+  int _pageCountFor(int total) => (total + _pageSize - 1) ~/ _pageSize;
+
+  List<dynamic> _itemsOfPage(int page, List<dynamic> all) {
+  final start = page * _pageSize;
+  final end = (start + _pageSize > all.length) ? all.length : (start + _pageSize);
+  if (start >= all.length || start >= end) return <dynamic>[];
+  return all.sublist(start, end);
+  }
+
+  ScrollController _scForPage(int page) {
+    return _pageScroll.putIfAbsent(page, () {
+      final sc = ScrollController();
+      sc.addListener(() => _onPageScroll(page));
+      return sc;
+    });
+  }
+
+  VariableListMeasurer _measForPage(int page) {
+    return _pageMeas.putIfAbsent(page, () => VariableListMeasurer());
+  }
+
+  // ========== 3) 追加: 末尾ページの自動ロード & 保存 ==========
+  void _onPageScroll(int page) {
+    if (_restoring) return;
+    final sc = _scForPage(page);
+    if (!sc.hasClients) return;
+
+    // 末尾ページなら差分読み込み
+    final lastPage = _pageCountFor(_vm.comments.length) - 1;
+    if (page == lastPage && !_loadingMore) {
+      if (sc.position.extentAfter <= _loadMoreThreshold) {
+        _fetchMoreDelta();
+      }
+    }
+  }
+
+  Future<void> _fetchMoreDelta() async {
     if (_loadingMore) return;
     _loadingMore = true;
     try {
       final added = await _vm.fetchDelta();
       if (!mounted) return;
-      if (keepPinned && (added > 0)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_sc.hasClients) {
-            _sc.jumpTo(_sc.position.maxScrollExtent);
-          }
-        });
-      }
-      setState(() {});
+      if (added > 0) setState(() {}); // ページ数/末尾更新
     } finally {
       _loadingMore = false;
     }
   }
 
+  // 現在ページから保存（indexInPage + fraction -> globalIndexへ変換）
+  void _saveFromPage(int page) {
+    if (_restoring) return;
+
+    final sc = _scForPage(page);
+    if (!sc.hasClients) return;
+
+    final all = _vm.comments;
+    if (all.isEmpty) return;
+
+    final pageItems = _itemsOfPage(page, all);
+    final meas = _measForPage(page);
+    meas.ensureCapacity(pageItems.length);
+
+    final off = sc.offset;
+    final idxInPage = meas.offsetToIndex(off, pageItems.length);
+    final rowTop = meas.indexToOffset(idxInPage);
+    final h = meas.getItemHeight(idxInPage) ?? meas.fallbackHeight;
+    final frac = (h <= 0) ? 0.0 : ((off - rowTop) / h).clamp(0.0, 1.0);
+
+    final globalIndex = page * _pageSize + idxInPage;
+    _vm.saveScrollByIndexAndFraction(globalIndex, frac);
+  }
+
+  // ========== 4) 追加: 復元（savedCommentNo をページにマップ） ==========
+  void _scheduleTryRestore() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryRestoreIfNeeded();
+    });
+  }
+
+  Future<void> _tryRestoreIfNeeded() async {
+    if (_restoredOnce || _vm.loading) return;
+
+    final savedNo = _vm.savedCommentNo;
+    if (savedNo <= 0) { 
+      _restoredOnce = true;
+      return; 
+    }
+
+    // まず、そのNoが入るまで差分取得（既存のユーティリティを活用）
+    await _vm.ensureContainsNo(savedNo);
+    if (!mounted) return;
+
+    // index を特定してターゲットページへ
+    final idx = _vm.indexByNo[savedNo];
+    if (idx == null) {
+      // まだ取れてない場合は次フレームでもう一度
+      _scheduleTryRestore();
+      return;
+    }
+
+    final targetPage = idx ~/ _pageSize;
+
+    _restoring = true;
+    if (_pc.hasClients) {
+      _pc.jumpToPage(targetPage);
+    }
+
+    // 該当行がビルドされるのを待って ensureVisible → 行内フラクションで微調整
+    for (int attempt = 0; attempt < 24; attempt++) {
+  final ctx = _measForPage(targetPage).keyForNo(savedNo).currentContext;
+      if (ctx != null) {
+        // 行頭を上端に（アニメなしで正確に）
+        await Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.0,
+          duration: Duration.zero,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+        );
+
+        // 行内フラクション分だけ下にずらす
+        final box = ctx.findRenderObject() as RenderBox?;
+        final h = box?.size.height ?? 0.0;
+        final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
+        if (h > 0 && frac > 0) {
+          final sc = _scForPage(targetPage);
+          if (sc.hasClients) {
+            final max = sc.position.maxScrollExtent;
+            sc.jumpTo((sc.offset + h * frac).clamp(0.0, max));
+          }
+        }
+
+  _vm.clearScrollFractionOnly(); // フラクションは使い切り
+        _restoring = false;
+        _restoredOnce = true;
+
+        // 復元直後の正しい位置で一度保存
+        _saveFromPage(targetPage);
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 16));
+    }
+
+    // うまく行かなければ次フレームで再挑戦できるように戻す
+    _restoring = false;
+    _scheduleTryRestore();
+  }
+
+
+  // ==== UI ====
+  @override
+  Widget build(BuildContext context) {
+    final items = _vm.comments;
+    final pageCount = _pageCountFor(items.length);
+
+    // 自動復元は初回データ到着後にポストフレームで試行
+    if (!_restoredOnce && !_vm.loading) {
+      _scheduleTryRestore();
+    }
+
+    final pageView = PageView.builder(
+      controller: _pc,
+      onPageChanged: (p) {
+        _saveFromPage(_currentPage);      // 追加：切り替え前のページ位置を保存
+        setState(() => _currentPage = p);
+      },
+      itemCount: pageCount > 0 ? pageCount : 1, // 0件でも空ページ1つは描画
+      itemBuilder: (ctx, page) {
+        final pageItems = _itemsOfPage(page, items);
+        final meas = _measForPage(page);
+        meas.ensureCapacity(pageItems.length);
+
+        final sc = _scForPage(page);
+
+        return NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            if (n is ScrollEndNotification) {
+              _saveFromPage(page);
+            }
+            return false;
+          },
+          child: CupertinoScrollbar(
+            controller: sc,
+            child: CustomScrollView(
+              controller: sc,
+              cacheExtent: 1200.0,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                // （必要なら）ページヘッダなどを SliverToBoxAdapter で入れてもOK
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx2, i) {
+                      final c  = pageItems.isNotEmpty ? pageItems[i] : const {};
+                      final no = (c['no'] as int?) ?? -1;
+                      final globalIndex = page * _pageSize + i;
+
+                      return MeasureSize(
+                        onChange: (sz) => meas.onItemSize(i, sz.height, sc: sc),
+                        child: Container(
+                          key: meas.keyForNo(no), // 行キー（ensureVisible用）
+                          child: _buildCommentItem(ctx2, c, globalIndex),
+                        ),
+                      );
+                    },
+                    childCount: pageItems.length,
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    addSemanticIndexes: false,
+                  ),
+                ),
+
+                // 末尾ページなら「読み込み中」プレースホルダ
+                if (page == pageCount - 1 && _loadingMore)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CupertinoActivityIndicator()),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text('コメント: ${widget.commentCount}', style: const TextStyle(fontSize: 11)),
+          ],
+        ),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _openPostDialog,
+          child: const Icon(CupertinoIcons.add),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: _vm.loading
+            ? Center(child: PlatformHelper.buildLoadingIndicator())
+            : Stack(
+                children: [
+                  pageView,
+
+                  // （任意）復元前だけ「続きへ」チップを表示して手動復元も用意
+                  if (_vm.savedCommentNo > 0 && !_restoredOnce)
+                    Positioned(
+                      top: 8, right: 8,
+                      child: CupertinoButton.filled(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        onPressed: _restoring ? null : _tryRestoreIfNeeded,
+                        child: Text('続き: No.${_vm.savedCommentNo}', style: const TextStyle(fontSize: 13)),
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
+  }
 
   void _showAnchorPreview(int no) {
     final c = _vm.getCommentByNo(no);
@@ -399,8 +601,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-
-
   Widget _buildAnchorText(List<int> anchors) {
     if (anchors.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -638,170 +838,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-  // =========================================
-  // UI
-  // =========================================
-  @override
-  Widget build(BuildContext context) {
-    final items = _vm.comments;
-    // ★ 追加：indexToOffset が概算（fallback）でも正しく計算できるように前もって初期化
-    _meas.ensureCapacity(items.length);
-    // 復元したいときだけ center 方式にする（1フレーム限定）
-    final wantCenter = (_vm.savedCommentNo > 0) && !_centerConsumed;
-    final savedNo    = wantCenter ? _vm.savedCommentNo : 0;
-
-    // ★ここから追記：復元不要（savedNo==0）なら、初回だけ保存を有効化して即保存
-    if (!_vm.loading && !wantCenter && !_centerConsumed && !_didPrimeSave) {
-      _didPrimeSave = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() => _centerConsumed = true);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          if (_vm.comments.isEmpty) {
-            _primePendingSave = true;   // ★保留
-          } else {
-            _forceSaveNow();
-          }
-        });
-      });
-    }
-
-    // ① 先に willUseCenter を自前で判定（bundle を作る前）
-    final idxMap = _vm.indexByNo;
-    final haveAnchorNow = (savedNo > 0) &&
-        ((idxMap[savedNo] != null) ||
-         items.indexWhere((e) => (e['no'] as int?) == savedNo) >= 0);
-
-    // ここがポイント：今はまだ無い → 保留＆取得依頼
-    if (wantCenter && !haveAnchorNow) {
-      _pendingAnchorNo ??= savedNo;     // 1回だけセット
-      _vm.ensureContainsNo(savedNo);    // 下で追加するVMメソッドを呼ぶ
-    }
-
-    final anchorIndex = (savedNo > 0)
-        ? (idxMap[savedNo] ?? items.indexWhere((e) => (e['no'] as int?) == savedNo))
-        : -1;
-    final willUseCenter = wantCenter && haveAnchorNow && !_centerConsumed;
-
-    // ② willUseCenter を itemBuilder 内で使う（bundle は参照しない）
-    final bundle = _scroll.buildAnchoredSlivers(
-      items: items,
-      savedNo: savedNo,
-      indexByNo: (no) => idxMap[no] ?? -1,
-      itemBuilder: (ctx, i) {
-        _meas.ensureCapacity(items.length);
-        final c  = items[i];
-        final no = c['no'] as int? ?? -1;
-
-        // willUseCenterに合わせて補正を殺す
-        final suppressAdjust = willUseCenter;
-
-        return MeasureSize(
-          onChange: (sz) => _meas.onItemSize(
-            i,
-            sz.height,
-            sc: suppressAdjust ? null : _sc,
-          ),
-          child: Container(
-            key: _meas.keyForNo(no), // ← GlobalKey を Container へ移す（RenderObject あり）
-            child: _buildCommentItem(context, c, i),
-          ),
-        );
-      },
-    );
-
-    final match = bundle.slivers.where((w) => w.key == bundle.centerKey).length;
-    debugPrint('[center-check] using=${bundle.usingCenter} match=$match'); // ← match は必ず 1
-
-    if (wantCenter && bundle.usingCenter) {
-      // アンカー行内の微調整（0でもOK）
-      _scroll.maybeScheduleLocalAdjust(
-        usingCenter: true,
-        savedFraction: _vm.savedLocalFraction,
-      );
-
-      // ★ 復元中は保存・delta取得を抑止
-      _restoringNow = true;
-
-      // 粗合わせは「手前マージン」を使う
-      _meas.markRestoreTargetIndex(anchorIndex);
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() => _centerConsumed = true);
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!_sc.hasClients) return;
-          // ★ 安全マージン（行数）を計算：画面高 / 推定行高 × 1.5 を下限40〜上限100に丸め
-          final vp = _sc.position.viewportDimension;
-          final est = _meas.getItemHeight(math.max(0, anchorIndex - 1)) ?? _meas.fallbackHeight;
-          final marginItems = math.min(100, math.max(40, ((vp / est) * 1.5).round()));
-          final preIndex = math.max(0, anchorIndex - marginItems);
-          double base = _meas.indexToOffset(preIndex);
-          if (base == 0.0 && preIndex > 0) base = est * preIndex;
-          final max = _sc.position.maxScrollExtent;
-          final target = base.clamp(0.0, max); // アンカーはこの後の精合わせで確実に入れる
-          _sc.jumpTo(target);
-          debugPrint('[handover] coarseJump(preIndex=$preIndex, margin=$marginItems, est=$est) → $target / max=$max');
-
-          await _refineToSaved(savedNo, anchorIndex);
-        });
-      });
-    }
-
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text('コメント: ${widget.commentCount}', style: const TextStyle(fontSize: 11)),
-          ],
-        ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _openPostDialog,
-          child: const Icon(CupertinoIcons.add),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: _vm.loading
-            ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : NotificationListener<ScrollEndNotification>(
-                onNotification: (n) {
-                  if (_restoringNow) return false; // 復元完了までフラッシュ禁止
-                  // 直前に予約された位置を即書き込み
-                  _vm.flushPendingScrollSave();
-                  return false;
-                },
-                child: NotificationListener<UserScrollNotification>( // ★ 追加
-                  onNotification: (u) {
-                    if (!_userScrolled && u.direction != ScrollDirection.idle) {
-                      _userScrolled = true;   // 以降は保存許可
-                    }
-                    return false;
-                  },
-                  child: CupertinoScrollbar(
-                    controller: _sc,
-                    child: CustomScrollView(
-                      controller: _sc,
-                      center: bundle.usingCenter ? bundle.centerKey : null, // ← 重要
-                      cacheExtent: 1200.0, // 任意: 近傍を先読み
-                      physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                      slivers: [...bundle.slivers],
-                    ),
-                  ),
-                ),
-              ),
-      ),
-    );
-  }
-  // ================== 局所オフセットの微調整 ==================
-
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
     final no = c['no'] ?? '-';
     final posted_at = c['posted_at'] ?? '';
@@ -811,25 +847,17 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final anchors = List<int>.from(c['anchors'] ?? []);
     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
     final urls = (c['urls'] as List?) ?? [];
-    // クリップ状態もcontroller経由で参照できるようにする（今後）
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: CupertinoColors.separator,
-            width: 0.5,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'No.$no  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
-            style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
-          ),
+          Text('No.$no  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
+              style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel)),
           const SizedBox(height: 8),
           if (anchors.isNotEmpty) _buildAnchorText(anchors),
           if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
@@ -856,19 +884,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                     if (loadingProgress == null) return child;
                     return const SizedBox(
                       height: 200,
-                      child: Center(
-                        child: CupertinoActivityIndicator(),
-                      ),
+                      child: Center(child: CupertinoActivityIndicator()),
                     );
                   },
                   errorBuilder: (context, error, stackTrace) => const SizedBox(
                     height: 200,
                     child: Center(
-                      child: Icon(
-                        CupertinoIcons.photo,
-                        size: 40,
-                        color: CupertinoColors.secondaryLabel,
-                      ),
+                      child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.secondaryLabel),
                     ),
                   ),
                 ),
@@ -888,14 +910,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   final commentId = 'vbox$no';
                   final success = await rateComment(widget.topicId, commentId, 1);
                   if (!mounted) return;
-                  if (success) {
-                    setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                  }
+                  if (success) setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
                 },
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text('＋$plus',
-                      style: const TextStyle(color: CupertinoColors.systemRed)),
+                  child: Text('＋$plus', style: const TextStyle(color: CupertinoColors.systemRed)),
                 ),
               ),
               CupertinoButton(
@@ -905,27 +924,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   final commentId = 'vbox$no';
                   final success = await rateComment(widget.topicId, commentId, -1);
                   if (!mounted) return;
-                  if (success) {
-                    setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                  }
+                  if (success) setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
                 },
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text('−$minus',
-                      style: const TextStyle(color: CupertinoColors.secondaryLabel)),
+                  child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
                 ),
               ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: () async {
-                  await _vm.toggleClip(c);
+                  await _vm.toggleClip(Map<String, dynamic>.from(c));
                   if (!mounted) return;
                   setState(() {});
                 },
                 child: Icon(
-                  _vm.clippedNos.contains(no)
-                      ? CupertinoIcons.heart_fill
-                      : CupertinoIcons.heart,
+                  _vm.clippedNos.contains(no) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
                   color: _vm.clippedNos.contains(no)
                       ? CupertinoColors.systemRed
                       : CupertinoColors.secondaryLabel,
@@ -941,7 +955,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   Future<void> _openPostDialog() async {
     if (!mounted) return;
-    // 直接本家に遷移（ダイアログなし）
     await Navigator.push(
       context,
       CupertinoPageRoute(
@@ -955,121 +968,40 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     if (!mounted) return;
   }
 
-  /// プラス・マイナスを表示する横長の棒グラフを作成
   Widget _buildPlusMinusGraph(int plus, int minus) {
     final total = plus + minus;
     if (total == 0) return const SizedBox.shrink();
     return Row(
       children: [
-        // プラスの棒（ピンク）
         if (plus > 0)
           Expanded(
             flex: plus,
             child: Container(
               height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFFED6D74),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  bottomLeft: Radius.circular(4),
-                ),
+              decoration: const BoxDecoration(
+                color: Color(0xFFED6D74),
+                borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
               ),
               alignment: Alignment.center,
-              child: Text(
-                plus.toString(),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white),
-              ),
+              child: Text(plus.toString(),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
             ),
           ),
-        // マイナスの棒（灰色）
         if (minus > 0)
           Expanded(
             flex: minus,
             child: Container(
               height: 20,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: CupertinoColors.systemGrey3,
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(4),
-                  bottomRight: Radius.circular(4),
-                ),
+                borderRadius: BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
               ),
               alignment: Alignment.center,
-              child: Text(
-                minus.toString(),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white),
-              ),
+              child: Text(minus.toString(),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
             ),
           ),
       ],
     );
   }
-
-  // 強制保存ヘルパー
-  void _forceSaveNow() {
-    if (!_sc.hasClients) return;
-    if (_vm.comments.isEmpty) return; 
-    _scroll.onScrollSave(
-      measurer: _meas,
-      totalCount: _vm.comments.length,
-      save: (index, frac) {
-        final f = frac.isFinite ? frac.clamp(0.0, 1.0) : 0.0;
-        _vm.saveScrollByIndexAndFraction(index, f);
-      },
-    );
-  }
-
-
-  Future<void> _refineToSaved(int savedNo, int anchorIndex) async {
-    for (var attempt = 0; attempt < 32; attempt++) { // 少し粘る（~500ms）
-      final ctx = (_meas.keyForNo(savedNo) as GlobalKey).currentContext;
-      if (ctx != null) {
-        await Scrollable.ensureVisible(
-          ctx,
-          alignment: 0.0, // 行頭を上端に
-          duration: Duration.zero,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-        );
-        final box = ctx.findRenderObject() as RenderBox?;
-        final h = box?.size.height ?? 0.0;
-        if (h > 0 && _vm.savedLocalFraction > 0) {
-          final localPx = (_vm.savedLocalFraction.clamp(0.0, 0.9999)) * h;
-          final max = _sc.position.maxScrollExtent;
-          _sc.jumpTo((_sc.offset + localPx).clamp(0.0, max));
-          debugPrint('[handover:refine] no=$savedNo h=$h frac=${_vm.savedLocalFraction} → +$localPx');
-        }
-        await _vm.clearScrollFractionOnly();
-        _meas.markRestoreTargetIndex(null);
-        _restoringNow = false;
-        _restoredOnce = true;              // ★ 復元成功 → 以降は保存許可
-        _forceSaveNow();  // 復元直後の正しい位置で1回だけ保存
-        return;
-      }
-
-      // ★ インデックス差から段階的に寄せる（過大/過小の両方に強い）
-      final total = _vm.comments.length;
-      final approxIndex = _meas.offsetToIndex(_sc.offset, total);
-      final delta = anchorIndex - approxIndex; // 正なら「下へ」足りてない
-      if (delta.abs() <= 2) {
-        // ほぼ着いた → もう一度 ensureVisible を待つ
-      } else {
-        final vp = _sc.position.viewportDimension;
-        final stepUnit = _meas.getItemHeight(approxIndex) ?? _meas.fallbackHeight;
-        // 1〜2画面ぶんずつ寄せる（上限 2.5 画面）
-        final rawStep = delta * stepUnit;
-        final maxStep = vp * 2.5;
-        final step = rawStep.clamp(-maxStep, maxStep).toDouble();
-        final max = _sc.position.maxScrollExtent;
-        _sc.jumpTo((_sc.offset + step).clamp(0.0, max));
-      }
-      await Future.delayed(const Duration(milliseconds: 16));
-    }
-
-    debugPrint('[handover:refine] give up (context not ready)');
-    // 失敗時は上書き保存しない／フラクションも消さない
-    _restoringNow = false;
-    // ★ 復元に失敗したセッションでは、ユーザーが指で動かすまでは保存されない（Aのガードが効く）
-  }
-
-
 }
