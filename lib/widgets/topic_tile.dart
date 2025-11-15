@@ -10,8 +10,15 @@ class TopicTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final TopicTileController controller;
 
-  /// キャッシュ（`comments_<id>`）があるときだけ × ボタンを表示して削除可能にする
-  final Future<void> Function(int topicId)? onRemoveIfCached;
+  /// ×ボタンを表示するかどうか（親が制御）。
+  final bool showRemoveButton;
+
+  /// ×ボタン押下時のコールバック。意味付けは親に委ねる。
+  final Future<void> Function(int topicId)? onRemove;
+
+  /// true の場合、キャッシュがなくても × ボタンを表示する。
+  /// false の場合はキャッシュ有無（コメントキャッシュ）と連動させる。
+  final bool removeButtonAlwaysVisible;
 
   /// 詳細から戻った直後に呼ばれる（自分→全体の順で更新する前後に外側の再評価を差し込みたい時）
   final VoidCallback? onAfterPop;
@@ -23,7 +30,9 @@ class TopicTile extends StatefulWidget {
     super.key,
     required this.topic,
     required this.controller,
-    this.onRemoveIfCached,
+    this.showRemoveButton = false,
+    this.onRemove,
+    this.removeButtonAlwaysVisible = false,
     this.onAfterPop,
     this.showThumb = true,
   });
@@ -106,7 +115,11 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
     final posted_at = widget.topic['posted_at'] as String? ?? '';
-    final thumb = widget.topic['thumb'] as String?;
+  final thumb = widget.topic['thumb'] as String?;
+
+  final showRemove = widget.showRemoveButton &&
+    widget.onRemove != null &&
+    (widget.removeButtonAlwaysVisible || _hasCachedComments);
 
 
     // ① 必ず初期化しておく（未初期化エラー対策）
@@ -244,12 +257,12 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                 ),
               ),
               // 右端 × ボタン（キャッシュあり時だけ）
-              if (_hasCachedComments && widget.onRemoveIfCached != null)
+              if (showRemove)
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(28, 28),
                   onPressed: () async {
-                    await widget.onRemoveIfCached!(id);
+                    await widget.onRemove!(id);
                     if (mounted) await refreshCacheState();
                     await widget.controller.refreshAll();
                   },

@@ -219,7 +219,12 @@ class TopicDetailController extends ChangeNotifier {
     _clippedNos = clips.where((c) => c['topicId'] == topicId).map<int>((c) => c['no'] as int).toSet();
 
     if (!_isWatched) {
-      await addWatchedTopicId(topicId, title: title, comments: commentCount, posted_at: postedAt);
+      await addWatchedTopic(
+        id: topicId,
+        title: title,
+        comments: commentCount,
+        posted_at: postedAt,
+      );
       _isWatched = true;
     }
 

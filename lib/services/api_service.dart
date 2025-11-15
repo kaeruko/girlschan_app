@@ -249,88 +249,64 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
 
 // ========== 履歴リスト関連（旧「お気に入りトピック」） ==========
 
-/// 履歴のトピック完全情報を取得
+// ========== 履歴関連（トピック履歴） ==========
+
 Future<List<Map<String, dynamic>>> getWatchedTopics() async {
-  // logd('');
-  // logd('============================================');
-  // logd('📋 [getWatchedTopics] Start');
-  // logd('============================================');
-  // logd('');
-  
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  // logd('📋 [getWatchedTopics] Loaded ${jsonList.length} topics from SharedPreferences');
-  
-  final topics = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  // logd('📋 [getWatchedTopics] Parsed ${topics.length} topics');
-  
-  // 各トピックのメタキャッシュから最新のコメント数を取得
-  for (final topic in topics) {
-    final topicId = topic['id'] as int;
-    // logd('📋 [getWatchedTopics] Processing topic $topicId: ${topic['title']}');
-    
-    try {
-      // logd('📋 [getWatchedTopics] Loading meta cache for topic $topicId');
-      final meta = await CacheService.loadMap('topic_meta_$topicId');
-      
-      if (meta != null) {
-        final total = meta['total'] as int?;
-        // logd('📋 [getWatchedTopics] Got meta: total=$total');
-        
-        if (total != null) {
-          // logd('📋 [getWatchedTopics] Updating topic $topicId comments from ${topic['comments']} to $total');
-          topic['comments'] = total;
-        }
-      } else {
-        // logd('📋 [getWatchedTopics] Meta cache is null for topic $topicId');
+
+  final topics = jsonList
+      .map((e) => jsonDecode(e) as Map<String, dynamic>)
+      .toList();
+
+  // watchedAt があれば、クリップと同じように新しい順にソート
+  topics.sort((a, b) {
+    DateTime parseDate(String? s) {
+      if (s == null || s.isEmpty) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
       }
-  } catch (e) {
-      // logd('📋 [getWatchedTopics] ❌ Error processing topic $topicId: $e');
-      // logd('📋 [getWatchedTopics] Stack trace: $st');
+      try {
+        return DateTime.parse(s);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
     }
-  }
-  
-  // logd('📋 [getWatchedTopics] ✅ Complete');
-  return topics.reversed.toList();
+
+    return parseDate(b['watchedAt'] as String?)
+        .compareTo(parseDate(a['watchedAt'] as String?));
+  });
+
+  return topics;
 }
 
-/// 履歴のトピックIDリストを取得（後方互換性用）
 Future<List<int>> getWatchedTopicIds() async {
-  final prefs = await SharedPreferences.getInstance();
-  // 新形式を試す
-  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  if (jsonList.isNotEmpty) {
-    return jsonList
-        .map((e) => (jsonDecode(e) as Map<String, dynamic>)['id'] as int)
-        .toList();
-  }
-  // 旧形式から移行
-  final ids = prefs.getStringList('watched_topics') ?? [];
-  return ids.map(int.parse).toList();
+  final topics = await getWatchedTopics();
+  return topics
+      .map((topic) => topic['id'])
+      .whereType<int>()
+      .toList();
 }
 
-/// 履歴に追加（完全情報を保存）
-Future<void> addWatchedTopicId(
-  int id, {
-  String? title,
-  int? comments,
-  String? posted_at,
+Future<void> addWatchedTopic({
+  required int id,
+  required String title,
+  required int comments,
+  required String posted_at,
 }) async {
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  
-  // 重複チェック
+
   final isDuplicate = jsonList.any((e) {
     final topic = jsonDecode(e) as Map<String, dynamic>;
     return topic['id'] == id;
   });
-  
+
   if (!isDuplicate) {
     final topic = {
       'id': id,
-      'title': title ?? 'トピック',
-      'comments': comments ?? 0,
-      'posted_at': posted_at ?? '',
+      'title': title,
+      'comments': comments,
+      'posted_at': posted_at,
       'watchedAt': DateTime.now().toIso8601String(),
     };
     jsonList.add(jsonEncode(topic));
@@ -338,18 +314,25 @@ Future<void> addWatchedTopicId(
   }
 }
 
-/// 履歴から削除
 Future<void> removeWatchedTopicId(int id) async {
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-  
+
   jsonList.removeWhere((e) {
     final topic = jsonDecode(e) as Map<String, dynamic>;
     return topic['id'] == id;
   });
-  
+
   await prefs.setStringList('watched_topics_full', jsonList);
+
+  // 旧 watched_topics も整理したいならついでに消す
+  final legacy = prefs.getStringList('watched_topics') ?? [];
+  if (legacy.isNotEmpty) {
+    final filtered = legacy.where((s) => int.tryParse(s) != id).toList();
+    await prefs.setStringList('watched_topics', filtered);
+  }
 }
+
 
 /// APIから取得したトピックリストで、watchedTopicsのコメント数を更新
 Future<void> updateWatchedTopicsComments(

@@ -176,7 +176,8 @@ class _TopicListScreenState extends State<TopicListScreen>
                             topic: topic,
                             controller: _controller,
                             showThumb: true,                      // 一覧はサムネ表示
-                            onRemoveIfCached: _removeCommentsCache, // ×でコメントキャッシュ削除
+                            showRemoveButton: true,
+                            onRemove: _removeCommentsCache,        // ×でコメントキャッシュ削除
                           );
                         },
                       ),

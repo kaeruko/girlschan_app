@@ -141,8 +141,9 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
       topic: _topicToMap(t),
       controller: _controller,
       showThumb: true,                 // 検索結果はサムネ表示
+      showRemoveButton: true,
       // 検索画面の「×」はコメントキャッシュ削除にしておく（任意）
-      onRemoveIfCached: (id) async {
+      onRemove: (id) async {
         await CacheService.clear('comments_$id');
         await _controller.refreshAll();
       },
