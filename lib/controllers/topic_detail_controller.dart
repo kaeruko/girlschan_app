@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
@@ -16,6 +17,12 @@ class TopicDetailController extends ChangeNotifier {
   // no -> index の逆引き（UIが高速に anchorIndex を求めるため）
   final Map<int, int> _indexByNo = {};
   Map<int, int> get indexByNo => _indexByNo;
+
+  // コメント番号 -> GlobalKey のマッピング（復元時に使用）
+  final Map<int, GlobalKey> commentKeys = {};
+  
+  /// コメント番号に対応する GlobalKey を取得（なければ新規作成）
+  GlobalKey keyForCommentNo(int no) => commentKeys.putIfAbsent(no, () => GlobalKey(debugLabel: 'comment_$no'));
 
   // ---- 保存凍結とデバウンス ----
   DateTime _mutatingUntil = DateTime.fromMillisecondsSinceEpoch(0);
@@ -267,13 +274,27 @@ class TopicDetailController extends ChangeNotifier {
   Future<int> fetchDelta() async {
     if (_fetching) return 0;
     _fetching = true;
+    _loadingMore = true;
+    notifyListeners(); // ★ ローディング開始を UI に通知
+    
     try {
       final from = _lastRemoteNo > 0 ? _lastRemoteNo : lastRemoteNo;
       final fetched = await fetchCommentsWithPagination(topicId, offset: from, limit: commentsPerPage);
       final List<dynamic> fetchedList = (fetched['comments'] as List<dynamic>? ?? const []);
+      // 追加: サーバ側の総件数が返るなら拾う
+      final fetchedTotal = (fetched['total'] as int?) ?? 0;
+      
       // ignore: avoid_print
       print('[delta] from=$from -> fetched=${fetchedList.length}');
-      if (fetchedList.isEmpty) return 0;
+      if (fetchedList.isEmpty) {
+        // 追加: 件数だけ更新されているケースでも UI を更新
+        if (fetchedTotal > 0 && fetchedTotal != _totalComments) {
+          _totalComments = fetchedTotal;
+        }
+        _loadingMore = false;
+        notifyListeners();
+        return 0;
+      }
 
       // 重複排除
       final List<Map<String, dynamic>> newOnes = [];
@@ -285,7 +306,15 @@ class TopicDetailController extends ChangeNotifier {
       }
       // ignore: avoid_print
       print('[delta] added=${newOnes.length}');
-      if (newOnes.isEmpty) return 0;
+      if (newOnes.isEmpty) {
+        // 追加: 件数の更新
+        if (fetchedTotal > 0 && fetchedTotal != _totalComments) {
+          _totalComments = fetchedTotal;
+        }
+        _loadingMore = false;
+        notifyListeners();
+        return 0;
+      }
 
       // 末尾に追加
       _allComments.addAll(newOnes);
@@ -296,14 +325,26 @@ class TopicDetailController extends ChangeNotifier {
         _byNo[no] = _allComments.length - newOnes.length + i;
         if (no > _lastRemoteNo) _lastRemoteNo = no;
       }
+      
+      // 追加: 総件数の更新（API の total 優先、なければ最大Noでフォールバック）
+      if (fetchedTotal > 0) {
+        _totalComments = fetchedTotal;
+      } else {
+        // Girls Channelのように No が連番なら max(No) を総件数相当として扱える
+        _totalComments = lastRemoteNo;
+      }
+      
       // ★ 追加: キャッシュ保存
       await CacheService.saveList('comments_$topicId', _allComments);
       _freezeSaving();
 
+      _loadingMore = false;
       notifyListeners();
       return newOnes.length;
     } finally {
       _fetching = false;
+      _loadingMore = false;
+      notifyListeners(); // ★ ローディング終了を UI に通知
     }
   }
   // --- コメント配列を更新したときに no->index を再構築 ---

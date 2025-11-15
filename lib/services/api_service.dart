@@ -18,7 +18,7 @@ Future<dynamic> _fetchJson(
   logd('📡 APIリクエスト: $uri');
 
   final response = await http.get(uri, headers: headers).timeout(
-    timeout ?? const Duration(seconds: 10),
+    timeout ?? const Duration(seconds: 60),
     onTimeout: () => throw Exception('タイムアウト: API応答がありません'),
   );
 

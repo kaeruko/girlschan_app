@@ -41,7 +41,7 @@ class TopicDetailScreen extends StatefulWidget {
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // ========== フィールド群 ==========
   late final TopicDetailController _vm;
-  static const int _pageSize = 10;
+  static const int _pageSize = 100;
   final PageController _pc = PageController();
   final Map<int, ScrollController> _pageScroll = {};             // page -> ScrollController
   final Map<int, VariableListMeasurer> _pageMeas = {};           // page -> measurer
@@ -50,6 +50,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _restoring = false;          // 復元中は保存/ロードを止める
   bool _restoredOnce = false;       // 一度でも復元が成功したか
   bool _loadingMore = false;        // 末尾ページの追加ロード中
+  int? _restoreTargetPageNo;        // 復元ターゲットのページ番号
+  bool _boostCacheDuringRestore = false; // 復元中は cacheExtent を爆上げ
   static const double _loadMoreThreshold = 300; // 末尾付近の閾値
 
   @override
@@ -174,71 +176,175 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     });
   }
 
+  /// ScrollController のアタッチを待つ
+  Future<void> _waitForAttach(ScrollController sc) async {
+    for (int i = 0; i < 30; i++) {
+      if (sc.hasClients &&
+          sc.position.hasPixels &&
+          sc.position.hasViewportDimension) {
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 16));
+    }
+  }
+
   Future<void> _tryRestoreIfNeeded() async {
-    if (_restoredOnce || _vm.loading) return;
+    // ★ 再入防止
+    if (_restoredOnce || _vm.loading || _restoring) return;
+    _restoring = true;
 
     final savedNo = _vm.savedCommentNo;
+    print('[復元開始] savedNo=$savedNo');
     if (savedNo <= 0) { 
+      print('[復元中止] savedNo が 0 以下');
       _restoredOnce = true;
+      _restoring = false;
       return; 
     }
 
-    // まず、そのNoが入るまで差分取得（既存のユーティリティを活用）
+    // まず、そのNoが入るまで差分取得
+    print('[復元] ensureContainsNo($savedNo) 実行中...');
     await _vm.ensureContainsNo(savedNo);
     if (!mounted) return;
 
     // index を特定してターゲットページへ
     final idx = _vm.indexByNo[savedNo];
+    print('[復元] indexByNo[$savedNo] = $idx');
     if (idx == null) {
-      // まだ取れてない場合は次フレームでもう一度
+      print('[復元] index が見つからない、再スケジュール');
+      _restoring = false;
       _scheduleTryRestore();
       return;
     }
 
     final targetPage = idx ~/ _pageSize;
+    print('[復元] targetPage=$targetPage (idx=$idx)');
 
     _restoring = true;
+    _restoreTargetPageNo = targetPage;
+    _boostCacheDuringRestore = true;
+    if (mounted) setState(() {}); // cacheExtent 反映
+
     if (_pc.hasClients) {
       _pc.jumpToPage(targetPage);
+      print('[復元] ページ遷移実行: $targetPage');
     }
 
-    // 該当行がビルドされるのを待って ensureVisible → 行内フラクションで微調整
-    for (int attempt = 0; attempt < 24; attempt++) {
-  final ctx = _measForPage(targetPage).keyForNo(savedNo).currentContext;
-      if (ctx != null) {
-        // 行頭を上端に（アニメなしで正確に）
-        await Scrollable.ensureVisible(
-          ctx,
-          alignment: 0.0,
-          duration: Duration.zero,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-        );
+    // スクロール位置が attach されるのを確実に待つ
+    await _waitForAttach(_scForPage(targetPage));
 
-        // 行内フラクション分だけ下にずらす
-        final box = ctx.findRenderObject() as RenderBox?;
-        final h = box?.size.height ?? 0.0;
-        final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
-        if (h > 0 && frac > 0) {
-          final sc = _scForPage(targetPage);
-          if (sc.hasClients) {
-            final max = sc.position.maxScrollExtent;
-            sc.jumpTo((sc.offset + h * frac).clamp(0.0, max));
-          }
-        }
+    // ページ遷移後、レイアウト完成を待つ
+    await Future.delayed(const Duration(milliseconds: 50));
 
-  _vm.clearScrollFractionOnly(); // フラクションは使い切り
-        _restoring = false;
-        _restoredOnce = true;
+    // ★★★ ここから「概算ジャンプ」 + 「実測追従」を入れる
+    // ページ内配列とメジャー/スクロールを準備
+    final all0 = _vm.comments;
+    final pageItems0 = _itemsOfPage(targetPage, all0);
+    final meas = _measForPage(targetPage);
+    meas.ensureCapacity(pageItems0.length);
+    final sc = _scForPage(targetPage);
 
-        // 復元直後の正しい位置で一度保存
-        _saveFromPage(targetPage);
-        return;
+    // ページ内の savedNo のインデックスを特定
+    final roughIndex =
+        pageItems0.indexWhere((item) => (item['no'] as int?) == savedNo);
+    if (roughIndex >= 0) {
+      // 実測が入るまでこのインデックスを基準に追従するよう指示
+      meas.markRestoreTargetIndex(roughIndex);
+      // まずは fallbackHeight ベースの概算オフセットへジャンプ
+      for (int i = 0; i < 10; i++) {
+        await Future.delayed(const Duration(milliseconds: 16));
+        if (!sc.hasClients) continue;
+        final guess = meas.indexToOffset(roughIndex);
+        try {
+          sc.jumpTo(guess);
+          print('[復元] 概算ジャンプ: index=$roughIndex, offset=$guess');
+        } catch (_) {}
+        break;
       }
-      await Future.delayed(const Duration(milliseconds: 16));
+    } else {
+      print('[復元] ページ内に$savedNoが見つからない（直後に再試行へ）');
     }
 
-    // うまく行かなければ次フレームで再挑戦できるように戻す
+    // ★ 該当行がビルドされるのを待ち、確実に ctx を得てから ensureVisible
+    for (int attempt = 0; attempt < 60; attempt++) {
+      final all = _vm.comments;
+      final pageItems = _itemsOfPage(targetPage, all);
+      
+      // savedNo がこのページ内に存在するか確認
+      final itemIndex = pageItems.indexWhere((item) => (item['no'] as int?) == savedNo);
+      if (itemIndex == -1) {
+        print('[復元] attempt=$attempt: ページ内に$savedNoが見つからない (pageItems.length=${pageItems.length})');
+        await Future.delayed(const Duration(milliseconds: 16));
+        continue;
+      }
+
+      print('[復元] attempt=$attempt: pageItems内で$savedNoを発見 (itemIndex=$itemIndex)');
+
+      // コメント番号をキーにしてコンテキストを取得
+      final key = _vm.keyForCommentNo(savedNo);
+      final ctx = key.currentContext;
+      
+      print('[復元] key=$key, key.currentContext = $ctx');
+      print('[復元] _vm.commentKeys.length=${_vm.commentKeys.length}');
+      
+      if (ctx == null) {
+        print('[復元] attempt=$attempt: currentContext がまだ null');
+        // もし実測が進んでいれば、その都度ターゲットまでの概算位置に追従
+        if (sc.hasClients) {
+          final off = meas.indexToOffset(itemIndex);
+          try { sc.jumpTo(off); } catch (_) {}
+        }
+        await Future.delayed(const Duration(milliseconds: 16));
+        continue;
+      }
+
+      print('[復演] currentContext を取得! ensureVisible 実行...');
+
+      // 行頭を上端に揃える
+      await Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.0,
+        duration: Duration.zero,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      );
+
+      // 行内フラクション分だけ下にずらす
+      final box = ctx.findRenderObject() as RenderBox?;
+      final h = box?.size.height ?? 0.0;
+      final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
+      print('[復元] box.height=$h, savedLocalFraction=$frac');
+      
+      if (h > 0 && frac > 0) {
+        final sc2 = _scForPage(targetPage);
+        if (sc2.hasClients) {
+          final max = sc2.position.maxScrollExtent;
+          final offset = (sc2.offset + h * frac).clamp(0.0, max);
+          sc2.jumpTo(offset);
+          print('[復元] スクロール位置を調整: offset=$offset');
+        }
+      }
+
+      _vm.clearScrollFractionOnly();
+      meas.markRestoreTargetIndex(null); // ★ 追従を解除
+      _restoring = false;
+      _restoredOnce = true;
+      _boostCacheDuringRestore = false;
+      _restoreTargetPageNo = null;
+      if (mounted) setState(() {}); // cacheExtent を元に戻す
+
+      // 復元直後の正しい位置で一度保存
+      _saveFromPage(targetPage);
+      print('[復元] 復元完了！');
+      return;
+    }
+
+    // うまく行かなければ次フレームで再挑戦
+    print('[復元] 60回試行失敗、再スケジュール');
+    meas.markRestoreTargetIndex(null);
     _restoring = false;
+    _boostCacheDuringRestore = false;
+    _restoreTargetPageNo = null;
+    if (mounted) setState(() {}); // cacheExtent を元に戻す
     _scheduleTryRestore();
   }
 
@@ -248,11 +354,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Widget build(BuildContext context) {
     final items = _vm.comments;
     final pageCount = _pageCountFor(items.length);
-
-    // 自動復元は初回データ到着後にポストフレームで試行
-    if (!_restoredOnce && !_vm.loading) {
-      _scheduleTryRestore();
-    }
 
     final pageView = PageView.builder(
       controller: _pc,
@@ -279,7 +380,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             controller: sc,
             child: CustomScrollView(
               controller: sc,
-              cacheExtent: 1200.0,
+              cacheExtent: (_boostCacheDuringRestore && _restoreTargetPageNo == page)
+                  ? 50000.0
+                  : 1200.0,
               physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics(),
               ),
@@ -294,10 +397,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
                       return MeasureSize(
                         onChange: (sz) => meas.onItemSize(i, sz.height, sc: sc),
-                        child: Container(
-                          key: meas.keyForNo(no), // 行キー（ensureVisible用）
-                          child: _buildCommentItem(ctx2, c, globalIndex),
-                        ),
+                        child: _buildCommentItem(ctx2, c, globalIndex),
                       );
                     },
                     childCount: pageItems.length,
@@ -329,7 +429,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text('コメント: ${widget.commentCount}', style: const TextStyle(fontSize: 11)),
+            Text(
+              'コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}',
+              style: const TextStyle(fontSize: 11),
+            ),
           ],
         ),
         trailing: CupertinoButton(
@@ -839,7 +942,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
-    final no = c['no'] ?? '-';
+    final no = (c['no'] as int?) ?? -1;
     final posted_at = c['posted_at'] ?? '';
     final body = c['body'] ?? '';
     final plus = c['plus'] ?? 0;
@@ -848,108 +951,111 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
     final urls = (c['urls'] as List?) ?? [];
 
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('No.$no  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
-              style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel)),
+    final innerWidget = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('No.$no  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
+            style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel)),
+        const SizedBox(height: 8),
+        if (anchors.isNotEmpty) _buildAnchorText(anchors),
+        if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
+        Text(body, style: const TextStyle(fontSize: 15)),
+        if (urls.isNotEmpty) _buildUrlsWidget(urls),
+        if (c['image_url'] != null) ...[
           const SizedBox(height: 8),
-          if (anchors.isNotEmpty) _buildAnchorText(anchors),
-          if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
-          Text(body, style: const TextStyle(fontSize: 15)),
-          if (urls.isNotEmpty) _buildUrlsWidget(urls),
-          if (c['image_url'] != null) ...[
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  CupertinoPageRoute(
-                    fullscreenDialog: true,
-                    builder: (_) => ImageViewerPage(url: c['image_url']),
-                  ),
-                );
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  c['image_url'],
-                  height: 200,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const SizedBox(
-                      height: 200,
-                      child: Center(child: CupertinoActivityIndicator()),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => const SizedBox(
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                CupertinoPageRoute(
+                  fullscreenDialog: true,
+                  builder: (_) => ImageViewerPage(url: c['image_url']),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                c['image_url'],
+                height: 200,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const SizedBox(
                     height: 200,
-                    child: Center(
-                      child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.secondaryLabel),
-                    ),
+                    child: Center(child: CupertinoActivityIndicator()),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => const SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.secondaryLabel),
                   ),
                 ),
               ),
             ),
-          ],
-          const SizedBox(height: 6),
-          _buildPlusMinusGraph(plus, minus),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () async {
-                  if (c['isLocal'] == true) return;
-                  final commentId = 'vbox$no';
-                  final success = await rateComment(widget.topicId, commentId, 1);
-                  if (!mounted) return;
-                  if (success) setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text('＋$plus', style: const TextStyle(color: CupertinoColors.systemRed)),
-                ),
-              ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () async {
-                  if (c['isLocal'] == true) return;
-                  final commentId = 'vbox$no';
-                  final success = await rateComment(widget.topicId, commentId, -1);
-                  if (!mounted) return;
-                  if (success) setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
-                ),
-              ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () async {
-                  await _vm.toggleClip(Map<String, dynamic>.from(c));
-                  if (!mounted) return;
-                  setState(() {});
-                },
-                child: Icon(
-                  _vm.clippedNos.contains(no) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                  color: _vm.clippedNos.contains(no)
-                      ? CupertinoColors.systemRed
-                      : CupertinoColors.secondaryLabel,
-                  size: 22,
-                ),
-              ),
-            ],
           ),
         ],
+        const SizedBox(height: 6),
+        _buildPlusMinusGraph(plus, minus),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                if (c['isLocal'] == true) return;
+                final commentId = 'vbox$no';
+                final success = await rateComment(this.widget.topicId, commentId, 1);
+                if (!mounted) return;
+                if (success) setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('＋$plus', style: const TextStyle(color: CupertinoColors.systemRed)),
+              ),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                if (c['isLocal'] == true) return;
+                final commentId = 'vbox$no';
+                final success = await rateComment(this.widget.topicId, commentId, -1);
+                if (!mounted) return;
+                if (success) setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
+              ),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                await _vm.toggleClip(Map<String, dynamic>.from(c));
+                if (!mounted) return;
+                setState(() {});
+              },
+              child: Icon(
+                _vm.clippedNos.contains(no) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                color: _vm.clippedNos.contains(no)
+                    ? CupertinoColors.systemRed
+                    : CupertinoColors.secondaryLabel,
+                size: 22,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    return Container(
+      key: no > 0 ? _vm.keyForCommentNo(no) : null,
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: innerWidget,
     );
   }
 
