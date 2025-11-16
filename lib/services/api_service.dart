@@ -60,7 +60,7 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
     // logd('');
     
     final url = 'https://girlschannel.net/topics/post_value?value=$value&topic_id=$topicId&comment_id=$commentId';
-    // logd('⭐ [rateComment] Request URL: $url');
+    logd('⭐ [rateComment] Request URL: $url');
     // logd('⭐ [rateComment] Parameters: topicId=$topicId, commentId=$commentId, value=$value');
     
     final response = await http.get(
@@ -91,10 +91,10 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
       }
       try {
         final data = jsonDecode(response.body);
-        // logd('⭐ [rateComment] Parsed JSON: $data');
+        logd('⭐ [rateComment] Parsed JSON: $data');
         return data['result'] == true;
       } catch (e) {
-        // logd('⭐ [rateComment] ⚠️ JSON parse error: $e');
+        logd('⭐ [rateComment] ⚠️ JSON parse error: $e');
         return true;
       }
     }

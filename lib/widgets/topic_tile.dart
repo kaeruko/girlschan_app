@@ -142,12 +142,20 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     }
 
     if (_hasCachedComments) {
-      final savedText = _savedCommentNo > 0 ? '$_savedCommentNo' : '0';
-      commentDisplay = '$savedText/$comments $posted_at';
-      // デバッグログは任意
-      // print('[TopicTile] 履歴アリ: id=$id ... cacheTime=$_cacheModifiedTime');
-    } else {
-      // print('[TopicTile] 履歴ナシ: id=$id ...');
+      final total = comments;
+      int shown = _savedCommentNo;
+
+      if (shown > 0 && total > 0) {
+        const pad = 2;
+        shown = shown + pad;
+
+        // total を超えないように＆マイナスにならないようにガード
+        if (shown > total) shown = total;
+        if (shown < 0) shown = 0;
+      }
+
+      final savedText = shown > 0 ? '$shown' : '0';
+      commentDisplay = '$savedText/$total $posted_at';
     }
 
     final blue = CupertinoColors.systemBlue;

@@ -99,6 +99,25 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // ========== 2) 追加: ページングのヘルパー ==========
   int _pageCountFor(int total) => (total + _pageSize - 1) ~/ _pageSize;
 
+  int get _pageCountLive => _pageCountFor(_vm.comments.length);
+  bool get _hasPrev => _currentPage > 0;
+  bool get _hasNext => _currentPage < _pageCountLive - 1;
+
+  void _goToPage(int p) {
+    final tgt = p.clamp(0, _pageCountLive > 0 ? _pageCountLive - 1 : 0);
+    if (_pc.hasClients) {
+      _saveFromPage(_currentPage); // 切り替え前に位置を保存
+      _pc.animateToPage(
+        tgt,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _goNextPage() => _hasNext ? _goToPage(_currentPage + 1) : null;
+  void _goPrevPage() => _hasPrev ? _goToPage(_currentPage - 1) : null;
+
   List<dynamic> _itemsOfPage(int page, List<dynamic> all) {
   final start = page * _pageSize;
   final end = (start + _pageSize > all.length) ? all.length : (start + _pageSize);
@@ -407,6 +426,34 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   ),
                 ),
 
+                // 末尾ページ以外なら「次の100件へ」ショートカット
+                if (page < pageCount - 1)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: CupertinoButton(
+                          onPressed: () => _goToPage(page + 1),
+                          child: const Text('次の100件へ'),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // 最後のページでは「さらに読み込む」（手動トリガ、オプション）
+                if (page == pageCount - 1)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: CupertinoButton.filled(
+                          onPressed: _loadingMore ? null : _fetchMoreDelta,
+                          child: Text(_loadingMore ? '読み込み中…' : 'さらに読み込む'),
+                        ),
+                      ),
+                    ),
+                  ),
+
                 // 末尾ページなら「読み込み中」プレースホルダ
                 if (page == pageCount - 1 && _loadingMore)
                   const SliverToBoxAdapter(
@@ -448,6 +495,57 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             : Stack(
                 children: [
                   pageView,
+
+                  // ページ移動用の左右ボタン
+                  if (_pageCountLive > 1)
+                    Positioned(
+                      left: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: CupertinoButton(
+                          padding: const EdgeInsets.all(8),
+                          onPressed: _hasPrev ? _goPrevPage : null,
+                          child: const Icon(CupertinoIcons.chevron_left, size: 22),
+                        ),
+                      ),
+                    ),
+
+                  if (_pageCountLive > 1)
+                    Positioned(
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: CupertinoButton(
+                          padding: const EdgeInsets.all(8),
+                          onPressed: _hasNext ? _goNextPage : null,
+                          child: const Icon(CupertinoIcons.chevron_right, size: 22),
+                        ),
+                      ),
+                    ),
+
+                  if (_pageCountLive > 1)
+                    Positioned(
+                      bottom: 8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemGrey6.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            '${_currentPage + 1} / $_pageCountLive',
+                            style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                          ),
+                        ),
+                      ),
+                    ),
 
                   // （任意）復元前だけ「続きへ」チップを表示して手動復元も用意
                   if (_vm.savedCommentNo > 0 && !_restoredOnce)
