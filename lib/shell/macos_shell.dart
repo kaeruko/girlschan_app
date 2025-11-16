@@ -5,6 +5,7 @@ import '../widgets/history_sidebar.dart';
 import '../screens/topic_detail.dart';
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
+import '../screens/search_screen.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -185,21 +186,21 @@ class _MacShellState extends State<MacShell> {
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             onPressed: () {
-              showCupertinoDialog(
-                context: context,
-                builder: (context) => CupertinoAlertDialog(
-                  title: const Text('検索'),
-                  content: const Text('検索画面（仮）'),
-                  actions: [
-                    CupertinoDialogAction(
-                      child: const Text('閉じる'),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
+              // 今アクティブなタブの Navigator を取ってくる
+              final nav = _tabNavKeys[_index].currentState;
+              if (nav == null) return;
+
+              nav.push(
+                CupertinoPageRoute(
+                  builder: (_) => const SearchScreen(),
                 ),
               );
             },
-            child: const Icon(CupertinoIcons.search, size: 22, color: CupertinoColors.activeBlue),
+            child: const Icon(
+              CupertinoIcons.search,
+              size: 22,
+              color: CupertinoColors.activeBlue,
+            ),
           ),
         ],
       ),

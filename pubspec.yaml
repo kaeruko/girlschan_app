@@ -23,7 +23,7 @@ dependencies:
   cupertino_icons: ^1.0.6
 
   # デスクトップ専用（iOSでは呼ばない＝安全）
-  window_manager: ^0.3.7
+  window_manager: ^0.5.1
   webview_flutter: ^4.13.0
   webview_flutter_wkwebview: ^3.23.1
 
