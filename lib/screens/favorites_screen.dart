@@ -48,21 +48,54 @@ class FavoritesScreenState extends State<FavoritesScreen>
     }
   }
 
-  Future<void> _loadWatchedTopics() async {
-    if (_inFlight) return;  // ★ 既に読込中なら実行しない
+Future<void> _loadWatchedTopics() async {
+    if (_inFlight) return;
     _inFlight = true;
     try {
-      //logd('📚 [_loadWatchedTopics] 履歴トピック読み込み開始', name: 'Favorites');
+      // 1. SharedPreferences から基本リストを取得
       final topics = await getWatchedTopics();
-      //logd('📚 [_loadWatchedTopics] ✅ 読み込み完了: ${topics.length}件', name: 'Favorites');
       
-      for (int i = 0; i < topics.length; i++) {
-        final topic = topics[i];
-        //logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'Favorites');
-      }
+      // 2. 各トピックについて、キャッシュファイルの最終更新日時を取得して埋め込む
+      //    並列処理(Future.wait)にして高速化します
+      await Future.wait(topics.map((topic) async {
+        final int id = topic['id'];
+        // キャッシュキー (topic_tile.dartの実装に合わせる)
+        final cacheKey = 'comments_$id';
+        
+        // CacheServiceからファイルの更新日時を取得
+        final modTime = await CacheService.getModifiedTime(cacheKey);
+        
+        // 一時的なキーとして保存 (UI表示用ではなくソート用)
+        topic['_cache_updated_at'] = modTime;
+      }));
 
-      // もし時系列表示したいなら（存在するキー名に合わせて）
-      // topics.sort((a, b) => DateTime.parse(b['watchedAt']).compareTo(DateTime.parse(a['watchedAt'])));
+      // 3. ソート実行
+      //    優先順位: 
+      //      1. キャッシュ更新日時が新しい順
+      //      2. キャッシュがない場合は watchedAt (登録日時) が新しい順
+      topics.sort((a, b) {
+        final timeA = a['_cache_updated_at'] as DateTime?;
+        final timeB = b['_cache_updated_at'] as DateTime?;
+
+        // 両方にキャッシュがある場合 -> 新しい順
+        if (timeA != null && timeB != null) {
+          return timeB.compareTo(timeA);
+        }
+
+        // 片方だけキャッシュがある場合 -> キャッシュありを優先(上に来る)
+        if (timeA != null) return -1;
+        if (timeB != null) return 1;
+
+        // 両方キャッシュがない場合 -> 登録日時(watchedAt)で比較
+        final watchedA = DateTime.tryParse(a['watchedAt'] ?? '');
+        final watchedB = DateTime.tryParse(b['watchedAt'] ?? '');
+        
+        if (watchedA != null && watchedB != null) {
+          return watchedB.compareTo(watchedA);
+        }
+        
+        return 0; // どちらも日時不明ならそのまま
+      });
 
       if (!mounted) return;
       setState(() {
@@ -70,11 +103,11 @@ class FavoritesScreenState extends State<FavoritesScreen>
         _loading = false;
       });
     } catch (e) {
-      //logd('❌ [_loadWatchedTopics] エラー: $e', name: 'Favorites');
+      logd('❌ [_loadWatchedTopics] エラー: $e', name: 'Favorites');
       if (!mounted) return;
       setState(() => _loading = false);
     } finally {
-      _inFlight = false;  // ★ ロード終了
+      _inFlight = false;
     }
   }
 
@@ -156,3 +189,4 @@ class FavoritesScreenState extends State<FavoritesScreen>
     );
   }
 }
+

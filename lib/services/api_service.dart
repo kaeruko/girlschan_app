@@ -247,8 +247,6 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
   }
 }
 
-// ========== 履歴リスト関連（旧「お気に入りトピック」） ==========
-
 // ========== 履歴関連（トピック履歴） ==========
 
 Future<List<Map<String, dynamic>>> getWatchedTopics() async {
