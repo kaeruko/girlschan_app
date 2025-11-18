@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
+import '../app/app_tabs.dart'; // ★ 追加
 import '../widgets/common/app_toast.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
@@ -154,8 +155,11 @@ class FavoritesScreenState extends State<FavoritesScreen>
     }
 
     _metaUpdating = true;
+    historyUpdatingNotifier.value = true; // ★ 回転開始
+
     _runMetaUpdateLoop().whenComplete(() {
       _metaUpdating = false;
+      historyUpdatingNotifier.value = false; // ★ 回転終了
     });
   }
 

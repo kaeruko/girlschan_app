@@ -53,7 +53,16 @@ class _IOSShellState extends State<IOSShell> {
       tabBar: CupertinoTabBar(
         items: [
           for (final t in widget.tabs)
-            BottomNavigationBarItem(icon: Icon(t.icon), label: t.label),
+            if (t.id == 'tab_favorites')
+              BottomNavigationBarItem(
+                icon: _RotatingIcon(
+                  loadingNotifier: historyUpdatingNotifier,
+                  child: Icon(t.icon),
+                ),
+                label: t.label,
+              )
+            else
+              BottomNavigationBarItem(icon: Icon(t.icon), label: t.label),
         ],
       ),
       tabBuilder: (context, i) {
@@ -74,6 +83,83 @@ class _IOSShellState extends State<IOSShell> {
             );
         }
       },
+    );
+  }
+}
+
+class _RotatingIcon extends StatefulWidget {
+  final ValueNotifier<bool> loadingNotifier;
+  final Widget child;
+
+  const _RotatingIcon({
+    super.key,
+    required this.loadingNotifier,
+    required this.child,
+  });
+
+  @override
+  State<_RotatingIcon> createState() => _RotatingIconState();
+}
+
+class _RotatingIconState extends State<_RotatingIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    );
+    widget.loadingNotifier.addListener(_onLoadingChanged);
+    // 初期状態チェック
+    if (widget.loadingNotifier.value) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_RotatingIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.loadingNotifier != widget.loadingNotifier) {
+      oldWidget.loadingNotifier.removeListener(_onLoadingChanged);
+      widget.loadingNotifier.addListener(_onLoadingChanged);
+      // 新しいnotifierの状態を反映
+      _onLoadingChanged();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.loadingNotifier.removeListener(_onLoadingChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onLoadingChanged() {
+    if (widget.loadingNotifier.value) {
+      if (!_controller.isAnimating) {
+        _controller.repeat();
+      }
+    } else {
+      if (_controller.isAnimating) {
+        // 現在の回転位置から0に戻すアニメーションをして止める
+        // 単に stop() だと唐突に止まるので、forward() で 1.0 まで回し切るか、
+        // reset() するか。ここでは自然に止めるために animateTo を使う手もあるが、
+        // シンプルに reset で止める（あるいは stop して reset）。
+        // 今回は「回転し続ける」→「止まる」なので、stop() してから reset() で元の位置に戻す。
+        _controller.stop();
+        _controller.reset();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: widget.child,
     );
   }
 }

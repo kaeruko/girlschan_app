@@ -35,6 +35,9 @@ final favoritesScreenStateKey = GlobalKey<FavoritesScreenState>();  // ★ 型�
 final clipsScreenStateKey = GlobalKey<ClipsScreenState>();  // ★ 型付き
 final _searchKey = GlobalKey<SearchScreenState>();
 
+// ★ 履歴更新中かどうかを通知する Notifier
+final ValueNotifier<bool> historyUpdatingNotifier = ValueNotifier(false);
+
 final List<TabSpec> kAppTabs = [
   TabSpec(
     id: 'tab_new',
