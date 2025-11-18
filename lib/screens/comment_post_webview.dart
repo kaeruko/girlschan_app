@@ -92,25 +92,6 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
           if (!_alive || !mounted) return; // ガード
           logd('✅ [onPageFinished]', name: 'CommentPostWebView');
           _safeSetState(() => _loading = false);
-          
-          // 初期テキストがあれば textarea に流し込む（最初の textarea を対象）
-          if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-            final js = '''
-              (function(t){
-                try{
-                  var ta = document.querySelector('textarea');
-                  if(ta){ ta.value = t; return 1; }
-                  return 0;
-                }catch(e){ return -1; }
-              })(${_escapeForJs(widget.initialText!)});
-            ''';
-            try {
-              await _ctrl.runJavaScriptReturningResult(js);
-              logd('✅ [initialText] Injected into textarea', name: 'CommentPostWebView');
-            } catch (e) {
-              logd('⚠️ [initialText] Failed to inject: $e', name: 'CommentPostWebView');
-            }
-          }
         },
         onNavigationRequest: (req) {
           // 完了後は全遷移をブロック（連打や戻るで二重送信しない）
@@ -124,17 +105,27 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
       ),
     );
 
-    // Cookie 事前投入
+    // Cookie だけ先に突っ込んでおく（girlschannel のクッキー）
     await WebViewEnv.primeCookies(
       baseUri: widget.postPageUrl,
       cookies: widget.primeCookies,
     );
 
-    logd('🚀 [_init] Loading ${widget.postPageUrl}',
-        name: 'CommentPostWebView');
-
-    // 1ページ目をロード
-    await _ctrl.loadRequest(widget.postPageUrl);
+    // ここを分岐：
+    // initialText があれば → 確認画面へ直接 POST
+    // なければ → これまで通りトピックページを開く
+    if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+      final html = _buildConfirmPostHtml(
+        topicId: widget.topicId,
+        text: widget.initialText!,
+      );
+      await _ctrl.loadHtmlString(
+        html,
+        baseUrl: 'https://girlschannel.net/', // Referer/Origin 用
+      );
+    } else {
+      await _ctrl.loadRequest(widget.postPageUrl);
+    }
   }
 
   bool _isSuccessUrl(Uri u) {
@@ -259,4 +250,46 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
 
 /// 文字列をJavaScriptリテラルにエスケープ
 String _escapeForJs(String s) => jsonEncode(s);
+
+String _buildConfirmPostHtml({
+    required int topicId,
+    required String text,
+  }) {
+    // textarea 中身としてエスケープ
+    final escaped = const HtmlEscape(HtmlEscapeMode.element).convert(text);
+
+    return '''
+<!doctype html>
+<html lang="ja">
+  <body>
+    <form id="f"
+      action="https://girlschannel.net/make_comment/$topicId/"
+      method="POST"
+      enctype="multipart/form-data">
+
+      <!-- 本文 -->
+      <textarea name="text" style="display:none;">$escaped</textarea>
+
+      <!-- ファイルは使わないが、元フォームと同じ name だけ用意しておく -->
+      <input type="file" name="add_pic" style="display:none;" />
+
+      <!-- 名前（空のまま） -->
+      <input type="hidden" name="name" value="">
+
+      <!-- 匿名で投稿（チェック済み相当） -->
+      <input type="hidden" name="anonymous" value="匿名で投稿">
+
+      <!-- 元フォームと同じ hidden -->
+      <input type="hidden" name="is_next" value="0">
+      <input type="hidden" name="is_post" value="1">
+
+    </form>
+    <script>
+      // ページ読み込み直後に自動で送信 → サーバ側の確認画面が返ってくる
+      document.getElementById('f').submit();
+    </script>
+  </body>
+</html>
+''';
+  }
 

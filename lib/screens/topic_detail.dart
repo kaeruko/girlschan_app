@@ -8,8 +8,9 @@ import '../models/comment.dart';
 import '../services/api_service.dart';
 import '../utils/platform_helper.dart';
 import '../controllers/topic_detail_controller.dart';
-import '../utils/variable_list_measurer.dart';
 import '../widgets/measure_size.dart';
+import '../utils/variable_list_measurer.dart';
+import 'comment_compose_page.dart';
 import 'comment_post_webview.dart';
 import 'image_viewer_page.dart';
 
@@ -185,7 +186,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final frac = (h <= 0) ? 0.0 : ((off - rowTop) / h).clamp(0.0, 1.0);
 
     final globalIndex = page * _pageSize + idxInPage;
-    _vm.saveScrollByIndexAndFraction(globalIndex, frac);
+    _vm.saveScrollByIndexAndFraction(globalIndex.toInt(), frac);
   }
 
   // ========== 4) 追加: 復元（savedCommentNo をページにマップ） ==========
@@ -1158,17 +1159,23 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   Future<void> _openPostDialog() async {
     if (!mounted) return;
-    await Navigator.push(
+
+    final result = await Navigator.push<bool>(
       context,
       CupertinoPageRoute(
-        builder: (_) => CommentPostWebView(
+        builder: (_) => CommentComposePage(
           topicId: widget.topicId,
           title: widget.title,
-          postPageUrl: Uri.parse('https://girlschannel.net/topics/${widget.topicId}'),
         ),
       ),
     );
+
     if (!mounted) return;
+
+    if (result == true) {
+      // 投稿されたのでコメント一覧を再読込したりする
+      // await _vm.reloadComments();
+    }
   }
 
   Widget _buildPlusMinusGraph(int plus, int minus) {
