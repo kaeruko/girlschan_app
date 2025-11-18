@@ -114,8 +114,7 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
       
       // ★ Python側のキー名 'total_count' に合わせる
       // APIが count を返している場合は 'count' でOK。先ほどのPythonコードでは 'total_count'
-      final total = result['total_count'] ; is int ? result['total_count'] as int : 0;
-
+      final total = result['total_count'] as int? ?? 0;
       setState(() {
         _currentQuery = query;
         _totalCount = total;

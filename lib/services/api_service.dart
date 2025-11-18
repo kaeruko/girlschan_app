@@ -199,6 +199,7 @@ Future<List<dynamic>> fetchPopularTopicsWithCache() async {
 }
 
 // キャッシュ対応のコメント取得（ページング対応）
+// キャッシュ対応のコメント取得（ページング対応）
 Future<Map<String, dynamic>> fetchCommentsWithPagination(
   int topicId, {
   int offset = 0,
@@ -225,19 +226,27 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     // logd('💬 [fetchCommentsWithPagination] Parsing JSON...');
     final comments = data['comments'] as List<dynamic>? ?? [];
     final total = data['total'] as int? ?? comments.length;
-    final posted_at = data['posted_at'] as String? ?? '';
     
+    // ★追加: Python側から返ってくる新しいフィールドを取得
+    final posted_at = data['posted_at'] as String? ?? '';
+    final thumb = data['thumb'] as String?; // nullの場合もあるので nullable
+
     // logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
     // logd('💬 [fetchCommentsWithPagination] Offset: $offset, Limit: $limit');
     
-    // totalをメタキャッシュに保存（watched_topicsの更新用）
-    await CacheService.saveMap('topic_meta_$topicId', {'total': total});
-    // logd('💬 [fetchCommentsWithPagination] 💾 Cached total: $total for topic $topicId');
+    // ★修正: totalだけでなく、サムネや日時もメタキャッシュに保存しておく
+    await CacheService.saveMap('topic_meta_$topicId', {
+      'total': total,
+      'posted_at': posted_at,
+      'thumb': thumb,
+    });
+    // logd('💬 [fetchCommentsWithPagination] 💾 Cached meta for topic $topicId');
     
     return {
       'comments': comments,
       'total': total,
       'posted_at': posted_at,
+      'thumb': thumb, // ★戻り値に追加
       'offset': offset,
       'limit': limit,
     };
@@ -246,7 +255,6 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     rethrow;
   }
 }
-
 // ========== 履歴関連（トピック履歴） ==========
 
 Future<List<Map<String, dynamic>>> getWatchedTopics() async {
@@ -331,7 +339,6 @@ Future<void> removeWatchedTopicId(int id) async {
   }
 }
 
-
 /// APIから取得したトピックリストで、watchedTopicsのコメント数を更新
 Future<void> updateWatchedTopicsComments(
   List<Map<String, dynamic>> fetchedTopics,
@@ -341,16 +348,14 @@ Future<void> updateWatchedTopicsComments(
     final jsonList = prefs.getStringList('watched_topics_full') ?? [];
     
     if (jsonList.isEmpty) {
-      return; // watchedTopicsがなければスキップ
+      return;
     }
     
-    // APIから取得したトピックをMapに変換（IDをキーに）
     final fetchedMap = {
       for (final topic in fetchedTopics) 
         (topic['id'] as int): topic
     };
     
-    // watchedTopicsを更新
     bool updated = false;
     for (int i = 0; i < jsonList.length; i++) {
       final watched = jsonDecode(jsonList[i]) as Map<String, dynamic>;
@@ -358,23 +363,53 @@ Future<void> updateWatchedTopicsComments(
       
       if (fetchedMap.containsKey(topicId)) {
         final fetchedComments = fetchedMap[topicId]!['comments'] as int?;
-        if (fetchedComments != null && 
-            watched['comments'] != fetchedComments) {
-          // コメント数が更新されていたら更新
+        
+        if (fetchedComments != null ) {          
           watched['comments'] = fetchedComments;
           jsonList[i] = jsonEncode(watched);
           updated = true;
-          // logd('📝 [updateWatchedTopicsComments] Updated topic $topicId: ${watched['comments']} comments', name: 'WatchedUpdate');
         }
       }
     }
     
     if (updated) {
       await prefs.setStringList('watched_topics_full', jsonList);
-      // logd('📝 [updateWatchedTopicsComments] ✅ Saved updated watched topics', name: 'WatchedUpdate');
     }
   } catch (e) {
-    // logd('📝 [updateWatchedTopicsComments] ❌ Error: $e', name: 'WatchedUpdate');
+    // エラー処理
+  }
+}
+
+/// トピックを閲覧したとして、watchedAt（最終閲覧日時）を現在時刻に更新する
+Future<void> touchWatchedTopic(int topicId) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+    
+    bool updated = false;
+    
+    // リストを走査して該当IDを探す
+    for (int i = 0; i < jsonList.length; i++) {
+      final Map<String, dynamic> topic = jsonDecode(jsonList[i]);
+      
+      if (topic['id'] == topicId) {
+        // 日時を現在時刻に更新
+        topic['watchedAt'] = DateTime.now().toIso8601String();
+        
+        // リストを更新
+        jsonList[i] = jsonEncode(topic);
+        updated = true;
+        break; // IDはユニークなので見つかったら終了
+      }
+    }
+    
+    if (updated) {
+      // 更新があった場合のみ保存
+      await prefs.setStringList('watched_topics_full', jsonList);
+      // logd('👆 [touchWatchedTopic] Updated timestamp for ID: $topicId');
+    }
+  } catch (e) {
+    // logd('❌ [touchWatchedTopic] Error: $e');
   }
 }
 

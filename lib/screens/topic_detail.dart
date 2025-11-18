@@ -358,7 +358,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
 
     // うまく行かなければ次フレームで再挑戦
-    print('[復元] 60回試行失敗、再スケジュール');
     meas.markRestoreTargetIndex(null);
     _restoring = false;
     _boostCacheDuringRestore = false;

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/cache_service.dart';
 import '../screens/topic_detail.dart';
+import '../utils/log.dart';
 import 'topic_tile_controller.dart';
 
 /// 共通トピックタイル（Material 依存ナシ）
@@ -21,8 +22,7 @@ class TopicTile extends StatefulWidget {
   /// false の場合はキャッシュ有無（コメントキャッシュ）と連動させる。
   final bool removeButtonAlwaysVisible;
 
-  /// 詳細から戻った直後に呼ばれる（自分→全体の順で更新する前後に外側の再評価を差し込みたい時）
-  final VoidCallback? onAfterPop;
+  final Future<void> Function()? onAfterPop; // または FutureOr<void> Function()?
 
   /// サムネイルの表示ON/OFF（お気に入りではナシ、一覧ではアリ等）
   final bool showThumb;
@@ -80,6 +80,29 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   Future<void> refreshCacheState() async {
     final id = widget.topic['id'] as int;
 
+    // 1. まずメタデータ（詳細画面で保存した最新情報）を確認して反映
+    //    ここが今回の修正ポイントです
+    try {
+      final meta = await CacheService.loadMap('topic_meta_$id');
+      if (meta != null) {
+        if (mounted) {
+          setState(() {
+            // メタデータに日時があれば上書き
+            if (meta['posted_at'] != null && meta['posted_at'].toString().isNotEmpty) {
+              widget.topic['posted_at'] = meta['posted_at'];
+            }
+            // メタデータにサムネがあれば上書き
+            if (meta['thumb'] != null && meta['thumb'].toString().isNotEmpty) {
+              widget.topic['thumb'] = meta['thumb'];
+            }
+          });
+        }
+      }
+    } catch (e) {
+      // エラーは無視
+    }
+
+    // 2. コメントキャッシュ（既読状態）の確認（既存の処理）
     final hasCached = await CacheService.exists('comments_$id');
 
     int saved = 0;
@@ -89,9 +112,9 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     if (hasCached) {
       final prefs = await SharedPreferences.getInstance();
       saved = prefs.getInt('scroll_$id') ?? 0;
-      // build() 内ではなくここで await
       modifiedTime = await CacheService.getModifiedTime('comments_$id');
-      // ★キャッシュからコメント数を取得
+      
+      // リスト長を取得（コメント数バッジ用）
       final cachedList = await CacheService.loadList('comments_$id');
       cachedCount = cachedList.length;
     }
@@ -101,7 +124,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       _hasCachedComments = hasCached;
       _savedCommentNo = saved;
       _cacheModifiedTime = modifiedTime;
-      // ★キャッシュがあればwidget.topic['comments']も更新
+      
       if (cachedCount != null && cachedCount > 0) {
         widget.topic['comments'] = cachedCount;
       }
@@ -171,20 +194,40 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () async {
+          // ① まず“今このタイルに紐づいている”コールバックを確保（ここが重要）
+          final afterPop = widget.onAfterPop;
+
+          logd('👆 [TopicTile] Tap detected: ID=${widget.topic['id']}', name: 'TileNav');
+
           await Navigator.of(context).push(
             CupertinoPageRoute(
               builder: (_) => TopicDetailScreen(
                 topicId: id,
                 title: title,
                 commentCount: comments,
-                posted_at: posted_at ?? '',
+                posted_at: posted_at,
               ),
             ),
           );
-          // 外側フック → 自分更新 → 全体更新（順）
-          widget.onAfterPop?.call();
+
+          logd('🔙 [TopicTile] Returned from Detail: ID=${widget.topic['id']}', name: 'TileNav');
+
+          // ② “キャプチャ済み” のコールバックを呼ぶ（await してOK）
+          final cb = widget.onAfterPop;
+          if (cb != null) {
+            logd('📞 [TopicTile] Calling onAfterPop hash=${identityHashCode(cb)}', name: 'TileNav');
+            try {
+              await cb();
+              logd('✅ [TopicTile] onAfterPop completed hash=${identityHashCode(cb)}', name: 'TileNav');
+            } catch (e, st) {
+              logd('❌ [TopicTile] onAfterPop error: $e\n$st', name: 'TileNav');
+            }
+          } else {
+            logd('⚠️ [TopicTile] onAfterPop is NULL', name: 'TileNav');
+          }
+
           if (mounted) await refreshCacheState();
-          await widget.controller.refreshAll();
+          // await widget.controller.refreshAll(); // 親でやっているなら不要のままでOK
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

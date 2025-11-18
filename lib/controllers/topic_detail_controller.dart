@@ -216,17 +216,19 @@ class TopicDetailController extends ChangeNotifier {
     final watched = await getWatchedTopicIds();
     final clips = await getClippedComments();
     _isWatched = watched.contains(topicId);
-    _clippedNos = clips.where((c) => c['topicId'] == topicId).map<int>((c) => c['no'] as int).toSet();
+    _clippedNos = clips
+        .where((c) => c['topicId'] == topicId)
+        .map<int>((c) => c['no'] as int)
+        .toSet();
 
-    if (!_isWatched) {
-      await addWatchedTopic(
-        id: topicId,
-        title: title,
-        comments: commentCount,
-        posted_at: postedAt,
-      );
-      _isWatched = true;
-    }
+    // ★ ここで必ず watchedAt を「今」にする（新規でも既存でも）
+    await _touchWatchedTopic(
+      id: topicId,
+      title: title,
+      comments: commentCount,
+      postedAt: postedAt,
+    );
+    _isWatched = true;
 
     // キャッシュ
     final cacheKey = 'comments_$topicId';
@@ -265,6 +267,11 @@ class TopicDetailController extends ChangeNotifier {
       _freezeSaving();
       _loading = false;
       notifyListeners();
+
+      // watchedTopicsのコメント数を更新
+      await updateWatchedTopicsComments([
+        {'id': topicId, 'comments': _totalComments}
+      ]);
     } catch (e) {
       _loading = false;
       notifyListeners();
@@ -336,7 +343,7 @@ class TopicDetailController extends ChangeNotifier {
         _totalComments = fetchedTotal;
       } else {
         // Girls Channelのように No が連番なら max(No) を総件数相当として扱える
-        _totalComments = lastRemoteNo;
+        // _totalComments = lastRemoteNo;
       }
       
       // ★ 追加: キャッシュ保存
@@ -350,6 +357,11 @@ class TopicDetailController extends ChangeNotifier {
       _fetching = false;
       _loadingMore = false;
       notifyListeners(); // ★ ローディング終了を UI に通知
+
+      // watchedTopicsのコメント数を更新（通信後に必ず実行）
+      await updateWatchedTopicsComments([
+        {'id': topicId, 'comments': _totalComments}
+      ]);
     }
   }
   // --- コメント配列を更新したときに no->index を再構築 ---
@@ -431,6 +443,46 @@ class TopicDetailController extends ChangeNotifier {
     flushPendingScrollSave(); // デバウンス中の未確定分を即コミット
     _saveDebounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _touchWatchedTopic({
+    required int id,
+    required String title,
+    required int comments,
+    required String postedAt,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+
+    final nowIso = DateTime.now().toIso8601String();
+
+    // 既存エントリを探す
+    final idx = jsonList.indexWhere((s) {
+      final m = jsonDecode(s) as Map<String, dynamic>;
+      return m['id'] == id;
+    });
+
+    if (idx >= 0) {
+      // 既に watched に登録済み → 上書き
+      final watched = jsonDecode(jsonList[idx]) as Map<String, dynamic>;
+      watched['title'] = title;
+      watched['comments'] = comments;
+      watched['posted_at'] = postedAt;
+      watched['watchedAt'] = nowIso; // ★ 最終閲覧時刻を更新
+      jsonList[idx] = jsonEncode(watched);
+    } else {
+      // 初登録
+      final watched = <String, dynamic>{
+        'id': id,
+        'title': title,
+        'comments': comments,
+        'posted_at': postedAt,
+        'watchedAt': nowIso,
+      };
+      jsonList.add(jsonEncode(watched));
+    }
+
+    await prefs.setStringList('watched_topics_full', jsonList);
   }
 
 }

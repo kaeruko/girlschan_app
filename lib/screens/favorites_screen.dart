@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
@@ -48,66 +49,42 @@ class FavoritesScreenState extends State<FavoritesScreen>
     }
   }
 
-Future<void> _loadWatchedTopics() async {
-    if (_inFlight) return;
+  Future<void> _loadWatchedTopics() async {
+    debugPrint('🔄 [Favorites] _loadWatchedTopics START');
+    if (_inFlight) {
+      debugPrint('⏭️ [Favorites] _loadWatchedTopics skipped: inFlight');
+      return;
+    }
     _inFlight = true;
     try {
-      // 1. SharedPreferences から基本リストを取得
+      // 1. リスト取得
       final topics = await getWatchedTopics();
       
-      // 2. 各トピックについて、キャッシュファイルの最終更新日時を取得して埋め込む
-      //    並列処理(Future.wait)にして高速化します
-      await Future.wait(topics.map((topic) async {
-        final int id = topic['id'];
-        // キャッシュキー (topic_tile.dartの実装に合わせる)
-        final cacheKey = 'comments_$id';
-        
-        // CacheServiceからファイルの更新日時を取得
-        final modTime = await CacheService.getModifiedTime(cacheKey);
-        
-        // 一時的なキーとして保存 (UI表示用ではなくソート用)
-        topic['_cache_updated_at'] = modTime;
-      }));
-
-      // 3. ソート実行
-      //    優先順位: 
-      //      1. キャッシュ更新日時が新しい順
-      //      2. キャッシュがない場合は watchedAt (登録日時) が新しい順
+      // 2. watchedAt (最終閲覧日時) の新しい順にソート
       topics.sort((a, b) {
-        final timeA = a['_cache_updated_at'] as DateTime?;
-        final timeB = b['_cache_updated_at'] as DateTime?;
-
-        // 両方にキャッシュがある場合 -> 新しい順
-        if (timeA != null && timeB != null) {
-          return timeB.compareTo(timeA);
-        }
-
-        // 片方だけキャッシュがある場合 -> キャッシュありを優先(上に来る)
-        if (timeA != null) return -1;
-        if (timeB != null) return 1;
-
-        // 両方キャッシュがない場合 -> 登録日時(watchedAt)で比較
-        final watchedA = DateTime.tryParse(a['watchedAt'] ?? '');
-        final watchedB = DateTime.tryParse(b['watchedAt'] ?? '');
-        
-        if (watchedA != null && watchedB != null) {
-          return watchedB.compareTo(watchedA);
-        }
-        
-        return 0; // どちらも日時不明ならそのまま
+        final timeA = DateTime.tryParse(a['watchedAt'] ?? '') ?? DateTime(0);
+        final timeB = DateTime.tryParse(b['watchedAt'] ?? '') ?? DateTime(0);
+        // 降順（新しいのが上）
+        return timeB.compareTo(timeA);
       });
 
-      if (!mounted) return;
+      if (!mounted) {
+        debugPrint('⚠️ [Favorites] _loadWatchedTopics: not mounted');
+        return;
+      }
       setState(() {
         _watchedTopics = topics;
         _loading = false;
       });
-    } catch (e) {
-      logd('❌ [_loadWatchedTopics] エラー: $e', name: 'Favorites');
+      debugPrint('✅ [Favorites] _loadWatchedTopics setState done, count=${topics.length}');
+    } catch (e, st) {
+      debugPrint('❌ [Favorites] _loadWatchedTopics error: $e\n$st');
+      // エラー処理
       if (!mounted) return;
       setState(() => _loading = false);
     } finally {
       _inFlight = false;
+      debugPrint('🔚 [Favorites] _loadWatchedTopics FINALLY');
     }
   }
 
@@ -127,9 +104,10 @@ Future<void> _loadWatchedTopics() async {
     await _controller.refreshAll();
   }
 
-  void _onDetailReturned() {
-    // ★ 詳細から戻ったら再読込
-    _loadWatchedTopics();
+  Future<void> _onDetailReturned() async {
+    debugPrint('🔔 [Favorites] _onDetailReturned START');
+    await _loadWatchedTopics();
+    debugPrint('✅ [Favorites] _onDetailReturned END');
   }
 
   @override

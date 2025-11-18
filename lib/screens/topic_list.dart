@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
@@ -22,7 +23,7 @@ class TopicListScreen extends StatefulWidget {
 }
 
 class _TopicListScreenState extends State<TopicListScreen>
-    with WidgetsBindingObserver {
+  with WidgetsBindingObserver {
   late final String cacheKey;
 
   final _controller = TopicTileController();
@@ -42,6 +43,15 @@ class _TopicListScreenState extends State<TopicListScreen>
     _loadFromCache();
   }
 
+  Future<void> _onAfterPopFromTile(int idx, int id) async {
+    debugPrint('🔔 ENTER _onAfterPopFromTile index=$idx id=$id');
+    logd('🔔 [TopicList] onAfterPop received index=$idx id=$id', name: 'TopicList');
+
+    await _moveTopicToTop(idx, id);
+
+    debugPrint('✅ LEAVE _onAfterPopFromTile index=$idx id=$id');
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -56,8 +66,96 @@ class _TopicListScreenState extends State<TopicListScreen>
     }
   }
 
+  Future<void> _moveTopicToTop(int index, int topicId) async {
+    debugPrint('🔄 ENTER _moveTopicToTop index=$index id=$topicId');
+    logd('🔄 [_moveTopicToTop] Start processing index=$index, id=$topicId', name: 'TopicList');
+
+    try {
+      final metaKey = 'topic_meta_$topicId';
+      final meta = await CacheService.loadMap(metaKey);
+      
+      if (!mounted) {
+        debugPrint('⚠️ _moveTopicToTop: state not mounted, abort');
+        return;
+      }
+
+      setState(() {
+        // 1. 安全のためリストを複製（再描画を確実にトリガーするため）
+        final List<Map<String, dynamic>> newList = List.from(_topics);
+
+        // 2. インデックスがずれていないか確認＆修正
+        int currentIdx = index;
+        if (currentIdx < 0 || currentIdx >= newList.length || newList[currentIdx]['id'] != topicId) {
+           currentIdx = newList.indexWhere((t) => t['id'] == topicId);
+        }
+        if (currentIdx == -1) {
+          debugPrint('⚠️ _moveTopicToTop: target not found id=$topicId');
+          return; // 見つからなければ終了
+        }
+
+        // 3. 対象トピックを「抜き出す」
+        final targetTopic = newList.removeAt(currentIdx);
+
+        // 4. 情報を最新化する
+        final updatedTopic = {
+          ...targetTopic,
+          if (meta != null && meta['total'] != null) 'comments': meta['total'],
+          if (meta != null && meta['posted_at'] != null) 'posted_at': meta['posted_at'],
+          if (meta != null && meta['thumb'] != null) 'thumb': meta['thumb'],
+        };
+
+        // 5. リストの「先頭」に挿入する
+        newList.insert(0, updatedTopic);
+        
+        // 6. 画面用リストを差し替え
+        _topics = newList;
+        
+        logd('✅ [_moveTopicToTop] Moved to top: ${updatedTopic['title']}', name: 'TopicList');
+      });
+      
+      // 7. タイルコントローラーのリフレッシュ（重要）
+      await _controller.refreshAll();
+      debugPrint('✅ LEAVE _moveTopicToTop id=$topicId');
+
+    } catch (e, st) {
+      debugPrint('❌ _moveTopicToTop exception: $e\n$st');
+      logd('❌ [_moveTopicToTop] Error: $e', name: 'TopicList');
+    }
+  }
+
+  Future<void> _moveTopicToTopById(int topicId) async {
+    debugPrint('🔄 ENTER _moveTopicToTopById id=$topicId');
+    try {
+      final meta = await CacheService.loadMap('topic_meta_$topicId');
+      if (!mounted) return;
+
+      setState(() {
+        final newList = List<Map<String, dynamic>>.from(_topics);
+        final currentIdx = newList.indexWhere((t) => t['id'] == topicId);
+        if (currentIdx == -1) {
+          debugPrint('⚠️ _moveTopicToTopById: target not found id=$topicId');
+          return;
+        }
+        final target = newList.removeAt(currentIdx);
+        final updated = {
+          ...target,
+          if (meta?['total'] != null) 'comments': meta!['total'],
+          if (meta?['posted_at'] != null) 'posted_at': meta!['posted_at'],
+          if (meta?['thumb'] != null) 'thumb': meta!['thumb'],
+        };
+        newList.insert(0, updated);
+        _topics = newList;
+      });
+
+      await _controller.refreshAll();
+      debugPrint('✅ LEAVE _moveTopicToTopById id=$topicId');
+    } catch (e, st) {
+      debugPrint('❌ _moveTopicToTopById exception: $e\n$st');
+    }
+  }
+
   Future<void> _loadFromCache() async {
-    // logd('📂 [_loadFromCache] Loading topics from cache... (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
+    // logd(' [_loadFromCache] Loading topics from cache... (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
     final cached = await CacheService.loadList(cacheKey);
     // logd('📂 [_loadFromCache] キャッシュ件数: ${cached.length} (cacheKey=$cacheKey)', name: 'TopicList');
@@ -104,7 +202,7 @@ class _TopicListScreenState extends State<TopicListScreen>
         // logd('  [${i + 1}] id=${topic['id']}, title=${topic['title']}, comments=${topic['comments']}', name: 'TopicList');
       }
       
-      // ⭐ watchedTopicsのコメント数を更新
+      //  watchedTopicsのコメント数を更新
       await updateWatchedTopicsComments(list);
       
       await CacheService.saveList(cacheKey, list);
@@ -152,7 +250,7 @@ class _TopicListScreenState extends State<TopicListScreen>
       );
     }
 
-    // logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
+    logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
     return Scaffold(
       body: Column(
@@ -170,14 +268,17 @@ class _TopicListScreenState extends State<TopicListScreen>
                         itemCount: _topics.length,
                         itemBuilder: (context, index) {
                           final topic = _topics[index];
-                          // logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
+                          logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
+                          final id = topic['id'] as int;
+                          final idx = index;
                           return TopicTile(
-                            key: ValueKey<int>(topic['id'] as int), // ★ これ必須
+                            key: ValueKey<int>(id), // ★ これ必須
                             topic: topic,
                             controller: _controller,
                             showThumb: true,                      // 一覧はサムネ表示
                             showRemoveButton: true,
                             onRemove: _removeCommentsCache,        // ×でコメントキャッシュ削除
+                            onAfterPop: () => _onAfterPopFromTile(idx, id),
                           );
                         },
                       ),
