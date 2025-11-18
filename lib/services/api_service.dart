@@ -149,6 +149,83 @@ Future<Map<String, dynamic>> searchTopics({
   }
 }
 
+// 1件分のメタ情報を取得する
+Future<Map<String, dynamic>> fetchTopicMeta(int topicId) async {
+  final url = Uri.parse('$apiBase/topics/meta');
+  final payload = jsonEncode({
+    'ids': [topicId],
+    'offset': 0,
+    'limit': 1,
+  });
+
+  logd('📡 [fetchTopicMeta] POST $url payload=$payload', name: 'API');
+
+  final resp = await http
+      .post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: payload,
+      )
+      .timeout(const Duration(seconds: 30));
+
+  if (resp.statusCode != 200) {
+    throw Exception('fetchTopicMeta failed: ${resp.statusCode}');
+  }
+
+  final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+  final topics = decoded['topics'] as List<dynamic>? ?? const [];
+  if (topics.isEmpty) {
+    throw Exception('fetchTopicMeta empty result for id=$topicId');
+  }
+
+  return topics.first as Map<String, dynamic>;
+}
+
+/// watched_topics_full の中の 1件だけを meta で更新し、
+/// 「コメント数が増えていたら true」を返す
+Future<bool> updateWatchedTopicFromMeta(Map<String, dynamic> meta) async {
+  final topicId = meta['id'] as int;
+  final newTotal = (meta['total'] as int?) ?? 0;
+  final newThumb = meta['thumb'];
+  final newPostedAt = meta['posted_at'];
+
+  final prefs = await SharedPreferences.getInstance();
+  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
+
+  bool updated = false;
+  bool hasNewComments = false;
+
+  for (int i = 0; i < jsonList.length; i++) {
+    final watched = jsonDecode(jsonList[i]) as Map<String, dynamic>;
+    if (watched['id'] != topicId) continue;
+
+    final oldTotal = (watched['comments'] as int?) ?? 0;
+    if (newTotal > oldTotal) {
+      hasNewComments = true;
+    }
+
+    // コメント数
+    watched['comments'] = newTotal;
+
+    // 投稿日・サムネはあれば上書き
+    if (newPostedAt is String && newPostedAt.isNotEmpty) {
+      watched['posted_at'] = newPostedAt;
+    }
+    if (newThumb is String && newThumb.isNotEmpty) {
+      watched['thumb'] = newThumb;
+    }
+
+    jsonList[i] = jsonEncode(watched);
+    updated = true;
+    break;
+  }
+
+  if (updated) {
+    await prefs.setStringList('watched_topics_full', jsonList);
+  }
+
+  return hasNewComments;
+}
 
 
 // キャッシュ対応のトピック取得

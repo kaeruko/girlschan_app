@@ -2,10 +2,12 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
+import '../widgets/common/app_toast.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
 import '../utils/log.dart';
+import '../screens/topic_detail.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -22,10 +24,39 @@ class FavoritesScreenState extends State<FavoritesScreen>
   bool _loading = true;
   bool _refreshing = false;  // ★ リフレッシュスピナー用（_loading とは別）
   bool _inFlight = false;  // ★ 重複ロード防止
+  bool _metaUpdating = false; // ★ メタ更新ジョブが走っているかどうか
 
   /// ★ app_tab 側から叩くための公開メソッド
   void reloadFromOutside() {
     _loadWatchedTopics();
+  }
+
+  DateTime? parseGirlsChanPostedAt(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+
+    // 1) 「〜前」は全部「最近」とみなす（fetch対象）
+    //    → dat落ち判定には使わないので、敢えて now を返してOK
+    if (s.contains('前')) {
+      return DateTime.now();
+    }
+
+    // 2) "2025/11/18(火) 18:37" みたいな形式をパース
+    //    年/月/日(…)? 時:分 を拾う
+    final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2}).*?(\d{1,2}):(\d{2})')
+        .firstMatch(s);
+    if (m != null) {
+      final year = int.parse(m.group(1)!);
+      final month = int.parse(m.group(2)!);
+      final day = int.parse(m.group(3)!);
+      final hour = int.parse(m.group(4)!);
+      final minute = int.parse(m.group(5)!);
+      return DateTime(year, month, day, hour, minute);
+    }
+
+    // 3) それ以外はよくわからないので「最近」とみなして fetch させたいなら
+    //    null ではなく now を返しておいてもいい
+    return DateTime.now();
   }
 
   @override
@@ -89,10 +120,16 @@ class FavoritesScreenState extends State<FavoritesScreen>
   }
 
   Future<void> _refreshWatched() async {
-    if (_refreshing || _inFlight) return;  // ★ ガード
+    if (_refreshing || _inFlight) return;  // ガード
     setState(() => _refreshing = true);
+
+    // まずローカルの履歴を読み直して UI を最新にする
     await _loadWatchedTopics();
+
     if (mounted) setState(() => _refreshing = false);
+
+    // メタ情報更新は UI とは独立して裏側でゆっくり回す
+    _startBackgroundMetaUpdate();
   }
 
   Future<void> _removeFromWatch(int topicId) async {
@@ -110,14 +147,113 @@ class FavoritesScreenState extends State<FavoritesScreen>
     debugPrint('✅ [Favorites] _onDetailReturned END');
   }
 
+  void _startBackgroundMetaUpdate() {
+    if (_metaUpdating) {
+      debugPrint('⏭️ [Favorites] meta update already running');
+      return;
+    }
+
+    _metaUpdating = true;
+    _runMetaUpdateLoop().whenComplete(() {
+      _metaUpdating = false;
+    });
+  }
+
+  Future<void> _runMetaUpdateLoop() async {
+    debugPrint('🚀 [Favorites] meta update loop start');
+
+    // スナップショットを取っておく（途中で _watchedTopics が変わっても安全に処理できる）
+    final topics = List<Map<String, dynamic>>.from(_watchedTopics);
+    final now = DateTime.now();
+
+    for (final t in topics) {
+      if (!mounted) break;
+
+      final id = t['id'] as int?;
+      if (id == null) continue;
+
+      // dat落ちチェック: posted_at が 1ヶ月より前ならスキップ
+      final postedAtStr = (t['posted_at'] as String? ?? '').trim();
+
+      // ★ GirlsChannel専用パーサで解釈
+      final postedAt = postedAtStr.isEmpty
+          ? null
+          : parseGirlsChanPostedAt(postedAtStr);
+
+      // postedAt が null → よく分からない → 「最近」とみなして fetch 続行
+      // postedAt があって 31日より前 → dat落ち扱いでスキップ
+      if (postedAt != null) {
+        final diffDays = now.difference(postedAt).inDays;
+        if (diffDays > 31) {
+          debugPrint('⏭️ [Favorites] skip id=$id (dat落ち: $diffDays days, postedAt="$postedAtStr")');
+          continue;
+        }
+      }
+
+      final beforeComments = (t['comments'] as int?) ?? 0;
+
+      try {
+        debugPrint('📡 [Favorites] fetch meta for id=$id');
+        final meta = await fetchTopicMeta(id);
+        debugPrint('📡 [Favorites] meta result for id=$id: $meta');
+        final hasNew = await updateWatchedTopicFromMeta(meta);
+        debugPrint('📡 [Favorites] hasNew for id=$id: $hasNew');
+
+      if (hasNew && mounted) {
+        final afterComments = (meta['total'] as int?) ?? beforeComments;
+        final title = (meta['title'] as String?) ?? 'トピック';
+        final topicId = id!;
+        final postedAtStr = meta['posted_at'] as String? ?? '';
+
+        debugPrint('🚨 [Favorites] showing toast for id=$topicId: beforeComments=$beforeComments, afterComments=$afterComments, title="$title"');
+
+        AppToast.show(
+          context,
+          '「$title」に新着 ($beforeComments → $afterComments)',
+          onTap: () {
+            debugPrint('👉 [Favorites] toast tapped for id=$topicId');
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => TopicDetailScreen(
+                  topicId: topicId,
+                  title: title,
+                  commentCount: afterComments,
+                  posted_at: postedAtStr,
+                ),
+              ),
+            );
+          },
+        );
+      } else {
+        debugPrint('🚨 [Favorites] NOT showing toast for id=$id: hasNew=$hasNew, mounted=$mounted');
+      }
+    } catch (e, st) {
+      debugPrint('❌ [Favorites] meta update error id=$id: $e\n$st');
+    }
+
+      // ガルちゃん側へのスクレイプ負荷を抑えるためにウェイト
+      await Future.delayed(const Duration(seconds: 5));
+    }
+
+    // 全件終わったら、更新されたコメント数・thumb・posted_at を反映するためもう一度読み直す
+    if (mounted) {
+      await _loadWatchedTopics();
+    }
+
+    debugPrint('🏁 [Favorites] meta update loop end');
+  }
+
+
+
+
   @override
   Widget build(BuildContext context) {
+    Widget body;
+
     if (_loading) {
-      return const Center(child: AppSpinner(size: 20));
-    }
-    if (_watchedTopics.isEmpty) {
-      // //logd('📚 [Favorites.build] 履歴トピックなし', name: 'Favorites');
-      return Center(
+      body = const Center(child: AppSpinner(size: 20));
+    } else if (_watchedTopics.isEmpty) {
+      body = Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -131,39 +267,45 @@ class FavoritesScreenState extends State<FavoritesScreen>
           ],
         ),
       );
-    }
-
-    // //logd('📚 [Favorites.build] UI描画: ${_watchedTopics.length}件の履歴トピック表示', name: 'Favorites');
-
-    return Column(
-      children: [
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshWatched,
-            child: CupertinoScrollbar(
-              controller: _scrollController,
-              child: ListView.builder(
+    } else {
+      body = Column(
+        children: [
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshWatched,
+              child: CupertinoScrollbar(
                 controller: _scrollController,
-                itemCount: _watchedTopics.length,
-                itemBuilder: (context, i) {
-                  final topic = _watchedTopics[i];
-                  return TopicTile(
-                    topic: topic,
-                    controller: _controller,
-                    showThumb: false,                   // 履歴はサムネ無しで軽量に
-                    showRemoveButton: true,
-                    removeButtonAlwaysVisible: true,
-                    onRemove: (id) async {              // ×で「履歴から外す」
-                      await _removeFromWatch(id);
-                    },
-                    onAfterPop: _onDetailReturned,      // 詳細から戻ったフック
-                  );
-                },
+                child: ListView.builder(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  itemCount: _watchedTopics.length,
+                  itemBuilder: (context, i) {
+                    final topic = _watchedTopics[i];
+                    return TopicTile(
+                      topic: topic,
+                      controller: _controller,
+                      showThumb: false,
+                      showRemoveButton: true,
+                      removeButtonAlwaysVisible: true,
+                      onRemove: (id) async {
+                        await _removeFromWatch(id);
+                      },
+                      onAfterPop: _onDetailReturned,
+                    );
+                  },
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      );
+    }
+
+    // ★ どのパスでも必ず Scaffold を返す
+    return Scaffold(
+      body: body,
     );
   }
 }

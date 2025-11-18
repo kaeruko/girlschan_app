@@ -1,107 +1,137 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
-/// Material の `SnackBar` / `ScaffoldMessenger` 代替。
-/// 
-/// **Overlay** で出す。連打時はキュー制御＆重複抑制。
-/// ScaffoldMessenger に依存しないので、あらゆるコンテキストで使える。
-/// 
-/// 使用例：
-/// ```dart
-/// AppToast.show(context, 'テキストをコピーしました');
-/// AppToast.show(context, 'エラーが発生しました', duration: Duration(seconds: 3));
-/// ```
+/// Overlay ベースのトースト。
+/// どの画面からでも使える & タップでアクション実行可能。
 class AppToast {
   static final _queue = <_ToastEntry>[];
   static bool _showing = false;
 
-  /// トースト通知を表示
-  /// 
-  /// [message] - 表示するメッセージ
-  /// [duration] - 表示時間（デフォルト 2秒）
   static Future<void> show(
     BuildContext context,
     String message, {
     Duration duration = const Duration(seconds: 2),
+    VoidCallback? onTap,
   }) async {
     if (message.trim().isEmpty) return;
 
-    // 直前と同一メッセージの連投を抑制
+    // 同じメッセージの連投を抑制
     if (_queue.isNotEmpty && _queue.last.message == message) return;
 
-    final overlay = Overlay.maybeOf(context);
-    if (overlay == null) return;
-
-    final entry = _ToastEntry(message, duration, overlay);
-    _queue.add(entry);
-
-    if (!_showing) {
-      _showing = true;
-      while (_queue.isNotEmpty) {
-        final current = _queue.removeAt(0);
-        await current._present();
-      }
-      _showing = false;
+    // ★ 常にルート Navigator の Overlay を使う
+    final overlay = Navigator.of(context, rootNavigator: true).overlay;
+    if (overlay == null) {
+      debugPrint('⚠️ [AppToast] overlay is null for context=$context');
+      return;
     }
+
+    _queue.add(_ToastEntry(
+      message: message,
+      duration: duration,
+      overlay: overlay,
+      onTap: onTap,
+    ));
+
+    if (_showing) return;
+
+    _showing = true;
+    while (_queue.isNotEmpty) {
+      final current = _queue.removeAt(0);
+      await current.present();
+    }
+    _showing = false;
   }
 }
 
-/// トースト表示用の内部エントリ
 class _ToastEntry {
+  _ToastEntry({
+    required this.message,
+    required this.duration,
+    required this.overlay,
+    this.onTap,
+  });
+
   final String message;
   final Duration duration;
   final OverlayState overlay;
+  final VoidCallback? onTap;
+
   late final OverlayEntry _entry;
+  bool _dismissed = false;
 
-  _ToastEntry(this.message, this.duration, this.overlay);
+  Future<void> present() async {
+    void dismiss() {
+      if (_dismissed) return;
+      _dismissed = true;
+      // ★ すでに remove 済み / overlay dispose 済みなら何もしない
+      if (_entry.mounted) {
+        _entry.remove();
+      }
+    }
 
-  Future<void> _present() async {
     _entry = OverlayEntry(
-      builder: (_) {
+      builder: (ctx) {
         return IgnorePointer(
-          ignoring: true,
+          ignoring: false, // タップを通す
           child: Stack(
             children: [
               Positioned(
                 left: 24,
                 right: 24,
-                bottom: 24,
-                child: _ToastBubble(message: message),
+                bottom: 80, // タブバーの少し上
+                child: _ToastBubble(
+                  message: message,
+                  onTap: () {
+                    onTap?.call();
+                    dismiss(); // タップした瞬間に閉じる
+                  },
+                ),
               ),
             ],
           ),
         );
       },
     );
+
     overlay.insert(_entry);
-    await Future.delayed(duration);
-    _entry.remove();
+    try {
+      await Future.delayed(duration);
+    } catch (_) {
+      // キャンセルされても無視
+    }
+    dismiss();
   }
 }
 
-/// トースト表示用のバブル UI
 class _ToastBubble extends StatelessWidget {
   final String message;
+  final VoidCallback? onTap;
 
-  const _ToastBubble({required this.message});
+  const _ToastBubble({
+    required this.message,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final style = CupertinoTheme.of(context).textTheme.textStyle;
     return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: CupertinoColors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          message,
-          style: style.copyWith(
-            color: CupertinoColors.white,
-            fontSize: 13,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: CupertinoColors.black.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(10),
           ),
-          textAlign: TextAlign.center,
+          child: Text(
+            message,
+            style: style.copyWith(
+              color: CupertinoColors.white,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ),
       ),
     );
