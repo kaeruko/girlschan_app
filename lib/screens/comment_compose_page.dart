@@ -42,7 +42,7 @@ class _CommentComposePageState extends State<CommentComposePage> {
 
     // WebView 側で投稿完了したら pop(true) する想定
     if (result == true) {
-      Navigator.of(context).pop(true); // 一個前の画面に「投稿したよ」と返す
+      Navigator.of(context).pop(text); // 一個前の画面に「投稿したよ」と返す（テキストも渡す）
     }
   }
 

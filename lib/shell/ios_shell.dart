@@ -27,7 +27,7 @@ class _IOSShellState extends State<IOSShell> {
 
   void _onTabChanged() {
     final idx = _controller.index;
-    final tabId = kAppTabs[idx].id;
+    final tabId = widget.tabs[idx].id;
 
     // ★ 履歴タブのリロード（型安全）
     if (tabId == 'tab_favorites') {

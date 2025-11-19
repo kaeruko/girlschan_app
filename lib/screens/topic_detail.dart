@@ -1160,7 +1160,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Future<void> _openPostDialog() async {
     if (!mounted) return;
 
-    final result = await Navigator.push<bool>(
+    final result = await Navigator.push<dynamic>(
       context,
       CupertinoPageRoute(
         builder: (_) => CommentComposePage(
@@ -1172,9 +1172,40 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
     if (!mounted) return;
 
-    if (result == true) {
-      // 投稿されたのでコメント一覧を再読込したりする
-      // await _vm.reloadComments();
+    if (result != null) {
+      // 投稿されたのでコメント一覧を再読込
+      final addedCount = await _vm.fetchDelta();
+      
+      // テキストが返ってきた場合は、その本文を持つコメントを探してクリップする
+      if (result is String && result.isNotEmpty) {
+        final postedText = result;
+        // 追加されたコメント（あるいは全コメント）から探す
+        // 直近の投稿なので末尾付近にあるはず
+        final candidates = _vm.comments.reversed.take(addedCount + 5); 
+        
+        Map<String, dynamic>? target;
+        for (final c in candidates) {
+          final body = c['body'] as String? ?? '';
+          // 改行やスペースの揺れを考慮して、ある程度緩く比較するか、完全一致か
+          // ここでは単純に trim して比較
+          if (body.trim() == postedText.trim()) {
+            target = c;
+            break;
+          }
+        }
+
+        if (target != null) {
+          // クリップ実行
+          await _vm.toggleClip(target);
+          if (mounted) {
+            PlatformHelper.showSnackBar(context, 'コメントを投稿し、クリップしました');
+          }
+        } else {
+           if (mounted) {
+            PlatformHelper.showSnackBar(context, 'コメントを投稿しました');
+          }
+        }
+      }
     }
   }
 
