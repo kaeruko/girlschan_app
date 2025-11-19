@@ -29,8 +29,8 @@ class TabSpec {
 /// 注意: GlobalKey は各タブの State にアクセスするため、定義時に生成される
 
 // 各タブの State にアクセスするための GlobalKey（重複なし）
-final _newTopicListKey = GlobalKey<State>();
-final _popularTopicListKey = GlobalKey<State>();
+final _newTopicListKey = GlobalKey<TopicListScreenState>();
+final _popularTopicListKey = GlobalKey<TopicListScreenState>();
 final favoritesScreenStateKey = GlobalKey<FavoritesScreenState>();  // ★ 型付き
 final clipsScreenStateKey = GlobalKey<ClipsScreenState>();  // ★ 型付き
 final _searchKey = GlobalKey<SearchScreenState>();

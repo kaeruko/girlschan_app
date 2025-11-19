@@ -3,6 +3,7 @@ import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
 import '../widgets/history_sidebar.dart';
 import '../screens/topic_detail.dart';
+import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/search_screen.dart';
@@ -59,6 +60,13 @@ class _MacShellState extends State<MacShell> {
     // ★ クリップタブのリロード（型安全）
     if (tabId == 'tab_clips') {
       _clipsKey.currentState?.reloadFromOutside();
+    }
+    // ★ 新着・人気タブのリフレッシュ（TopicListScreenState）
+    if (tabId == 'tab_new' || tabId == 'tab_popular') {
+      final key = _effectiveTabs[newIndex].stateKey;
+      if (key is GlobalKey<tl.TopicListScreenState>) {
+        key.currentState?.refreshTiles();
+      }
     }
   }
 

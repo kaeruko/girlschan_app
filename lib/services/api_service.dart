@@ -168,6 +168,8 @@ Future<Map<String, dynamic>> fetchTopicMeta(int topicId) async {
       )
       .timeout(const Duration(seconds: 30));
 
+  logd('📡 [fetchTopicMeta] Response: ${resp.body}', name: 'API');
+
   if (resp.statusCode != 200) {
     throw Exception('fetchTopicMeta failed: ${resp.statusCode}');
   }
@@ -188,6 +190,7 @@ Future<bool> updateWatchedTopicFromMeta(Map<String, dynamic> meta) async {
   final newTotal = (meta['total'] as int?) ?? 0;
   final newThumb = meta['thumb'];
   final newPostedAt = meta['posted_at'];
+  final newFetchedAt = meta['fetched_at'];
 
   final prefs = await SharedPreferences.getInstance();
   final jsonList = prefs.getStringList('watched_topics_full') ?? [];
@@ -210,6 +213,9 @@ Future<bool> updateWatchedTopicFromMeta(Map<String, dynamic> meta) async {
     // 投稿日・サムネはあれば上書き
     if (newPostedAt is String && newPostedAt.isNotEmpty) {
       watched['posted_at'] = newPostedAt;
+    }
+    if (newFetchedAt is String && newFetchedAt.isNotEmpty) {
+      watched['fetched_at'] = newFetchedAt;
     }
     if (newThumb is String && newThumb.isNotEmpty) {
       watched['thumb'] = newThumb;
@@ -341,6 +347,10 @@ Future<List<Map<String, dynamic>>> getWatchedTopics() async {
   final topics = jsonList
       .map((e) => jsonDecode(e) as Map<String, dynamic>)
       .toList();
+
+  for (final t in topics) {
+    logd('📂 [getWatchedTopics] id=${t['id']} title=${t['title']} posted_at=${t['posted_at']} fetched_at=${t['fetched_at']}');
+  }
 
   // watchedAt があれば、クリップと同じように新しい順にソート
   topics.sort((a, b) {

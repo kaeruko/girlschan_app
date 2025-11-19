@@ -108,12 +108,14 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
         count: 50,
       );
 
-      final topics = (result['topics'] as List<dynamic>? ?? [])
+      // フラットな構造に対応: { "topics": [...], "total_count": 676 }
+      final topicsList = result['topics'] as List<dynamic>? ?? [];
+      
+      final topics = topicsList
           .map((t) => Topic.fromJson(t as Map<String, dynamic>))
           .toList();
       
-      // ★ Python側のキー名 'total_count' に合わせる
-      // APIが count を返している場合は 'count' でOK。先ほどのPythonコードでは 'total_count'
+      // total_count はルートにある
       final total = result['total_count'] as int? ?? 0;
       setState(() {
         _currentQuery = query;

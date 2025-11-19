@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import '../app/app_tabs.dart'; // ★ 追加
 import '../widgets/common/app_toast.dart';
 import '../widgets/topic_tile.dart';
@@ -135,6 +136,9 @@ class FavoritesScreenState extends State<FavoritesScreen>
 
   Future<void> _removeFromWatch(int topicId) async {
     await removeWatchedTopicId(topicId);
+    // ★ コメントキャッシュも消さないと、一覧で「既読（青背景）」が消えない
+    await CacheService.clear('comments_$topicId');
+
     if (!mounted) return;  // ★ mounted ガード
     setState(() {
       _watchedTopics.removeWhere((t) => t['id'] == topicId);
@@ -197,40 +201,51 @@ class FavoritesScreenState extends State<FavoritesScreen>
       final beforeComments = (t['comments'] as int?) ?? 0;
 
       try {
+        // ★ 現在チェック中のトピック名を表示（トーストだと邪魔かもしれないので、一旦ログか、あるいは「チェック中...」みたいなのを出す？）
+        // ユーザー要望: 「トースト、現在取得中のトピック名を出してほしい」
+        final currentTitle = t['title'] as String? ?? 'トピック';
+        if (mounted) {
+          AppToast.show(context, '「$currentTitle」をチェック中...');
+        }
+
         debugPrint('📡 [Favorites] fetch meta for id=$id');
         final meta = await fetchTopicMeta(id);
         debugPrint('📡 [Favorites] meta result for id=$id: $meta');
         final hasNew = await updateWatchedTopicFromMeta(meta);
         debugPrint('📡 [Favorites] hasNew for id=$id: $hasNew');
 
-      if (hasNew && mounted) {
-        final afterComments = (meta['total'] as int?) ?? beforeComments;
-        final title = (meta['title'] as String?) ?? 'トピック';
-        final topicId = id!;
-        final postedAtStr = meta['posted_at'] as String? ?? '';
+        if (hasNew && mounted) {
+          final afterComments = (meta['total'] as int?) ?? beforeComments;
+          final title = (meta['title'] as String?) ?? 'トピック';
+          final topicId = id!;
+          final postedAtStr = meta['posted_at'] as String? ?? '';
 
-        debugPrint('🚨 [Favorites] showing toast for id=$topicId: beforeComments=$beforeComments, afterComments=$afterComments, title="$title"');
+          debugPrint('🚨 [Favorites] showing toast for id=$topicId: beforeComments=$beforeComments, afterComments=$afterComments, title="$title"');
 
-        AppToast.show(
-          context,
-          '「$title」に新着 ($beforeComments → $afterComments)',
-          onTap: () {
-            debugPrint('👉 [Favorites] toast tapped for id=$topicId');
-            Navigator.of(context).push(
-              CupertinoPageRoute(
-                builder: (_) => TopicDetailScreen(
-                  topicId: topicId,
-                  title: title,
-                  commentCount: afterComments,
-                  posted_at: postedAtStr,
+          AppToast.show(
+            context,
+            '「$title」に新着 ($beforeComments → $afterComments)',
+            onTap: () {
+              debugPrint('👉 [Favorites] toast tapped for id=$topicId');
+              Navigator.of(context).push(
+                CupertinoPageRoute(
+                  builder: (_) => TopicDetailScreen(
+                    topicId: topicId,
+                    title: title,
+                    commentCount: afterComments,
+                    posted_at: postedAtStr,
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      } else {
-        debugPrint('🚨 [Favorites] NOT showing toast for id=$id: hasNew=$hasNew, mounted=$mounted');
-      }
+              );
+            },
+          );
+        } else {
+          // ★ 更新がない場合も表示
+          if (mounted) {
+            AppToast.show(context, '「$currentTitle」は新着なし');
+          }
+          debugPrint('🚨 [Favorites] NOT showing toast for id=$id: hasNew=$hasNew, mounted=$mounted');
+        }
     } catch (e, st) {
       debugPrint('❌ [Favorites] meta update error id=$id: $e\n$st');
     }

@@ -19,10 +19,10 @@ class TopicListScreen extends StatefulWidget {
   });
 
   @override
-  State<TopicListScreen> createState() => _TopicListScreenState();
+  State<TopicListScreen> createState() => TopicListScreenState();
 }
 
-class _TopicListScreenState extends State<TopicListScreen>
+class TopicListScreenState extends State<TopicListScreen>
   with WidgetsBindingObserver {
   late final String cacheKey;
 
@@ -64,6 +64,10 @@ class _TopicListScreenState extends State<TopicListScreen>
     if (state == AppLifecycleState.resumed) {
       _controller.refreshAll();
     }
+  }
+
+  void refreshTiles() {
+    _controller.refreshAll();
   }
 
   Future<void> _moveTopicToTop(int index, int topicId) async {
@@ -268,7 +272,7 @@ class _TopicListScreenState extends State<TopicListScreen>
                         itemCount: _topics.length,
                         itemBuilder: (context, index) {
                           final topic = _topics[index];
-                          logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
+                          // logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
                           final id = topic['id'] as int;
                           final idx = index;
                           return TopicTile(

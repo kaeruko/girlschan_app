@@ -158,12 +158,12 @@ class TopicDetailController extends ChangeNotifier {
       savedLocalFraction = ff;
 
       // ★コミットログ（これで保存→復元の整合が追える）
-      logd('[saveScroll] topic=$topicId no=$no index=$safe frac=$ff');
+      // logd('[saveScroll] topic=$topicId no=$no index=$safe frac=$ff');
     });
 
     // ★スケジュールログ（必要なら）
-    logd('[saveScroll] schedule idx=$index frac=$fraction '
-         'delay=${base.inMilliseconds}ms frozen=$_savingFrozen');
+    // logd('[saveScroll] schedule idx=$index frac=$fraction '
+    //      'delay=${base.inMilliseconds}ms frozen=$_savingFrozen');
   }
 
   // ★未確定分を即書き込むフラッシュ
