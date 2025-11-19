@@ -484,8 +484,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: _openPostDialog,
-          child: const Icon(CupertinoIcons.add),
+          onPressed: _showMenu,
+          child: const Icon(CupertinoIcons.bars),
         ),
       ),
       child: SafeArea(
@@ -497,7 +497,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   pageView,
 
                   // ページ移動用の左右ボタン
-                  if (_pageCountLive > 1)
+                  if (_pageCountLive > 1 && _hasPrev)
                     Positioned(
                       left: 8,
                       top: 0,
@@ -512,7 +512,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                       ),
                     ),
 
-                  if (_pageCountLive > 1)
+                  if (_pageCountLive > 1 && _hasNext)
                     Positioned(
                       right: 8,
                       top: 0,
@@ -923,72 +923,29 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               final Uri uri = Uri.parse(url);
               if (!mounted) return;
               if (await canLaunchUrl(uri)) {
-                if (!mounted) return;
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               }
             },
             child: Container(
-              margin: const EdgeInsets.only(bottom: 8.0),
+              margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                border: Border.all(color: CupertinoColors.separator),
+                color: CupertinoColors.systemGrey6,
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: CupertinoColors.systemGrey4),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // サムネイル
                   if (thumbnail != null && thumbnail.isNotEmpty)
                     ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        bottomLeft: Radius.circular(8),
-                      ),
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
                       child: Image.network(
                         thumbnail,
-                        width: 100,
+                        width: 80,
                         height: 80,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            width: 100,
-                            height: 80,
-                            color: CupertinoColors.systemGrey6,
-                            child: const Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CupertinoActivityIndicator(),
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          width: 100,
-                          height: 80,
-                          color: CupertinoColors.systemGrey6,
-                          child: const Center(
-                            child: Icon(CupertinoIcons.photo, size: 24, color: CupertinoColors.systemGrey),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      width: 100,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemGrey6,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          bottomLeft: Radius.circular(8),
-                        ),
-                      ),
-                      child: const Center(
-                        child: Icon(CupertinoIcons.link, size: 24, color: CupertinoColors.systemGrey),
+                        errorBuilder: (_, __, ___) => const SizedBox(width: 80, height: 80),
                       ),
                     ),
-                  // タイトルと説明
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
@@ -996,35 +953,37 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            title,
+                            title.isNotEmpty ? title : url,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: CupertinoColors.activeBlue,
+                            ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
                           ),
-                          if (description != null && description.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              description,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: CupertinoColors.secondaryLabel,
+                          if (description != null && description.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                description,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: CupertinoColors.secondaryLabel,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ],
                           const SizedBox(height: 4),
                           Text(
                             url,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 10,
-                              color: CupertinoColors.systemBlue,
+                              color: CupertinoColors.tertiaryLabel,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -1038,6 +997,47 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       ),
     );
   }
+
+  void _showMenu() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openPostDialog();
+            },
+            child: const Text('コメント投稿'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final url = Uri.parse('https://girlschannel.net/topics/${widget.topicId}/');
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: const Text('トピックに移動'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _vm.fetchDelta();
+            },
+            child: const Text('再読み込み'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
+
 
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
     final no = (c['no'] as int?) ?? -1;
