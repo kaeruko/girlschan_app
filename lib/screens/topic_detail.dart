@@ -208,13 +208,14 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  Future<void> _tryRestoreIfNeeded() async {
+  Future<void> _tryRestoreIfNeeded({int? targetNo}) async {
     // ★ 再入防止
-    if (_restoredOnce || _vm.loading || _restoring) return;
+    if (_restoredOnce && targetNo == null) return; // 自動復元済みなら何もしない（手動指定なら通す）
+    if (_vm.loading || _restoring) return;
     _restoring = true;
 
-    final savedNo = _vm.savedCommentNo;
-    print('[復元開始] savedNo=$savedNo');
+    final savedNo = targetNo ?? _vm.savedCommentNo;
+    print('[復元開始] savedNo=$savedNo (target=$targetNo)');
     if (savedNo <= 0) { 
       print('[復元中止] savedNo が 0 以下');
       _restoredOnce = true;
@@ -1006,9 +1007,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(ctx);
+              _showJumpDialog();
+            },
+            child: const Text('指定のコメントへ移動'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
               _openPostDialog();
             },
-            child: const Text('コメント投稿'),
+            child: const Text('コメントを投稿する'),
           ),
           CupertinoActionSheetAction(
             onPressed: () async {
@@ -1018,14 +1026,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 await launchUrl(url, mode: LaunchMode.externalApplication);
               }
             },
-            child: const Text('トピックに移動'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _vm.fetchDelta();
-            },
-            child: const Text('再読み込み'),
+            child: const Text('ブラウザで開く'),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -1033,6 +1034,42 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           onPressed: () => Navigator.pop(ctx),
           child: const Text('キャンセル'),
         ),
+      ),
+    );
+  }
+
+  void _showJumpDialog() {
+    final controller = TextEditingController();
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('コメントへ移動'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: 'コメントNo (例: 100)',
+            keyboardType: TextInputType.number,
+            autofocus: true,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('キャンセル'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              final text = controller.text.trim();
+              final no = int.tryParse(text);
+              Navigator.pop(ctx);
+              if (no != null && no > 0) {
+                _tryRestoreIfNeeded(targetNo: no);
+              }
+            },
+            child: const Text('移動'),
+          ),
+        ],
       ),
     );
   }
