@@ -1147,17 +1147,48 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       ],
     );
 
-    return Container(
-      key: no > 0 ? _vm.keyForCommentNo(no) : null,
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
+    return GestureDetector(
+      onLongPress: () {
+        showCupertinoModalPopup(
+          context: context,
+          builder: (context) => CupertinoActionSheet(
+            actions: [
+              CupertinoActionSheetAction(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _vm.toggleClip(Map<String, dynamic>.from(c));
+                  if (mounted) setState(() {});
+                },
+                child: const Text('クリップに登録する'),
+              ),
+              CupertinoActionSheetAction(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _openPostDialog(initialText: '>>$no');
+                },
+                child: const Text('このコメントに返信'),
+              ),
+            ],
+            cancelButton: CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(context),
+              isDestructiveAction: true,
+              child: const Text('キャンセル'),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        key: no > 0 ? _vm.keyForCommentNo(no) : null,
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: innerWidget,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: innerWidget,
     );
   }
 
-  Future<void> _openPostDialog() async {
+  Future<void> _openPostDialog({String? initialText}) async {
     if (!mounted) return;
 
     final result = await Navigator.push<dynamic>(
@@ -1166,6 +1197,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         builder: (_) => CommentComposePage(
           topicId: widget.topicId,
           title: widget.title,
+          initialText: initialText,
         ),
       ),
     );

@@ -4,11 +4,13 @@ import 'comment_post_webview.dart';
 class CommentComposePage extends StatefulWidget {
   final int topicId;
   final String title;
+  final String? initialText;
 
   const CommentComposePage({
     super.key,
     required this.topicId,
     required this.title,
+    this.initialText,
   });
 
   @override
@@ -16,8 +18,20 @@ class CommentComposePage extends StatefulWidget {
 }
 
 class _CommentComposePageState extends State<CommentComposePage> {
-  final _ctrl = TextEditingController();
+  late final TextEditingController _ctrl;
   bool _posting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialText ?? '');
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _goToConfirm() async {
     final text = _ctrl.text.trim();
