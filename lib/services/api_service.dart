@@ -282,7 +282,6 @@ Future<List<dynamic>> fetchPopularTopicsWithCache() async {
 }
 
 // キャッシュ対応のコメント取得（ページング対応）
-// キャッシュ対応のコメント取得（ページング対応）
 Future<Map<String, dynamic>> fetchCommentsWithPagination(
   int topicId, {
   int offset = 0,

@@ -79,9 +79,6 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   @override
   Future<void> refreshCacheState() async {
     final id = widget.topic['id'] as int;
-
-    // 1. まずメタデータ（詳細画面で保存した最新情報）を確認して反映
-    //    ここが今回の修正ポイントです
     try {
       final meta = await CacheService.loadMap('topic_meta_$id');
       if (meta != null) {
@@ -139,9 +136,9 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
     final posted_at = widget.topic['posted_at'] as String? ?? '';
-  final thumb = widget.topic['thumb'] as String?;
+    final thumb = widget.topic['thumb'] as String?;
 
-  final showRemove = widget.showRemoveButton &&
+    final showRemove = widget.showRemoveButton &&
     widget.onRemove != null &&
     (widget.removeButtonAlwaysVisible || _hasCachedComments);
 
@@ -183,10 +180,42 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     }
 
     final blue = CupertinoColors.systemBlue;
+    
+    // ★ 1ヶ月以上前かどうか判定
+    bool isOld = false;
+    if (posted_at.isNotEmpty) {
+      // "2025/11/19(水) 20:28" 形式を想定
+      final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(posted_at);
+      if (m != null) {
+        final y = int.parse(m.group(1)!);
+        final mo = int.parse(m.group(2)!);
+        final d = int.parse(m.group(3)!);
+        final date = DateTime(y, mo, d);
+        final diff = DateTime.now().difference(date).inDays;
+        if (diff > 30) {
+          isOld = true;
+        }
+      }
+    }
+
+    // 背景色の決定
+    Color? bgColor;
+    if (_hasCachedComments) {
+      if (isOld) {
+        // 既読かつ古い -> グレー（少し濃いめにする）
+        bgColor = CupertinoColors.systemGrey4;
+      } else {
+        // 既読かつ新しい -> 青
+        bgColor = blue.withOpacity(0.05);
+      }
+    } else {
+      // 未読 -> 透明（古くても透明）
+      bgColor = CupertinoColors.transparent;
+    }
 
     return Container(
       decoration: BoxDecoration(
-        color: _hasCachedComments ? blue.withOpacity(0.05) : CupertinoColors.transparent,
+        color: bgColor,
         border: _hasCachedComments
             ? Border(left: BorderSide(color: blue, width: 4))
             : null,

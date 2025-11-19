@@ -220,6 +220,16 @@ class FavoritesScreenState extends State<FavoritesScreen>
           final topicId = id!;
           final postedAtStr = meta['posted_at'] as String? ?? '';
 
+          // ★ UI上のコメント数を即座に更新
+          setState(() {
+            final index = _watchedTopics.indexWhere((wt) => wt['id'] == topicId);
+            if (index >= 0) {
+              _watchedTopics[index]['comments'] = afterComments;
+              _watchedTopics[index]['title'] = title;
+              _watchedTopics[index]['posted_at'] = postedAtStr;
+            }
+          });
+
           debugPrint('🚨 [Favorites] showing toast for id=$topicId: beforeComments=$beforeComments, afterComments=$afterComments, title="$title"');
 
           AppToast.show(

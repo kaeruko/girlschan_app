@@ -283,8 +283,18 @@ class TopicDetailController extends ChangeNotifier {
   int _lastRemoteNo = 0;
   final Map<int, int> _byNo = {};
 
+  DateTime? _lastFetchTime;
+
   Future<int> fetchDelta() async {
     if (_fetching) return 0;
+
+    // ★ 短時間の連打防止（1秒間隔）
+    final now = DateTime.now();
+    if (_lastFetchTime != null && now.difference(_lastFetchTime!).inMilliseconds < 1000) {
+      return 0;
+    }
+    _lastFetchTime = now;
+
     _fetching = true;
     _loadingMore = true;
     notifyListeners(); // ★ ローディング開始を UI に通知

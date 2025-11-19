@@ -10,7 +10,7 @@ class AppToast {
   static Future<void> show(
     BuildContext context,
     String message, {
-    Duration duration = const Duration(seconds: 2),
+    Duration duration = const Duration(seconds: 5),
     VoidCallback? onTap,
   }) async {
     if (message.trim().isEmpty) return;
