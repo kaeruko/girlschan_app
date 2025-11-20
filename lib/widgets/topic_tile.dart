@@ -12,15 +12,8 @@ class TopicTile extends StatefulWidget {
   final Map<String, dynamic> topic;
   final TopicTileController controller;
 
-  /// ×ボタンを表示するかどうか（親が制御）。
-  final bool showRemoveButton;
-
   /// ×ボタン押下時のコールバック。意味付けは親に委ねる。
   final Future<void> Function(int topicId)? onRemove;
-
-  /// true の場合、キャッシュがなくても × ボタンを表示する。
-  /// false の場合はキャッシュ有無（コメントキャッシュ）と連動させる。
-  final bool removeButtonAlwaysVisible;
 
   final Future<void> Function()? onAfterPop; // または FutureOr<void> Function()?
 
@@ -31,9 +24,7 @@ class TopicTile extends StatefulWidget {
     super.key,
     required this.topic,
     required this.controller,
-    this.showRemoveButton = false,
     this.onRemove,
-    this.removeButtonAlwaysVisible = false,
     this.onAfterPop,
     this.showThumb = true,
   });
@@ -138,9 +129,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final posted_at = widget.topic['posted_at'] as String? ?? '';
     final thumb = widget.topic['thumb'] as String?;
 
-    final showRemove = widget.showRemoveButton &&
-    widget.onRemove != null &&
-    (widget.removeButtonAlwaysVisible || _hasCachedComments);
+    final showRemove = widget.onRemove != null;
 
 
     // ① 必ず初期化しておく（未初期化エラー対策）
@@ -279,6 +268,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                         child: (thumb != null && thumb.isNotEmpty)
                             ? Image.network(
                                 thumb,
+                                headers: const {'Referer': 'https://girlschannel.net/'},
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) => const Icon(
                                   CupertinoIcons.photo,

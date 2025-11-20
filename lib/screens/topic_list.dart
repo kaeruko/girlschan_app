@@ -251,7 +251,6 @@ class TopicListScreenState extends State<TopicListScreen>
                             topic: topic,
                             controller: _controller,
                             showThumb: true,                      // 一覧はサムネ表示
-                            showRemoveButton: true,
                             onRemove: _removeCommentsCache,        // ×でコメントキャッシュ削除
                             onAfterPop: () => _onAfterPopFromTile(idx, id),
                           );

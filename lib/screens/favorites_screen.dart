@@ -316,8 +316,6 @@ class FavoritesScreenState extends State<FavoritesScreen>
                       topic: topic,
                       controller: _controller,
                       showThumb: false,
-                      showRemoveButton: true,
-                      removeButtonAlwaysVisible: true,
                       onRemove: (id) async {
                         await _removeFromWatch(id);
                       },

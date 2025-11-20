@@ -168,7 +168,6 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
       topic: _topicToMap(t),
       controller: _controller,
       showThumb: true,
-      showRemoveButton: true,
       onRemove: (id) async {
         await CacheService.clear('comments_$id');
         await _controller.refreshAll();
