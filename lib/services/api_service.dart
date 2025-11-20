@@ -354,7 +354,7 @@ Future<List<Map<String, dynamic>>> getWatchedTopics() async {
       .toList();
 
   for (final t in topics) {
-    logd('📂 [getWatchedTopics] id=${t['id']} title=${t['title']} posted_at=${t['posted_at']} fetched_at=${t['fetched_at']}');
+    // logd('📂 [getWatchedTopics] id=${t['id']} title=${t['title']} posted_at=${t['posted_at']} fetched_at=${t['fetched_at']}');
   }
 
   // watchedAt があれば、クリップと同じように新しい順にソート

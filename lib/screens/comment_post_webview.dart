@@ -23,6 +23,9 @@ class CommentPostWebView extends StatefulWidget {
   /// 初期テキスト（テキストエリアに事前入力）
   final String? initialText;
 
+  /// 成功検知用テキスト（ページ内にこの文言があれば成功とみなす）
+  final String? successText;
+
   const CommentPostWebView({
     super.key,
     required this.topicId,
@@ -32,6 +35,7 @@ class CommentPostWebView extends StatefulWidget {
     this.onCompleted,
     this.successUrlPrefix = '/post_done', // ホストを含む/含まないは後で吸収
     this.initialText,
+    this.successText,
   });
 
   @override
@@ -92,6 +96,19 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
           if (!_alive || !mounted) return; // ガード
           logd('✅ [onPageFinished]', name: 'CommentPostWebView');
           _safeSetState(() => _loading = false);
+
+          if (widget.successText != null) {
+            try {
+              final result = await _ctrl.runJavaScriptReturningResult(
+                  "document.body.innerText.includes('${widget.successText}')");
+              logd('🔍 [onPageFinished] successText check result: $result', name: 'CommentPostWebView');
+              if (result == true) {
+                _markComplete('text_detection');
+              }
+            } catch (e) {
+              logd('⚠️ [onPageFinished] successText check failed: $e', name: 'CommentPostWebView');
+            }
+          }
         },
         onNavigationRequest: (req) {
           // 完了後は全遷移をブロック（連打や戻るで二重送信しない）
@@ -131,11 +148,9 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
   bool _isSuccessUrl(Uri u) {
     // successUrlPrefix がホスト付き/相対、両対応にしておく
     final p = widget.successUrlPrefix;
-    if (p.startsWith('http')) {
-      return u.toString().startsWith(p);
-    } else {
-      return u.path.startsWith(p);
-    }
+    final match = p.startsWith('http') ? u.toString().startsWith(p) : u.path.startsWith(p);
+    logd('🔍 [_isSuccessUrl] url=$u prefix=$p match=$match', name: 'CommentPostWebView');
+    return match;
   }
 
   Future<void> _markComplete(String source) async {
@@ -172,11 +187,20 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
     // 少し待ってから安全に閉じる（UI連打の吸収）
     await Future.delayed(const Duration(milliseconds: 300));
     if (!_alive || !mounted) return;
+
+    // ★ Fix: 閉じるためにブロックを解除
+    _safeSetState(() => _blockingClose = false);
+    // ビルド反映待ち
+    await Future.delayed(const Duration(milliseconds: 50));
+
     logd('👈 [_markComplete] Closing screen', name: 'CommentPostWebView');
-    Navigator.of(context).maybePop(true);
+    Navigator.of(context).pop(true);
   }
 
   Future<bool> _handleBack() async {
+    // 完了済みならWebView内の戻るもしない
+    if (_completed) return false;
+
     // WebView 内で戻れるなら戻る、無理なら画面を閉じる
     if (await _ctrl.canGoBack()) {
       logd('⬅️ [_handleBack] Going back in WebView',
@@ -195,6 +219,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
     return PopScope(
       canPop: !_blockingClose,
       onPopInvoked: (didPop) async {
+        logd('🔙 [onPopInvoked] didPop=$didPop blockingClose=$_blockingClose', name: 'CommentPostWebView');
         if (didPop) return;
         final allow = await _handleBack();
         if (allow && mounted) {

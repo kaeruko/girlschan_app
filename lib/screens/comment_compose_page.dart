@@ -48,6 +48,7 @@ class _CommentComposePageState extends State<CommentComposePage> {
           postPageUrl:
               Uri.parse('https://girlschannel.net/topics/${widget.topicId}'),
           initialText: text, // ★ ここで渡す
+          successText: 'コメント投稿完了', // ★ 成功検知用テキスト
         ),
       ),
     );
