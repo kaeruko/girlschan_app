@@ -569,3 +569,23 @@ Future<void> removeClippedComment(int topicId, int commentNo) async {
   
   await prefs.setStringList('clipped_comments', clips);
 }
+
+Future<void> updateClippedCommentMemo(int topicId, int commentNo, String memo) async {
+  final prefs = await SharedPreferences.getInstance();
+  final clips = prefs.getStringList('clipped_comments') ?? [];
+  
+  bool updated = false;
+  for (int i = 0; i < clips.length; i++) {
+    final clip = jsonDecode(clips[i]) as Map<String, dynamic>;
+    if (clip['topicId'] == topicId && clip['no'] == commentNo) {
+      clip['memo'] = memo;
+      clips[i] = jsonEncode(clip);
+      updated = true;
+      break;
+    }
+  }
+  
+  if (updated) {
+    await prefs.setStringList('clipped_comments', clips);
+  }
+}

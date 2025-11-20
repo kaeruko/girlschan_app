@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../screens/topic_detail.dart';
 import '../widgets/common/app_spinner.dart';
@@ -100,6 +101,102 @@ with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _updateMemo(Map<String, dynamic> clip, String memo) async {
+    final topicId = clip['topicId'] as int;
+    final no = clip['no'] as int;
+    await updateClippedCommentMemo(topicId, no, memo);
+    if (!mounted) return;
+    setState(() {
+      final index = _clips.indexWhere((c) => c['topicId'] == topicId && c['no'] == no);
+      if (index != -1) {
+        _clips[index]['memo'] = memo;
+      }
+    });
+  }
+
+  void _showMemoDialog(Map<String, dynamic> clip) {
+    final currentMemo = clip['memo'] as String? ?? '';
+    final controller = TextEditingController(text: currentMemo);
+
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('メモ'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: 'メモを入力...',
+            maxLines: 3,
+            autofocus: true,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              _updateMemo(clip, controller.text);
+              Navigator.pop(context);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClipMenu(Map<String, dynamic> clip) {
+    final hasMemo = (clip['memo'] as String? ?? '').isNotEmpty;
+
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _showMemoDialog(clip);
+            },
+            child: Text(hasMemo ? 'メモを編集' : 'メモを追加'),
+          ),
+          if (hasMemo)
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.pop(context);
+                _updateMemo(clip, '');
+              },
+              child: const Text('メモを削除'),
+            ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              Clipboard.setData(ClipboardData(text: clip['body'] as String));
+            },
+            child: const Text('コピー'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+              _removeClip(clip);
+            },
+            child: const Text('クリップを削除'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -159,8 +256,10 @@ with WidgetsBindingObserver {
     final plus = clip['plus'] as int;
     final minus = clip['minus'] as int;
     final topicId = clip['topicId'] as int;
+    final memo = clip['memo'] as String? ?? '';
 
     return GestureDetector(
+      onLongPress: () => _showClipMenu(clip),
       onTap: () {
         Navigator.of(context).push(
           CupertinoPageRoute(
@@ -209,6 +308,24 @@ with WidgetsBindingObserver {
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
             ),
+            if (memo.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemYellow.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  memo,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.black,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [
