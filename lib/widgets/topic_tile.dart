@@ -207,7 +207,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     if (_hasCachedComments) {
       if (isOld) {
         // 既読かつ古い -> グレー（少し濃いめにする）
-        bgColor = CupertinoColors.systemGrey4;
+        bgColor = CupertinoColors.systemGrey6;
       } else {
         // 既読かつ新しい -> 青
         bgColor = blue.withOpacity(0.05);
@@ -326,8 +326,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isBold ? FontWeight.bold : (_hasCachedComments ? FontWeight.w600 : FontWeight.w500),
-                          color: _hasCachedComments ? CupertinoColors.activeBlue : null,
+                          fontWeight: (isBold && !isOld) ? FontWeight.w800 : FontWeight.w400,
+                          color: (!isOld) ? CupertinoColors.activeBlue : null,
                         ),
                       ),
                       const SizedBox(height: 4),

@@ -230,45 +230,36 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Future<void> _tryRestoreIfNeeded({int? targetNo}) async {
     // ★ 再入防止
     if (_restoredOnce && targetNo == null) {
-      print('[復元] 自動復元済みのためスキップ');
       return; 
     }
     if (_vm.loading || _restoring) {
-      print('[復元] loading=${_vm.loading}, restoring=$_restoring のためスキップ (target=$targetNo)');
       return;
     }
     _restoring = true;
 
     final savedNo = targetNo ?? _vm.savedCommentNo;
-    print('[復元開始] savedNo=$savedNo (target=$targetNo)');
     if (savedNo <= 0) { 
-      print('[復元中止] savedNo が 0 以下');
       _restoredOnce = true;
       _restoring = false;
       return; 
     }
 
     // まず、そのNoが入るまで差分取得
-    print('[復元] ensureContainsNo($savedNo) 実行中...');
     await _vm.ensureContainsNo(savedNo);
     if (!mounted) {
-      print('[復元] unmounted during ensureContainsNo');
       _restoring = false;
       return;
     }
 
     // index を特定してターゲットページへ
     final idx = _vm.indexByNo[savedNo];
-    print('[復元] indexByNo[$savedNo] = $idx');
     if (idx == null) {
-      print('[復元] index が見つからない、再スケジュール');
       _restoring = false;
       _scheduleTryRestore();
       return;
     }
 
     final targetPage = idx ~/ _pageSize;
-    print('[復元] targetPage=$targetPage (idx=$idx)');
 
     _restoring = true;
     _restoreTargetPageNo = targetPage;
@@ -280,9 +271,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
     if (_pc.hasClients) {
       _pc.jumpToPage(targetPage);
-      print('[復元] ページ遷移実行: $targetPage');
     } else {
-      print('[復元] _pc has no clients! (wait failed?)');
     }
 
     // スクロール位置が attach されるのを確実に待つ
@@ -312,12 +301,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         final guess = meas.indexToOffset(roughIndex);
         try {
           sc.jumpTo(guess);
-          print('[復元] 概算ジャンプ: index=$roughIndex, offset=$guess');
         } catch (_) {}
         break;
       }
     } else {
-      print('[復元] ページ内に$savedNoが見つからない（直後に再試行へ）');
     }
 
     // ★ 該当行がビルドされるのを待ち、確実に ctx を得てから ensureVisible
@@ -328,35 +315,25 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       // savedNo がこのページ内に存在するか確認
       final itemIndex = pageItems.indexWhere((item) => (item['no'] as int?) == savedNo);
       if (itemIndex == -1) {
-        print('[復元] attempt=$attempt: ページ内に$savedNoが見つからない (pageItems.length=${pageItems.length})');
         await Future.delayed(const Duration(milliseconds: 16));
         continue;
       }
-
-      // print('[復元] attempt=$attempt: pageItems内で$savedNoを発見 (itemIndex=$itemIndex)');
 
       // コメント番号をキーにしてコンテキストを取得
       final key = _vm.keyForCommentNo(savedNo);
       final ctx = key.currentContext;
       
-      // print('[復元] key=$key, key.currentContext = $ctx');
-      // print('[復元] _vm.commentKeys.length=${_vm.commentKeys.length}');
-      
       if (ctx == null) {
-        print('[復元] attempt=$attempt: currentContext がまだ null (key=$key)');
         // もし実測が進んでいれば、その都度ターゲットまでの概算位置に追従
         if (sc.hasClients) {
           final off = meas.indexToOffset(itemIndex);
           try { 
             sc.jumpTo(off); 
-            // print('[復元] 追従ジャンプ: offset=$off');
           } catch (_) {}
         }
         await Future.delayed(const Duration(milliseconds: 16));
         continue;
       }
-
-      print('[復元] currentContext を取得! ensureVisible 実行... (attempt=$attempt)');
 
       // 行頭を上端に揃える
       await Scrollable.ensureVisible(
@@ -370,14 +347,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       final box = ctx.findRenderObject() as RenderBox?;
       final h = box?.size.height ?? 0.0;
       final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
-      print('[復元] box.height=$h, savedLocalFraction=$frac');
       
       if (h > 0 && frac > 0) {
         final sc2 = _scForPage(targetPage);
         if (sc2.hasClients) {
           final max = sc2.position.maxScrollExtent;
           final offset = (sc2.offset + h * frac).clamp(0.0, max);
-          print('[復元] スクロール位置を調整: offset=$offset');
           sc2.jumpTo(offset);
         }
       }
@@ -392,7 +367,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
       // 復元直後の正しい位置で一度保存
       _saveFromPage(targetPage);
-      print('[復元] 復元完了！');
       return;
     }
 
@@ -407,6 +381,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
 
   // ==== UI ====
+  bool _allowPop = false;
+
   @override
   Widget build(BuildContext context) {
     final items = _vm.comments;
@@ -444,12 +420,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 parent: AlwaysScrollableScrollPhysics(),
               ),
               slivers: [
-                // （必要なら）ページヘッダなどを SliverToBoxAdapter で入れてもOK
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (ctx2, i) {
-                      final c  = pageItems.isNotEmpty ? pageItems[i] : const {};
-                      final no = (c['no'] as int?) ?? -1;
+                      final c = pageItems.isNotEmpty ? pageItems[i] : const {};
                       final globalIndex = page * _pageSize + i;
 
                       return MeasureSize(
@@ -500,6 +474,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                       child: Center(child: CupertinoActivityIndicator()),
                     ),
                   ),
+                
+                // 下部余白
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           ),
@@ -507,83 +484,109 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       },
     );
 
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(
-              'コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}',
-              style: const TextStyle(fontSize: 11),
-            ),
-          ],
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+
+        // 戻る前に確実に保存
+        _saveFromPage(_currentPage);
+        await _vm.flushPendingScrollSave();
+
+        if (mounted) {
+          setState(() => _allowPop = true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.of(context).pop();
+          });
+        }
+      },
+      child: CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          middle: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                'コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _fetchMoreDelta,
+                child: const Icon(CupertinoIcons.refresh),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _showMenu,
+                child: const Icon(CupertinoIcons.ellipsis),
+              ),
+            ],
+          ),
         ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _showMenu,
-          child: const Icon(CupertinoIcons.bars),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: _vm.loading
-            ? Center(child: PlatformHelper.buildLoadingIndicator())
-            : Stack(
-                children: [
-                  pageView,
+        child: SafeArea(
+          bottom: false,
+          child: _vm.loading
+              ? Center(child: PlatformHelper.buildLoadingIndicator())
+              : Stack(
+                  children: [
+                    pageView,
 
-                  // ページ移動用の左右ボタン
-                  if (_pageCountLive > 1 && _hasPrev)
-                    Positioned(
-                      left: 8,
-                      top: 0,
-                      bottom: 0,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: CupertinoButton(
-                          padding: const EdgeInsets.all(8),
-                          onPressed: _hasPrev ? _goPrevPage : null,
-                          child: const Icon(CupertinoIcons.chevron_left, size: 22),
-                        ),
-                      ),
-                    ),
-
-                  if (_pageCountLive > 1 && _hasNext)
-                    Positioned(
-                      right: 8,
-                      top: 0,
-                      bottom: 0,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: CupertinoButton(
-                          padding: const EdgeInsets.all(8),
-                          onPressed: _hasNext ? _goNextPage : null,
-                          child: const Icon(CupertinoIcons.chevron_right, size: 22),
-                        ),
-                      ),
-                    ),
-
-                  if (_pageCountLive > 1)
-                    Positioned(
-                      bottom: 8,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: CupertinoColors.systemGrey6.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            '${_currentPage + 1} / $_pageCountLive',
-                            style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                    // ページ移動用の左右ボタン
+                    if (_pageCountLive > 1 && _hasPrev)
+                      Positioned(
+                        left: 8,
+                        top: 0,
+                        bottom: 0,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: CupertinoButton(
+                            padding: const EdgeInsets.all(8),
+                            onPressed: _hasPrev ? _goPrevPage : null,
+                            child: const Icon(CupertinoIcons.chevron_left, size: 22),
                           ),
                         ),
                       ),
-                    ),
+
+                    if (_pageCountLive > 1 && _hasNext)
+                      Positioned(
+                        right: 8,
+                        top: 0,
+                        bottom: 0,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: CupertinoButton(
+                            padding: const EdgeInsets.all(8),
+                            onPressed: _hasNext ? _goNextPage : null,
+                            child: const Icon(CupertinoIcons.chevron_right, size: 22),
+                          ),
+                        ),
+                      ),
+
+                    if (_pageCountLive > 1)
+                      Positioned(
+                        bottom: 8,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: CupertinoColors.systemGrey6.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              '${_currentPage + 1} / $_pageCountLive',
+                              style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                            ),
+                          ),
+                        ),
+                      ),
 
                   // （任意）復元前だけ「続きへ」チップを表示して手動復元も用意
                   if (_vm.savedCommentNo > 0 && !_restoredOnce)
@@ -598,7 +601,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 ],
               ),
       ),
-    );
+    ));
   }
 
   void _showAnchorPreview(int no) {
