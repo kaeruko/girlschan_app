@@ -65,6 +65,7 @@ class TopicDetailController extends ChangeNotifier {
     required this.commentCount,
     required this.postedAt,
     this.enableRefresh = true,
+    this.saveReadPosition = true, // ★ 追加
   });
 
   final int topicId;
@@ -73,6 +74,7 @@ class TopicDetailController extends ChangeNotifier {
   final String postedAt;
 
   final bool enableRefresh;
+  final bool saveReadPosition; // ★ 追加
 
   // state
   static const int commentsPerPage = 500;
@@ -118,6 +120,9 @@ class TopicDetailController extends ChangeNotifier {
 
   // ==== persist scroll（新方式：凍結＋デバウンス付き） ====
   Future<void> saveScrollByIndexAndFraction(int index, double fraction) async {
+    // ★ saveReadPosition が false なら保存しない
+    if (!saveReadPosition) return;
+
     // 最新候補を溜める（スクロール中の大量イベントを圧縮）
     _pendingIndex = index;
     _pendingFraction = fraction;
@@ -164,6 +169,9 @@ class TopicDetailController extends ChangeNotifier {
 
   // ★未確定分を即書き込むフラッシュ
   Future<void> flushPendingScrollSave() async {
+    // ★ saveReadPosition が false なら保存しない
+    if (!saveReadPosition) return;
+
     _saveDebounce?.cancel();
     final i = _pendingIndex;
     final f = _pendingFraction;
@@ -463,7 +471,14 @@ class TopicDetailController extends ChangeNotifier {
       // 既に watched に登録済み → 上書き
       final watched = jsonDecode(jsonList[idx]) as Map<String, dynamic>;
       watched['title'] = title;
-      watched['comments'] = comments;
+      
+      // ★ comments が 0 の場合は、既存の値を維持する（上書きしない）
+      if (comments > 0) {
+        watched['comments'] = comments;
+      } else {
+        // 既存の値があればそれをキープ、なければ 0 のまま
+      }
+
       watched['posted_at'] = postedAt;
       watched['watchedAt'] = nowIso; // ★ 最終閲覧時刻を更新
       jsonList[idx] = jsonEncode(watched);

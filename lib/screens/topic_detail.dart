@@ -21,6 +21,7 @@ class TopicDetailScreen extends StatefulWidget {
   final String posted_at;
   final int? initialJumpTo;
   final bool enableRefresh;
+  final bool saveReadPosition; // ★ 追加
 
   const TopicDetailScreen({
     super.key,
@@ -30,6 +31,7 @@ class TopicDetailScreen extends StatefulWidget {
     required this.posted_at,
     this.initialJumpTo,
     this.enableRefresh = true,
+    this.saveReadPosition = true, // ★ デフォルトは true
   });
 
   @override
@@ -61,6 +63,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       commentCount: widget.commentCount,
       postedAt: widget.posted_at,
       enableRefresh: widget.enableRefresh,
+      saveReadPosition: widget.saveReadPosition, // ★ 追加
     )..addListener(_onVmChanged);
 
     // 初期化処理
@@ -1335,8 +1338,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
                 ),
                 alignment: Alignment.center,
-                child: Text(plus.toString(),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
               ),
             ),
           if (minus > 0)
@@ -1349,8 +1350,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   borderRadius: BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
                 ),
                 alignment: Alignment.center,
-                child: Text(minus.toString(),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
               ),
             ),
         ],

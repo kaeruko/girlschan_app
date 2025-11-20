@@ -170,6 +170,7 @@ with WidgetsBindingObserver {
               commentCount: 0,
               posted_at: posted_at,
               initialJumpTo: commentNo, // ★ コメント番号を渡す
+              saveReadPosition: false,  // ★ クリップからの遷移では既読位置を保存しない
             ),
           ),
         ).then((_) {
