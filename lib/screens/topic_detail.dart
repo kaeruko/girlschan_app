@@ -1057,6 +1057,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(ctx);
+              _vm.hardReload();
+            },
+            child: const Text('再読み込み'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(ctx);
               _openPostDialog();
             },
             child: const Text('コメントを投稿する'),

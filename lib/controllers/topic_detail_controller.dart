@@ -369,6 +369,74 @@ class TopicDetailController extends ChangeNotifier {
       ]);
     }
   }
+
+  /// キャッシュとスクロール位置を破棄して最新500件を取り直す
+  Future<void> hardReload() async {
+    if (_loading || _fetching) return;
+    _loading = true;
+    notifyListeners();
+
+    try {
+      // 1. メモリ上のデータをクリア
+      _allComments = [];
+      _indexByNo.clear();
+      _byNo.clear();
+      _totalComments = 0;
+      _lastRemoteNo = 0;
+      _hasMore = false;
+
+      // 2. SharedPreferences (スクロール位置) をクリア
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('scroll_$topicId');
+      await prefs.remove('scroll_frac_$topicId');
+      _savedCommentNo = 0;
+      savedLocalFraction = 0.0;
+
+      // 3. キャッシュをクリア
+      await CacheService.saveList('comments_$topicId', []);
+
+      // 4. 最新500件を取得 (offset=0, limit=500)
+      //    ※ fetchFirstPage() は limit=commentsPerPage(100) なので、
+      //       ここでは明示的に 500 を指定して呼ぶか、あるいは
+      //       fetchFirstPage() を呼んでから追加ロードするか。
+      //       要望は「offset0から最大500まで」なので一括で取れるなら取る。
+      //       API仕様的に limit が効くなら指定する。
+      const reloadLimit = 500;
+      final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: reloadLimit, old: _isOld);
+      final list = (page['comments'] as List<dynamic>? ?? []).toList();
+      final total = (page['total'] as int?) ?? list.length;
+
+      _allComments = list;
+      _totalComments = total;
+      _hasMore = list.length >= reloadLimit; // 500件取れたらまだあるかも
+
+      // 5. 再構築
+      _rebuildIndexByNo();
+      
+      // インデックスと lastRemoteNo を更新
+      for (int i = 0; i < list.length; i++) {
+        final no = list[i]['no'] as int;
+        _byNo[no] = i; // indexByNo と重複するが _byNo は fetchDelta 用
+        if (no > _lastRemoteNo) _lastRemoteNo = no;
+      }
+
+      // 6. 新しいデータをキャッシュ保存
+      await CacheService.saveList('comments_$topicId', _allComments);
+      
+      // 7. 履歴も更新
+      await updateWatchedTopicsComments([
+        {'id': topicId, 'comments': _totalComments}
+      ]);
+
+      _freezeSaving();
+    } catch (e) {
+      logd('Hard Reload Error: $e');
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
   // --- コメント配列を更新したときに no->index を再構築 ---
   void _rebuildIndexByNo() {
     _indexByNo.clear();

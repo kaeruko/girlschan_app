@@ -254,7 +254,7 @@ class TopicListScreenState extends State<TopicListScreen>
       );
     }
 
-    logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
+    // logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
     return Scaffold(
       body: Column(
