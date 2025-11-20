@@ -65,8 +65,6 @@ class TopicDetailController extends ChangeNotifier {
     required this.commentCount,
     required this.postedAt,
     this.enableRefresh = true,
-    this.testingBypassInit = false,
-    this.testingInitialComments,
   });
 
   final int topicId;
@@ -75,8 +73,6 @@ class TopicDetailController extends ChangeNotifier {
   final String postedAt;
 
   final bool enableRefresh;
-  final bool testingBypassInit;
-  final List<Map<String, dynamic>>? testingInitialComments;
 
   // state
   static const int commentsPerPage = 500;
@@ -200,15 +196,6 @@ class TopicDetailController extends ChangeNotifier {
 
   // ==== init ====
   Future<void> init() async {
-    if (testingBypassInit) {
-      _allComments = (testingInitialComments ?? const []).map((e) => Map<String, dynamic>.from(e)).toList();
-      _totalComments = _allComments.length;
-      _rebuildIndexByNo();
-      _loading = false;
-      notifyListeners();
-      return;
-    }
-
     await _loadSavedScroll();
     logd('[init] after _loadSavedScroll: savedCommentNo=$_savedCommentNo, savedLocalFraction=$savedLocalFraction');
 

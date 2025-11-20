@@ -162,6 +162,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       }
     }
 
+    bool isBold = false;
     if (_hasCachedComments) {
       final total = comments;
       int shown = _savedCommentNo;
@@ -169,14 +170,17 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       if (shown > 0 && total > 0) {
         const pad = 2;
         shown = shown + pad;
-
-        // total を超えないように＆マイナスにならないようにガード
         if (shown > total) shown = total;
         if (shown < 0) shown = 0;
       }
 
       final savedText = shown > 0 ? '$shown' : '0';
       commentDisplay = '$savedText/$total $posted_at';
+      
+      // ★ 未読がある場合（表示済み < 総数）は太字にする
+      if (shown < total) {
+        isBold = true;
+      }
     }
 
     final blue = CupertinoColors.systemBlue;
@@ -322,7 +326,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: _hasCachedComments ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: isBold ? FontWeight.bold : (_hasCachedComments ? FontWeight.w600 : FontWeight.w500),
                           color: _hasCachedComments ? CupertinoColors.activeBlue : null,
                         ),
                       ),

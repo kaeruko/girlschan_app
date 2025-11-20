@@ -19,10 +19,8 @@ class TopicDetailScreen extends StatefulWidget {
   final String title;
   final int commentCount;
   final String posted_at;
-
+  final int? initialJumpTo;
   final bool enableRefresh;
-  final bool testingBypassInit;
-  final List<Map<String, dynamic>>? testingInitialComments;
 
   const TopicDetailScreen({
     super.key,
@@ -30,9 +28,8 @@ class TopicDetailScreen extends StatefulWidget {
     required this.title,
     required this.commentCount,
     required this.posted_at,
+    this.initialJumpTo,
     this.enableRefresh = true,
-    this.testingBypassInit = false,
-    this.testingInitialComments,
   });
 
   @override
@@ -64,11 +61,18 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       commentCount: widget.commentCount,
       postedAt: widget.posted_at,
       enableRefresh: widget.enableRefresh,
-      testingBypassInit: widget.testingBypassInit,
-      testingInitialComments: widget.testingInitialComments,
     )..addListener(_onVmChanged);
 
-    _vm.init();
+    // 初期化処理
+    // ★ initialJumpTo がある場合はそれを優先して復元試行
+    if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
+      // 少し待ってから実行しないとマウント前で失敗する可能性があるため
+      Future.microtask(() => _tryRestoreIfNeeded(targetNo: widget.initialJumpTo));
+    } else {
+      _vm.init().then((_) {
+        if (mounted) _tryRestoreIfNeeded();
+      });
+    }
   }
 
   @override
@@ -1079,6 +1083,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
     final no = (c['no'] as int?) ?? -1;
     final posted_at = c['posted_at'] ?? '';
+    final name = c['name'] ?? '';
     final body = c['body'] ?? '';
     final plus = c['plus'] ?? 0;
     final minus = c['minus'] ?? 0;
@@ -1089,7 +1094,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final innerWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('No.$no  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
+        Text('No.$no  $name  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
             style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel)),
         const SizedBox(height: 8),
         if (anchors.isNotEmpty) _buildAnchorText(anchors),
@@ -1164,21 +1169,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
               ),
             ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () async {
-                await _vm.toggleClip(Map<String, dynamic>.from(c));
-                if (!mounted) return;
-                setState(() {});
-              },
-              child: Icon(
-                _vm.clippedNos.contains(no) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                color: _vm.clippedNos.contains(no)
-                    ? CupertinoColors.systemRed
-                    : CupertinoColors.secondaryLabel,
-                size: 22,
-              ),
-            ),
+
           ],
         ),
       ],
@@ -1281,37 +1272,53 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   Widget _buildPlusMinusGraph(int plus, int minus) {
     final total = plus + minus;
     if (total == 0) return const SizedBox.shrink();
-    return Row(
-      children: [
-        if (plus > 0)
-          Expanded(
-            flex: plus,
-            child: Container(
-              height: 20,
-              decoration: const BoxDecoration(
-                color: Color(0xFFED6D74),
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
+
+    const double minWidth = 30.0;
+    const double maxWidth = 300.0;
+    const int capVotes = 1000;
+
+    double barWidth;
+    if (total >= capVotes) {
+      barWidth = maxWidth;
+    } else {
+      final growthRatio = total / capVotes;
+      barWidth = minWidth + (maxWidth - minWidth) * growthRatio;
+    }
+
+    return SizedBox(
+      width: barWidth,
+      child: Row(
+        children: [
+          if (plus > 0)
+            Expanded(
+              flex: plus,
+              child: Container(
+                height: 20,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFED6D74),
+                  borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
+                ),
+                alignment: Alignment.center,
+                child: Text(plus.toString(),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
               ),
-              alignment: Alignment.center,
-              child: Text(plus.toString(),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
             ),
-          ),
-        if (minus > 0)
-          Expanded(
-            flex: minus,
-            child: Container(
-              height: 20,
-              decoration: const BoxDecoration(
-                color: CupertinoColors.systemGrey3,
-                borderRadius: BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
+          if (minus > 0)
+            Expanded(
+              flex: minus,
+              child: Container(
+                height: 20,
+                decoration: const BoxDecoration(
+                  color: CupertinoColors.systemGrey3,
+                  borderRadius: BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
+                ),
+                alignment: Alignment.center,
+                child: Text(minus.toString(),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
               ),
-              alignment: Alignment.center,
-              child: Text(minus.toString(),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CupertinoColors.white)),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

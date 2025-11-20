@@ -168,7 +168,8 @@ with WidgetsBindingObserver {
               topicId: topicId,
               title: topicTitle,
               commentCount: 0,
-              posted_at: posted_at, 
+              posted_at: posted_at,
+              initialJumpTo: commentNo, // ★ コメント番号を渡す
             ),
           ),
         ).then((_) {
