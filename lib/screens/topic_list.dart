@@ -71,15 +71,15 @@ class TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _moveTopicToTop(int index, int topicId) async {
-    debugPrint('🔄 ENTER _moveTopicToTop index=$index id=$topicId');
-    logd('🔄 [_moveTopicToTop] Start processing index=$index, id=$topicId', name: 'TopicList');
+    debugPrint('🔄 ENTER _updateTopicInPlace index=$index id=$topicId');
+    logd('🔄 [_updateTopicInPlace] Start processing index=$index, id=$topicId', name: 'TopicList');
 
     try {
       final metaKey = 'topic_meta_$topicId';
       final meta = await CacheService.loadMap(metaKey);
       
       if (!mounted) {
-        debugPrint('⚠️ _moveTopicToTop: state not mounted, abort');
+        debugPrint('⚠️ _updateTopicInPlace: state not mounted, abort');
         return;
       }
 
@@ -93,12 +93,12 @@ class TopicListScreenState extends State<TopicListScreen>
            currentIdx = newList.indexWhere((t) => t['id'] == topicId);
         }
         if (currentIdx == -1) {
-          debugPrint('⚠️ _moveTopicToTop: target not found id=$topicId');
+          debugPrint('⚠️ _updateTopicInPlace: target not found id=$topicId');
           return; // 見つからなければ終了
         }
 
-        // 3. 対象トピックを「抜き出す」
-        final targetTopic = newList.removeAt(currentIdx);
+        // 3. 対象トピックを取得（削除はしない）
+        final targetTopic = newList[currentIdx];
 
         // 4. 情報を最新化する
         final updatedTopic = {
@@ -108,53 +108,22 @@ class TopicListScreenState extends State<TopicListScreen>
           if (meta != null && meta['thumb'] != null) 'thumb': meta['thumb'],
         };
 
-        // 5. リストの「先頭」に挿入する
-        newList.insert(0, updatedTopic);
+        // 5. 元の位置で更新する（移動させない）
+        newList[currentIdx] = updatedTopic;
         
         // 6. 画面用リストを差し替え
         _topics = newList;
         
-        logd('✅ [_moveTopicToTop] Moved to top: ${updatedTopic['title']}', name: 'TopicList');
+        logd('✅ [_updateTopicInPlace] Updated in place: ${updatedTopic['title']}', name: 'TopicList');
       });
       
       // 7. タイルコントローラーのリフレッシュ（重要）
       await _controller.refreshAll();
-      debugPrint('✅ LEAVE _moveTopicToTop id=$topicId');
+      debugPrint('✅ LEAVE _updateTopicInPlace id=$topicId');
 
     } catch (e, st) {
-      debugPrint('❌ _moveTopicToTop exception: $e\n$st');
-      logd('❌ [_moveTopicToTop] Error: $e', name: 'TopicList');
-    }
-  }
-
-  Future<void> _moveTopicToTopById(int topicId) async {
-    debugPrint('🔄 ENTER _moveTopicToTopById id=$topicId');
-    try {
-      final meta = await CacheService.loadMap('topic_meta_$topicId');
-      if (!mounted) return;
-
-      setState(() {
-        final newList = List<Map<String, dynamic>>.from(_topics);
-        final currentIdx = newList.indexWhere((t) => t['id'] == topicId);
-        if (currentIdx == -1) {
-          debugPrint('⚠️ _moveTopicToTopById: target not found id=$topicId');
-          return;
-        }
-        final target = newList.removeAt(currentIdx);
-        final updated = {
-          ...target,
-          if (meta?['total'] != null) 'comments': meta!['total'],
-          if (meta?['posted_at'] != null) 'posted_at': meta!['posted_at'],
-          if (meta?['thumb'] != null) 'thumb': meta!['thumb'],
-        };
-        newList.insert(0, updated);
-        _topics = newList;
-      });
-
-      await _controller.refreshAll();
-      debugPrint('✅ LEAVE _moveTopicToTopById id=$topicId');
-    } catch (e, st) {
-      debugPrint('❌ _moveTopicToTopById exception: $e\n$st');
+      debugPrint('❌ _updateTopicInPlace exception: $e\n$st');
+      logd('❌ [_updateTopicInPlace] Error: $e', name: 'TopicList');
     }
   }
 
@@ -241,7 +210,9 @@ class TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _removeCommentsCache(int topicId) async {
-    // 一覧では「×」はコメントキャッシュ消去の意味にする
+    // ★ watched_topics_full からも削除（履歴に残らないようにする）
+    await removeWatchedTopicId(topicId);
+    // コメントキャッシュも消去
     await CacheService.clear('comments_$topicId');
     await _controller.refreshAll();
   }

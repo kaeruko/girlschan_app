@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
-import '../app/app_tabs.dart'; // ★ 追加
+import '../app/app_tabs.dart';
 import '../widgets/common/app_toast.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
