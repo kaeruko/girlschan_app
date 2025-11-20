@@ -64,15 +64,14 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     )..addListener(_onVmChanged);
 
     // 初期化処理
-    // ★ initialJumpTo がある場合はそれを優先して復元試行
-    if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
-      // 少し待ってから実行しないとマウント前で失敗する可能性があるため
-      Future.microtask(() => _tryRestoreIfNeeded(targetNo: widget.initialJumpTo));
-    } else {
-      _vm.init().then((_) {
-        if (mounted) _tryRestoreIfNeeded();
-      });
-    }
+    _vm.init().then((_) {
+      if (!mounted) return;
+      if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
+        _tryRestoreIfNeeded(targetNo: widget.initialJumpTo);
+      } else {
+        _tryRestoreIfNeeded();
+      }
+    });
   }
 
   @override
@@ -95,6 +94,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void _onVmChanged() {
     if (!mounted) return;
     setState(() {});
+
+    // ★ initialJumpTo がある場合は、initState 側の明示的な呼び出しに任せるのでここでは何もしない
+    if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
+      return;
+    }
+
     // 初回データ到着後は復元を試みる
     if (!_restoredOnce && !_vm.loading) {
       _scheduleTryRestore();
@@ -212,10 +217,26 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
+  /// PageController のアタッチを待つ
+  Future<void> _waitForPageController() async {
+    for (int i = 0; i < 30; i++) {
+      if (_pc.hasClients && _pc.position.hasPixels) {
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 16));
+    }
+  }
+
   Future<void> _tryRestoreIfNeeded({int? targetNo}) async {
     // ★ 再入防止
-    if (_restoredOnce && targetNo == null) return; // 自動復元済みなら何もしない（手動指定なら通す）
-    if (_vm.loading || _restoring) return;
+    if (_restoredOnce && targetNo == null) {
+      print('[復元] 自動復元済みのためスキップ');
+      return; 
+    }
+    if (_vm.loading || _restoring) {
+      print('[復元] loading=${_vm.loading}, restoring=$_restoring のためスキップ (target=$targetNo)');
+      return;
+    }
     _restoring = true;
 
     final savedNo = targetNo ?? _vm.savedCommentNo;
@@ -230,7 +251,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     // まず、そのNoが入るまで差分取得
     print('[復元] ensureContainsNo($savedNo) 実行中...');
     await _vm.ensureContainsNo(savedNo);
-    if (!mounted) return;
+    if (!mounted) {
+      print('[復元] unmounted during ensureContainsNo');
+      _restoring = false;
+      return;
+    }
 
     // index を特定してターゲットページへ
     final idx = _vm.indexByNo[savedNo];
@@ -250,9 +275,14 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     _boostCacheDuringRestore = true;
     if (mounted) setState(() {}); // cacheExtent 反映
 
+    // ★ PageView がビルドされるのを待つ
+    await _waitForPageController();
+
     if (_pc.hasClients) {
       _pc.jumpToPage(targetPage);
       print('[復元] ページ遷移実行: $targetPage');
+    } else {
+      print('[復元] _pc has no clients! (wait failed?)');
     }
 
     // スクロール位置が attach されるのを確実に待つ
@@ -303,27 +333,30 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         continue;
       }
 
-      print('[復元] attempt=$attempt: pageItems内で$savedNoを発見 (itemIndex=$itemIndex)');
+      // print('[復元] attempt=$attempt: pageItems内で$savedNoを発見 (itemIndex=$itemIndex)');
 
       // コメント番号をキーにしてコンテキストを取得
       final key = _vm.keyForCommentNo(savedNo);
       final ctx = key.currentContext;
       
-      print('[復元] key=$key, key.currentContext = $ctx');
-      print('[復元] _vm.commentKeys.length=${_vm.commentKeys.length}');
+      // print('[復元] key=$key, key.currentContext = $ctx');
+      // print('[復元] _vm.commentKeys.length=${_vm.commentKeys.length}');
       
       if (ctx == null) {
-        print('[復元] attempt=$attempt: currentContext がまだ null');
+        print('[復元] attempt=$attempt: currentContext がまだ null (key=$key)');
         // もし実測が進んでいれば、その都度ターゲットまでの概算位置に追従
         if (sc.hasClients) {
           final off = meas.indexToOffset(itemIndex);
-          try { sc.jumpTo(off); } catch (_) {}
+          try { 
+            sc.jumpTo(off); 
+            // print('[復元] 追従ジャンプ: offset=$off');
+          } catch (_) {}
         }
         await Future.delayed(const Duration(milliseconds: 16));
         continue;
       }
 
-      print('[復演] currentContext を取得! ensureVisible 実行...');
+      print('[復元] currentContext を取得! ensureVisible 実行... (attempt=$attempt)');
 
       // 行頭を上端に揃える
       await Scrollable.ensureVisible(
@@ -344,8 +377,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         if (sc2.hasClients) {
           final max = sc2.position.maxScrollExtent;
           final offset = (sc2.offset + h * frac).clamp(0.0, max);
-          sc2.jumpTo(offset);
           print('[復元] スクロール位置を調整: offset=$offset');
+          sc2.jumpTo(offset);
         }
       }
 

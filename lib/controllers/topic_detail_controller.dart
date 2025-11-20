@@ -237,7 +237,7 @@ class TopicDetailController extends ChangeNotifier {
 
   Future<void> fetchFirstPage() async {
     try {
-      final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage);
+      final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage, old: _isOld);
       final list = (page['comments'] as List<dynamic>? ?? []).toList();
       final total = (page['total'] as int?) ?? list.length;
 
@@ -288,7 +288,7 @@ class TopicDetailController extends ChangeNotifier {
     
     try {
       final from = _lastRemoteNo > 0 ? _lastRemoteNo : lastRemoteNo;
-      final fetched = await fetchCommentsWithPagination(topicId, offset: from, limit: commentsPerPage);
+      final fetched = await fetchCommentsWithPagination(topicId, offset: from, limit: commentsPerPage, old: _isOld);
       final List<dynamic> fetchedList = (fetched['comments'] as List<dynamic>? ?? const []);
       // 追加: サーバ側の総件数が返るなら拾う
       final fetchedTotal = (fetched['total'] as int?) ?? 0;
@@ -482,4 +482,16 @@ class TopicDetailController extends ChangeNotifier {
     await prefs.setStringList('watched_topics_full', jsonList);
   }
 
+  bool get _isOld {
+    if (postedAt.isEmpty) return false;
+    final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(postedAt);
+    if (m == null) return false;
+    final y = int.parse(m.group(1)!);
+    final mo = int.parse(m.group(2)!);
+    final d = int.parse(m.group(3)!);
+    final date = DateTime(y, mo, d);
+    final diff = DateTime.now().difference(date).inDays;
+    logd('📅 [isOld] postedAt=$postedAt diff=$diff days (threshold=30) -> isOld=${diff > 30}');
+    return diff > 30;
+  }
 }

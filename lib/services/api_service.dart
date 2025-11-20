@@ -286,6 +286,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
   int topicId, {
   int offset = 0,
   int limit = 10,
+  bool old = false,
 }) async {
   try {
     // logd('');
@@ -294,11 +295,16 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     // logd('============================================');
     // logd('');
     
+    final queryParams = {
+      'offset': offset.toString(),
+      'limit': limit.toString(),
+    };
+    if (old) {
+      queryParams['old'] = 'true';
+    }
+
     final uri = Uri.parse('$apiBase/topic/$topicId').replace(
-      queryParameters: {
-        'offset': offset.toString(),
-        'limit': limit.toString(),
-      },
+      queryParameters: queryParams,
     );
     // logd('💬 [fetchCommentsWithPagination] API URL: $uri');
     // logd('💬 [fetchCommentsWithPagination] Parameters: topicId=$topicId, offset=$offset, limit=$limit');
