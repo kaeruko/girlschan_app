@@ -1,32 +1,34 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import '../models/comment.dart';
-import '../screens/image_viewer_page.dart';
 
 class CommentTile extends StatelessWidget {
   final Map<String, dynamic> comment;
   final bool isClipped;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-  final Function(int no) onAnchorTap;
-  final Function(bool isPlus) onVote;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final Function(int no)? onAnchorTap;
+  final Function(String url)? onImageTap;
+  final Function(bool isPlus)? onVote;
+  final bool Function(int no)? checkAnchorAvailability;
 
   const CommentTile({
     super.key,
     required this.comment,
-    required this.isClipped,
-    required this.onTap,
-    required this.onLongPress,
-    required this.onAnchorTap,
-    required this.onVote,
+    this.isClipped = false,
+    this.onTap,
+    this.onLongPress,
+    this.onAnchorTap,
+    this.onImageTap,
+    this.onVote,
+    this.checkAnchorAvailability,
   });
 
   @override
   Widget build(BuildContext context) {
     final no = (comment['no'] as int?) ?? -1;
-    final posted_at = comment['posted_at'] ?? '';
+    final postedAt = comment['posted_at'] ?? '';
     final name = comment['name'] ?? '';
     final body = comment['body'] ?? '';
     final plus = comment['plus'] ?? 0;
@@ -34,32 +36,28 @@ class CommentTile extends StatelessWidget {
     final anchors = List<int>.from(comment['anchors'] ?? []);
     final reverseAnchors = List<int>.from(comment['reverse_anchors'] ?? []);
     final urls = (comment['urls'] as List?) ?? [];
+    final imageUrl = comment['image_url'] as String?;
 
     final innerWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('No.$no  $name  $posted_at${comment['isLocal'] == true ? ' （ローカル）' : ''}',
-            style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel)),
+        Text(
+          'No.$no  $name  $postedAt${comment['isLocal'] == true ? ' （ローカル）' : ''}',
+          style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
+        ),
         const SizedBox(height: 8),
         if (anchors.isNotEmpty) _buildAnchorText(anchors),
         if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
         Text(body, style: const TextStyle(fontSize: 15)),
-        if (urls.isNotEmpty) _buildUrlsWidget(context, urls),
-        if (comment['image_url'] != null) ...[
+        if (urls.isNotEmpty) _buildUrlsWidget(urls),
+        if (imageUrl != null) ...[
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                CupertinoPageRoute(
-                  fullscreenDialog: true,
-                  builder: (_) => ImageViewerPage(url: comment['image_url']),
-                ),
-              );
-            },
+            onTap: () => onImageTap?.call(imageUrl),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
-                comment['image_url'],
+                imageUrl,
                 height: 200,
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, loadingProgress) {
@@ -87,7 +85,10 @@ class CommentTile extends StatelessWidget {
           children: [
             CupertinoButton(
               padding: EdgeInsets.zero,
-              onPressed: () => onVote(true),
+              onPressed: () {
+                if (comment['isLocal'] == true) return;
+                onVote?.call(true);
+              },
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Text('＋$plus', style: const TextStyle(color: CupertinoColors.systemRed)),
@@ -95,7 +96,10 @@ class CommentTile extends StatelessWidget {
             ),
             CupertinoButton(
               padding: EdgeInsets.zero,
-              onPressed: () => onVote(false),
+              onPressed: () {
+                if (comment['isLocal'] == true) return;
+                onVote?.call(false);
+              },
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
@@ -107,9 +111,22 @@ class CommentTile extends StatelessWidget {
     );
 
     return GestureDetector(
-      onLongPress: onLongPress,
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
+        // key: no > 0 ? _vm.keyForCommentNo(no) : null, // Key handling should be done by parent if needed, or passed in.
+        // The parent (TopicDetailScreen) uses the key for scrolling. 
+        // We should probably allow passing a Key to the widget itself, or let the parent wrap it.
+        // But the original code put the key on the Container.
+        // If I put the key on CommentTile, it's on the widget.
+        // The parent wraps CommentTile in MeasureSize.
+        // The original code: Container(key: ...).
+        // If I pass the key to CommentTile constructor, it applies to CommentTile.
+        // If CommentTile builds a Container, that Container doesn't necessarily need the key if CommentTile has it?
+        // Wait, Scrollable.ensureVisible(ctx) uses the context of the key.
+        // If the key is on CommentTile, ctx refers to CommentTile.
+        // If the key is on Container, ctx refers to Container.
+        // It should be fine if it's on CommentTile.
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
         ),
@@ -129,23 +146,27 @@ class CommentTile extends StatelessWidget {
           Wrap(
             spacing: 4,
             children: anchors.map((no) {
+              final isAvailable = checkAnchorAvailability?.call(no) ?? true;
+
               return GestureDetector(
-                onTap: () => onAnchorTap(no),
+                onTap: () => onAnchorTap?.call(no),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: CupertinoColors.systemBlue.withOpacity(0.1),
+                    color: isAvailable
+                        ? CupertinoColors.systemBlue.withOpacity(0.1)
+                        : CupertinoColors.systemGrey.withOpacity(0.1),
                     border: Border.all(
-                      color: CupertinoColors.systemBlue,
+                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
                       width: 1,
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     '>>$no',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: CupertinoColors.systemBlue,
+                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -160,7 +181,7 @@ class CommentTile extends StatelessWidget {
 
   Widget _buildReverseAnchorText(List<int> reverseAnchors) {
     if (reverseAnchors.isEmpty) return const SizedBox.shrink();
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
@@ -170,7 +191,7 @@ class CommentTile extends StatelessWidget {
               spacing: 4,
               children: reverseAnchors.take(5).map((no) {
                 return GestureDetector(
-                  onTap: () => onAnchorTap(no),
+                  onTap: () => onAnchorTap?.call(no),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -204,7 +225,7 @@ class CommentTile extends StatelessWidget {
     );
   }
 
-  Widget _buildUrlsWidget(BuildContext context, List<dynamic> urls) {
+  Widget _buildUrlsWidget(List<dynamic> urls) {
     if (urls.isEmpty) return const SizedBox.shrink();
 
     return Padding(

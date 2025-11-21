@@ -14,6 +14,7 @@ import '../utils/variable_list_measurer.dart';
 import 'comment_compose_page.dart';
 import 'comment_post_webview.dart';
 import 'image_viewer_page.dart';
+import '../widgets/comment_tile.dart';
 
 class TopicDetailScreen extends StatefulWidget {
   final int topicId;
@@ -432,7 +433,39 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
                       return MeasureSize(
                         onChange: (sz) => meas.onItemSize(i, sz.height, sc: sc),
-                        child: _buildCommentItem(ctx2, c, globalIndex),
+                        child: Container(
+                          key: (c['no'] as int) > 0 ? _vm.keyForCommentNo(c['no'] as int) : null,
+                          child: CommentTile(
+                            comment: c,
+                            isClipped: _vm.clippedNos.contains(c['no']),
+                            onLongPress: () => _showCommentActionSheet(ctx2, c),
+                            onAnchorTap: (no) => _showAnchorPreview(no),
+                            onImageTap: (url) {
+                              Navigator.of(context).push(
+                                CupertinoPageRoute(
+                                  fullscreenDialog: true,
+                                  builder: (_) => ImageViewerPage(url: url),
+                                ),
+                              );
+                            },
+                            onVote: (isPlus) async {
+                              final no = c['no'] as int;
+                              final commentId = 'vbox$no';
+                              final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
+                              if (!mounted) return;
+                              if (success) {
+                                setState(() {
+                                  if (isPlus) {
+                                    c['plus'] = (c['plus'] ?? 0) + 1;
+                                  } else {
+                                    c['minus'] = (c['minus'] ?? 0) + 1;
+                                  }
+                                });
+                              }
+                            },
+                            checkAnchorAvailability: (no) => _vm.getCommentByNo(no).isNotEmpty,
+                          ),
+                        ),
                       );
                     },
                     childCount: pageItems.length,
@@ -893,201 +926,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-  Widget _buildAnchorText(List<int> anchors) {
-    if (anchors.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Wrap(
-            spacing: 4,
-            children: anchors.map((no) {
-              final referencedComment = _vm.getCommentByNo(no);
-              final isAvailable = referencedComment.isNotEmpty;
 
-              return GestureDetector(
-                onTap: () => _showAnchorPreview(no),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isAvailable ? CupertinoColors.systemBlue.withOpacity(0.1) : CupertinoColors.systemGrey.withOpacity(0.1),
-                    border: Border.all(
-                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '>>$no',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReverseAnchorText(List<int> reverseAnchors) {
-    if (reverseAnchors.isEmpty) return const SizedBox.shrink();
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Wrap(
-              spacing: 4,
-              children: reverseAnchors.take(5).map((no) {
-                return GestureDetector(
-                  onTap: () => _showAnchorPreview(no),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemOrange.withOpacity(0.1),
-                      border: Border.all(
-                        color: CupertinoColors.systemOrange,
-                        width: 1,
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '<<$no',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: CupertinoColors.systemOrange,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          if (reverseAnchors.length > 5)
-            Text(
-              ' +${reverseAnchors.length - 5}件',
-              style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // URL表示ウィジェット
-  Widget _buildUrlsWidget(List<dynamic> urls) {
-    if (urls.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Column(
-        children: urls.map((urlData) {
-          String url = '';
-          String title = '';
-          String? description;
-          String? thumbnail;
-
-          // Map型とCommentUrl型の両方に対応
-          if (urlData is Map<String, dynamic>) {
-            url = urlData['url'] ?? '';
-            title = urlData['title'] ?? '';
-            description = urlData['description'];
-            thumbnail = urlData['thumbnail'];
-          } else if (urlData is CommentUrl) {
-            url = urlData.url;
-            title = urlData.title;
-            description = urlData.description;
-            thumbnail = urlData.thumbnail;
-          }
-
-          if (url.isEmpty) return const SizedBox.shrink();
-
-          return GestureDetector(
-            onTap: () async {
-              final Uri uri = Uri.parse(url);
-              if (!mounted) return;
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey6,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: CupertinoColors.systemGrey4),
-              ),
-              child: Row(
-                children: [
-                  if (thumbnail != null && thumbnail.isNotEmpty)
-                    ClipRRect(
-                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                      child: Image.network(
-                        thumbnail,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox(width: 80, height: 80),
-                      ),
-                    ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title.isNotEmpty ? title : url,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: CupertinoColors.activeBlue,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (description != null && description.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                description,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: CupertinoColors.secondaryLabel,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Text(
-                            url,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: CupertinoColors.tertiaryLabel,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
 
   void _showMenu() {
     showCupertinoModalPopup(
@@ -1173,140 +1012,35 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
 
 
-  Widget _buildCommentItem(BuildContext context, dynamic c, int i) {
-    final no = (c['no'] as int?) ?? -1;
-    final posted_at = c['posted_at'] ?? '';
-    final name = c['name'] ?? '';
-    final body = c['body'] ?? '';
-    final plus = c['plus'] ?? 0;
-    final minus = c['minus'] ?? 0;
-    final anchors = List<int>.from(c['anchors'] ?? []);
-    final reverseAnchors = List<int>.from(c['reverse_anchors'] ?? []);
-    final urls = (c['urls'] as List?) ?? [];
+  void _showCommentActionSheet(BuildContext context, Map<String, dynamic> c) {
+    final no = c['no'] as int;
+    final isClipped = _vm.clippedNos.contains(no);
 
-    final innerWidget = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('No.$no  $name  $posted_at${c['isLocal'] == true ? ' （ローカル）' : ''}',
-            style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel)),
-        const SizedBox(height: 8),
-        if (anchors.isNotEmpty) _buildAnchorText(anchors),
-        if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
-        Text(body, style: const TextStyle(fontSize: 15)),
-        if (urls.isNotEmpty) _buildUrlsWidget(urls),
-        if (c['image_url'] != null) ...[
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                CupertinoPageRoute(
-                  fullscreenDialog: true,
-                  builder: (_) => ImageViewerPage(url: c['image_url']),
-                ),
-              );
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _handleClipAction(Map<String, dynamic>.from(c));
             },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                c['image_url'],
-                height: 200,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const SizedBox(
-                    height: 200,
-                    child: Center(child: CupertinoActivityIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => const SizedBox(
-                  height: 200,
-                  child: Center(
-                    child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.secondaryLabel),
-                  ),
-                ),
-              ),
-            ),
+            isDestructiveAction: isClipped,
+            child: Text(isClipped ? 'クリップから削除する' : 'クリップに登録する'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _openPostDialog(initialText: '>>$no');
+            },
+            child: const Text('このコメントに返信'),
           ),
         ],
-        const SizedBox(height: 6),
-        _buildPlusMinusGraph(plus, minus),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () async {
-                if (c['isLocal'] == true) return;
-                final commentId = 'vbox$no';
-                final success = await rateComment(this.widget.topicId, commentId, 1);
-                if (!mounted) return;
-                if (success) setState(() => c['plus'] = (c['plus'] ?? 0) + 1);
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text('＋$plus', style: const TextStyle(color: CupertinoColors.systemRed)),
-              ),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () async {
-                if (c['isLocal'] == true) return;
-                final commentId = 'vbox$no';
-                final success = await rateComment(this.widget.topicId, commentId, 0);
-                if (!mounted) return;
-                if (success) setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
-              ),
-            ),
-
-          ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          isDestructiveAction: true,
+          child: const Text('キャンセル'),
         ),
-      ],
-    );
-
-    final isClipped = _vm.clippedNos.contains(no);
-    
-    return GestureDetector(
-      onLongPress: () {
-        showCupertinoModalPopup(
-          context: context,
-          builder: (context) => CupertinoActionSheet(
-            actions: [
-              CupertinoActionSheetAction(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await _handleClipAction(Map<String, dynamic>.from(c));
-                },
-                isDestructiveAction: isClipped,
-                child: Text(isClipped ? 'クリップから削除する' : 'クリップに登録する'),
-              ),
-              CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _openPostDialog(initialText: '>>$no');
-                },
-                child: const Text('このコメントに返信'),
-              ),
-            ],
-            cancelButton: CupertinoActionSheetAction(
-              onPressed: () => Navigator.pop(context),
-              isDestructiveAction: true,
-              child: const Text('キャンセル'),
-            ),
-          ),
-        );
-      },
-      child: Container(
-        key: no > 0 ? _vm.keyForCommentNo(no) : null,
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: innerWidget,
       ),
     );
   }
@@ -1367,52 +1101,5 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  Widget _buildPlusMinusGraph(int plus, int minus) {
-    final total = plus + minus;
-    if (total == 0) return const SizedBox.shrink();
 
-    const double minWidth = 30.0;
-    const double maxWidth = 300.0;
-    const int capVotes = 1000;
-
-    double barWidth;
-    if (total >= capVotes) {
-      barWidth = maxWidth;
-    } else {
-      final growthRatio = total / capVotes;
-      barWidth = minWidth + (maxWidth - minWidth) * growthRatio;
-    }
-
-    return SizedBox(
-      width: barWidth,
-      child: Row(
-        children: [
-          if (plus > 0)
-            Expanded(
-              flex: plus,
-              child: Container(
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFED6D74),
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
-                ),
-                alignment: Alignment.center,
-              ),
-            ),
-          if (minus > 0)
-            Expanded(
-              flex: minus,
-              child: Container(
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: CupertinoColors.systemGrey3,
-                  borderRadius: BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
-                ),
-                alignment: Alignment.center,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
