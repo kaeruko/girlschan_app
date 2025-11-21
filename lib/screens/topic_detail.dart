@@ -235,155 +235,181 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   Future<void> _tryRestoreIfNeeded({int? targetNo}) async {
-    // ★ 再入防止
-    if (_restoredOnce && targetNo == null) {
-      return; 
+    // 1. 実行可能かチェックし、復元モードを開始
+    final target = _startRestoreProcess(targetNo);
+    if (target == null) return;
+
+    try {
+      // 2. 必要なデータ（コメント）がメモリにあるか確認・取得
+      final hasData = await _ensureDataAvailable(target);
+      if (!hasData) return; // データがなければ諦める（またはリトライ予約）
+
+      // 3. ターゲットのページ番号を特定
+      final pageIndex = _vm.indexByNo[target]! ~/ _pageSize; // nullチェックはensureDataで保証済とする
+
+      // 4. そのページへ横移動 (PageView)
+      await _jumpToTargetPage(pageIndex);
+
+      // 5. ページ内で該当コメントまで縦スクロール (ScrollController)
+      //    ※ここは複雑なので専用メソッドに任せる
+      final success = await _seekAndScrollToComment(pageIndex, target);
+
+      if (!success) {
+        // 失敗したらリトライをスケジュール
+        _scheduleTryRestore();
+      }
+    } finally {
+      // 6. 終了処理（フラグ解除など）
+      _finishRestoreProcess(targetNo: target);
     }
-    if (_vm.loading || _restoring) {
-      return;
-    }
-    _restoring = true;
+  }
+
+  // 復元を開始できるか判定し、フラグを立てる
+  int? _startRestoreProcess(int? targetNo) {
+    // 再入防止
+    if (_restoredOnce && targetNo == null) return null;
+    if (_vm.loading || _restoring) return null;
 
     final savedNo = targetNo ?? _vm.savedCommentNo;
-    if (savedNo <= 0) { 
+    if (savedNo <= 0) {
       _restoredOnce = true;
-      _restoring = false;
-      return; 
+      return null;
     }
-
-    // まず、そのNoが入るまで差分取得
-    await _vm.ensureContainsNo(savedNo);
-    if (!mounted) {
-      _restoring = false;
-      return;
-    }
-
-    // index を特定してターゲットページへ
-    final idx = _vm.indexByNo[savedNo];
-    if (idx == null) {
-      _restoring = false;
-      _scheduleTryRestore();
-      return;
-    }
-
-    final targetPage = idx ~/ _pageSize;
 
     _restoring = true;
-    _restoreTargetPageNo = targetPage;
-    _boostCacheDuringRestore = true;
-    if (mounted) setState(() {}); // cacheExtent 反映
+    return savedNo;
+  }
 
-    // ★ PageView がビルドされるのを待つ
-    await _waitForPageController();
-
-    if (_pc.hasClients) {
-      _pc.jumpToPage(targetPage);
-    } else {
-    }
-
-    // スクロール位置が attach されるのを確実に待つ
-    await _waitForAttach(_scForPage(targetPage));
-
-    // ページ遷移後、レイアウト完成を待つ
-    await Future.delayed(const Duration(milliseconds: 50));
-
-    // ★★★ ここから「概算ジャンプ」 + 「実測追従」を入れる
-    // ページ内配列とメジャー/スクロールを準備
-    final all0 = _vm.comments;
-    final pageItems0 = _itemsOfPage(targetPage, all0);
-    final meas = _measForPage(targetPage);
-    meas.ensureCapacity(pageItems0.length);
-    final sc = _scForPage(targetPage);
-
-    // ページ内の savedNo のインデックスを特定
-    final roughIndex =
-        pageItems0.indexWhere((item) => (item['no'] as int?) == savedNo);
-    if (roughIndex >= 0) {
-      // 実測が入るまでこのインデックスを基準に追従するよう指示
-      meas.markRestoreTargetIndex(roughIndex);
-      // まずは fallbackHeight ベースの概算オフセットへジャンプ
-      for (int i = 0; i < 10; i++) {
-        await Future.delayed(const Duration(milliseconds: 16));
-        if (!sc.hasClients) continue;
-        final guess = meas.indexToOffset(roughIndex);
-        try {
-          sc.jumpTo(guess);
-        } catch (_) {}
-        break;
-      }
-    } else {
-    }
-
-    // ★ 該当行がビルドされるのを待ち、確実に ctx を得てから ensureVisible
-    for (int attempt = 0; attempt < 60; attempt++) {
-      final all = _vm.comments;
-      final pageItems = _itemsOfPage(targetPage, all);
-      
-      // savedNo がこのページ内に存在するか確認
-      final itemIndex = pageItems.indexWhere((item) => (item['no'] as int?) == savedNo);
-      if (itemIndex == -1) {
-        await Future.delayed(const Duration(milliseconds: 16));
-        continue;
-      }
-
-      // コメント番号をキーにしてコンテキストを取得
-      final key = _vm.keyForCommentNo(savedNo);
-      final ctx = key.currentContext;
-      
-      if (ctx == null) {
-        // もし実測が進んでいれば、その都度ターゲットまでの概算位置に追従
-        if (sc.hasClients) {
-          final off = meas.indexToOffset(itemIndex);
-          try { 
-            sc.jumpTo(off); 
-          } catch (_) {}
-        }
-        await Future.delayed(const Duration(milliseconds: 16));
-        continue;
-      }
-
-      // 行頭を上端に揃える
-      await Scrollable.ensureVisible(
-        ctx,
-        alignment: 0.0,
-        duration: Duration.zero,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-      );
-
-      // 行内フラクション分だけ下にずらす
-      final box = ctx.findRenderObject() as RenderBox?;
-      final h = box?.size.height ?? 0.0;
-      final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
-      
-      if (h > 0 && frac > 0) {
-        final sc2 = _scForPage(targetPage);
-        if (sc2.hasClients) {
-          final max = sc2.position.maxScrollExtent;
-          final offset = (sc2.offset + h * frac).clamp(0.0, max);
-          sc2.jumpTo(offset);
-        }
-      }
-
-      _vm.clearScrollFractionOnly();
-      meas.markRestoreTargetIndex(null); // ★ 追従を解除
-      _restoring = false;
-      _restoredOnce = true;
-      _boostCacheDuringRestore = false;
-      _restoreTargetPageNo = null;
-      if (mounted) setState(() {}); // cacheExtent を元に戻す
-
-      // 復元直後の正しい位置で一度保存
-      _saveFromPage(targetPage);
-      return;
-    }
-
-    // うまく行かなければ次フレームで再挑戦
-    meas.markRestoreTargetIndex(null);
+  // 終了処理
+  void _finishRestoreProcess({int? targetNo}) {
     _restoring = false;
     _boostCacheDuringRestore = false;
     _restoreTargetPageNo = null;
-    if (mounted) setState(() {}); // cacheExtent を元に戻す
-    _scheduleTryRestore();
+    
+    if (mounted) setState(() {}); // CacheExtentなどを元に戻す
+    
+    // 今回のターゲットへの復元が終わったら完了フラグを立てる
+    if (targetNo == null || targetNo == _vm.savedCommentNo) {
+      // 成功/失敗に関わらず「一度試した」とする場合
+      // (成功時のみtrueにするなら _seekAndScrollToComment の戻り値を見る)
+    }
+  }
+
+  Future<bool> _ensureDataAvailable(int targetNo) async {
+    await _vm.ensureContainsNo(targetNo);
+    if (!mounted) return false;
+    
+    // データロード後もインデックスが見つからなければ失敗
+    if (!_vm.indexByNo.containsKey(targetNo)) {
+      _scheduleTryRestore(); // 再ロードが必要かもしれないのでスケジュール
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _jumpToTargetPage(int pageIndex) async {
+    _restoreTargetPageNo = pageIndex;
+    _boostCacheDuringRestore = true;
+    if (mounted) setState(() {});
+
+    await _waitForPageController();
+    
+    if (_pc.hasClients && _pc.page?.round() != pageIndex) {
+      _pc.jumpToPage(pageIndex);
+    }
+    
+    // スクロールコントローラーがアタッチされるのを待つ
+    await _waitForAttach(_scForPage(pageIndex));
+    // レイアウト安定待ち
+    await Future.delayed(const Duration(milliseconds: 50));
+  }
+
+  Future<bool> _seekAndScrollToComment(int pageIndex, int targetNo) async {
+    final sc = _scForPage(pageIndex);
+    final meas = _measForPage(pageIndex);
+    
+    // 1. まず概算位置へジャンプ（画面外だと描画されないため）
+    _performApproximateJump(pageIndex, targetNo, sc, meas);
+
+    // 2. 実測ベースの厳密な位置合わせ（最大60フレーム試行）
+    for (int attempt = 0; attempt < 60; attempt++) {
+      if (!mounted) return false;
+
+      // UI要素（RenderObject）が見つかるかトライ
+      final found = await _tryAlignVisible(targetNo, pageIndex);
+      if (found) {
+        // 成功したら現在位置を保存して終了
+        _saveFromPage(pageIndex);
+        _restoredOnce = true;
+        return true; 
+      }
+      
+      // 見つからない場合、概算位置を微調整して次フレームへ
+      _adjustApproximatePosition(pageIndex, targetNo, sc, meas);
+      await Future.delayed(const Duration(milliseconds: 16));
+    }
+
+    return false; // タイムアウト
+  }
+
+  // 概算ジャンプ処理
+  void _performApproximateJump(int page, int targetNo, ScrollController sc, VariableListMeasurer meas) {
+    final all = _vm.comments;
+    final pageItems = _itemsOfPage(page, all);
+    final roughIndex = pageItems.indexWhere((item) => item['no'] == targetNo);
+
+    if (roughIndex >= 0) {
+      meas.markRestoreTargetIndex(roughIndex); // 追従モードON
+      if (sc.hasClients) {
+        try {
+          final guess = meas.indexToOffset(roughIndex);
+          sc.jumpTo(guess);
+        } catch (_) {}
+      }
+    }
+  }
+
+  // 厳密な位置合わせ（Contextが見つかればスクロールしてtrueを返す）
+  Future<bool> _tryAlignVisible(int targetNo, int pageIndex) async {
+    final key = _vm.keyForCommentNo(targetNo);
+    final ctx = key.currentContext;
+
+    if (ctx == null) return false;
+
+    // コンテキストが見つかった＝描画された
+    // 1. 行頭を合わせる
+    await Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.0,
+      duration: Duration.zero,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+    );
+
+    // 2. 途中まで読んでいた場合の微調整（Fraction）
+    final box = ctx.findRenderObject() as RenderBox?;
+    final h = box?.size.height ?? 0.0;
+    final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
+
+    if (h > 0 && frac > 0) {
+      final sc = _scForPage(pageIndex);
+      if (sc.hasClients) {
+        final offset = (sc.offset + h * frac).clamp(0.0, sc.position.maxScrollExtent);
+        sc.jumpTo(offset);
+      }
+    }
+
+    // 後始末
+    _vm.clearScrollFractionOnly();
+    _measForPage(pageIndex).markRestoreTargetIndex(null); // 追従OFF
+    return true;
+  }
+
+  // 見つからなかった場合の微調整（コンテキストが無いときに呼ばれる）
+  void _adjustApproximatePosition(int page, int targetNo, ScrollController sc, VariableListMeasurer meas) {
+     // 実装は概算ジャンプと同じロジックで「最新の計測データ」を使って再ジャンプするだけ
+     // ここでは _performApproximateJump を呼ぶだけでも良いが、
+     // インデックス検索コストを避けるなら index を引数に回す工夫も可
+     _performApproximateJump(page, targetNo, sc, meas);
   }
 
 
