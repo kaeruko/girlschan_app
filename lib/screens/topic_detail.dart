@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../utils/log.dart';
 
 import '../models/comment.dart';
 import '../services/api_service.dart';
@@ -1206,7 +1207,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               onPressed: () async {
                 if (c['isLocal'] == true) return;
                 final commentId = 'vbox$no';
-                final success = await rateComment(this.widget.topicId, commentId, -1);
+                final success = await rateComment(this.widget.topicId, commentId, 0);
                 if (!mounted) return;
                 if (success) setState(() => c['minus'] = (c['minus'] ?? 0) + 1);
               },

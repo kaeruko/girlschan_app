@@ -206,6 +206,7 @@ with WidgetsBindingObserver {
         child: _loading
             ? const Center(child: AppSpinner(size: 20))
             : CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 controller: _scrollController,
                 slivers: [
                   // ← MaterialのRefreshIndicatorの代わり

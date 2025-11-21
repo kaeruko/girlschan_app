@@ -53,15 +53,15 @@ Future<List<dynamic>> _fetchList(
 
 Future<bool> rateComment(int topicId, String commentId, int value) async {
   try {
-    // logd('');
-    // logd('============================================');
-    // logd('⭐ [rateComment] API呼び出し開始');
-    // logd('============================================');
-    // logd('');
+    logd('');
+    logd('============================================');
+    logd('⭐ [rateComment] API呼び出し開始');
+    logd('============================================');
+    logd('');
     
     final url = 'https://girlschannel.net/topics/post_value?value=$value&topic_id=$topicId&comment_id=$commentId';
     logd('⭐ [rateComment] Request URL: $url');
-    // logd('⭐ [rateComment] Parameters: topicId=$topicId, commentId=$commentId, value=$value');
+    logd('⭐ [rateComment] Parameters: topicId=$topicId, commentId=$commentId, value=$value');
     
     final response = await http.get(
       Uri.parse(url),
@@ -81,12 +81,12 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
       },
     );
     
-    // logd('⭐ [rateComment] Response status: ${response.statusCode}');
-    // logd('⭐ [rateComment] Response body: ${response.body}');
+    logd('⭐ [rateComment] Response status: ${response.statusCode}');
+    logd('⭐ [rateComment] Response body: ${response.body}');
     
     if (response.statusCode == 200) {
       if (response.body.isEmpty) {
-        // logd('⭐ [rateComment] ✅ Success (empty body)');
+        logd('⭐ [rateComment] ✅ Success (empty body)');
         return true;
       }
       try {
@@ -98,10 +98,10 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
         return true;
       }
     }
-    // logd('⭐ [rateComment] ❌ Failed with status ${response.statusCode}');
+    logd('⭐ [rateComment] ❌ Failed with status ${response.statusCode}');
     return false;
   } catch (e) {
-    // logd('⭐ [rateComment] ❌ Error: $e');
+    logd('⭐ [rateComment] ❌ Error: $e');
     return false;
   }
 }
@@ -340,6 +340,28 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     };
   } catch (e) {
     // logd('💬 [fetchCommentsWithPagination] ❌ Error: $e');
+    rethrow;
+  }
+}
+
+/// 指定されたコメントのスレッド（アンカー先・元など）を取得
+Future<Map<String, dynamic>> fetchCommentThread(int topicId, int commentId) async {
+  try {
+    // logd('');
+    // logd('============================================');
+    // logd('🧵 [fetchCommentThread] API呼び出し開始');
+    // logd('============================================');
+    // logd('');
+
+    final uri = Uri.parse('$apiBase/comment/$topicId/$commentId');
+    // logd('🧵 [fetchCommentThread] API URL: $uri');
+
+    final data = await _fetchMap(uri);
+
+    // logd('🧵 [fetchCommentThread] ✅ Success - Fetched ${data['count']} comments');
+    return data;
+  } catch (e) {
+    // logd('🧵 [fetchCommentThread] ❌ Error: $e');
     rethrow;
   }
 }
