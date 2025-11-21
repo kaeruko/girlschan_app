@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../models/comment.dart';
+import 'vote_bar_graph.dart';
+import 'url_preview_list.dart';
+import 'anchor_chips.dart';
 
 class CommentTile extends StatelessWidget {
   final Map<String, dynamic> comment;
@@ -46,10 +46,22 @@ class CommentTile extends StatelessWidget {
           style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
         ),
         const SizedBox(height: 8),
-        if (anchors.isNotEmpty) _buildAnchorText(anchors),
-        if (reverseAnchors.isNotEmpty) _buildReverseAnchorText(reverseAnchors),
+        if (anchors.isNotEmpty)
+          AnchorChips(
+            anchors: anchors,
+            onTap: (no) => onAnchorTap?.call(no),
+            isReverse: false,
+            checkExists: checkAnchorAvailability,
+          ),
+        if (reverseAnchors.isNotEmpty)
+          AnchorChips(
+            anchors: reverseAnchors,
+            onTap: (no) => onAnchorTap?.call(no),
+            isReverse: true,
+            checkExists: checkAnchorAvailability,
+          ),
         Text(body, style: const TextStyle(fontSize: 15)),
-        if (urls.isNotEmpty) _buildUrlsWidget(urls),
+        if (urls.isNotEmpty) UrlPreviewList(urls: urls),
         if (imageUrl != null) ...[
           const SizedBox(height: 8),
           GestureDetector(
@@ -78,7 +90,7 @@ class CommentTile extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 6),
-        _buildPlusMinusGraph(plus, minus),
+        VoteBarGraph(plus: plus, minus: minus),
         const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -136,246 +148,9 @@ class CommentTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAnchorText(List<int> anchors) {
-    if (anchors.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Wrap(
-            spacing: 4,
-            children: anchors.map((no) {
-              final isAvailable = checkAnchorAvailability?.call(no) ?? true;
 
-              return GestureDetector(
-                onTap: () => onAnchorTap?.call(no),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isAvailable
-                        ? CupertinoColors.systemBlue.withOpacity(0.1)
-                        : CupertinoColors.systemGrey.withOpacity(0.1),
-                    border: Border.all(
-                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '>>$no',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isAvailable ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildReverseAnchorText(List<int> reverseAnchors) {
-    if (reverseAnchors.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Wrap(
-              spacing: 4,
-              children: reverseAnchors.take(5).map((no) {
-                return GestureDetector(
-                  onTap: () => onAnchorTap?.call(no),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemOrange.withOpacity(0.1),
-                      border: Border.all(
-                        color: CupertinoColors.systemOrange,
-                        width: 1,
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '<<$no',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: CupertinoColors.systemOrange,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          if (reverseAnchors.length > 5)
-            Text(
-              ' +${reverseAnchors.length - 5}件',
-              style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
-            ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildUrlsWidget(List<dynamic> urls) {
-    if (urls.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Column(
-        children: urls.map((urlData) {
-          String url = '';
-          String title = '';
-          String? description;
-          String? thumbnail;
-
-          if (urlData is Map<String, dynamic>) {
-            url = urlData['url'] ?? '';
-            title = urlData['title'] ?? '';
-            description = urlData['description'];
-            thumbnail = urlData['thumbnail'];
-          } else if (urlData is CommentUrl) {
-            url = urlData.url;
-            title = urlData.title;
-            description = urlData.description;
-            thumbnail = urlData.thumbnail;
-          }
-
-          if (url.isEmpty) return const SizedBox.shrink();
-
-          return GestureDetector(
-            onTap: () async {
-              final Uri uri = Uri.parse(url);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey6,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: CupertinoColors.systemGrey4),
-              ),
-              child: Row(
-                children: [
-                  if (thumbnail != null && thumbnail.isNotEmpty)
-                    ClipRRect(
-                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                      child: Image.network(
-                        thumbnail,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox(width: 80, height: 80),
-                      ),
-                    ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title.isNotEmpty ? title : url,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: CupertinoColors.activeBlue,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (description != null && description.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                description,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: CupertinoColors.secondaryLabel,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Text(
-                            url,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: CupertinoColors.tertiaryLabel,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildPlusMinusGraph(int plus, int minus) {
-    final total = plus + minus;
-    if (total == 0) return const SizedBox.shrink();
-
-    const double minWidth = 30.0;
-    const double maxWidth = 300.0;
-    const int capVotes = 1000;
-
-    double barWidth;
-    if (total >= capVotes) {
-      barWidth = maxWidth;
-    } else {
-      final growthRatio = total / capVotes;
-      barWidth = minWidth + (maxWidth - minWidth) * growthRatio;
-    }
-
-    return SizedBox(
-      width: barWidth,
-      child: Row(
-        children: [
-          if (plus > 0)
-            Expanded(
-              flex: plus,
-              child: Container(
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFED6D74),
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
-                ),
-                alignment: Alignment.center,
-              ),
-            ),
-          if (minus > 0)
-            Expanded(
-              flex: minus,
-              child: Container(
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: CupertinoColors.systemGrey3,
-                  borderRadius: BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
-                ),
-                alignment: Alignment.center,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
