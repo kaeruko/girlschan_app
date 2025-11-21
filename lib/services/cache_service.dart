@@ -1,11 +1,30 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/log.dart';
 
+class _CacheEntry {
+  final dynamic data;
+  final DateTime? modified;
+  _CacheEntry(this.data, this.modified);
+}
 
 class CacheService {
   static bool _initialized = false;
+  
+  // メモリキャッシュ
+  static final Map<String, _CacheEntry> _memoryCache = {};
+  // ファイル存在確認用キャッシュ
+  static final Set<String> _knownFiles = {};
+  // SharedPreferencesインスタンス
+  static SharedPreferences? _prefs;
+
+  /// SharedPreferencesのインスタンスを取得（シングルトン）
+  static Future<SharedPreferences> getPrefs() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
+  }
 
   /// キャッシュディレクトリを初期化して情報を出力
   static Future<void> initialize() async {
@@ -14,33 +33,23 @@ class CacheService {
 
     try {
       final dir = await getApplicationSupportDirectory();
-      // logd('');
-      // logd('============================================');
-      // logd('💾 キャッシュサービス初期化');
-      // logd('============================================');
-      // logd('📂 キャッシュディレクトリ: ${dir.path}');
-
+      
       // ディレクトリが存在しなければ作成
       if (!await dir.exists()) {
         await dir.create(recursive: true);
-        // logd('📂 ディレクトリを新規作成しました');
       }
 
-      // ディレクトリ内のファイル一覧を表示
+      // ディレクトリ内のファイル一覧を取得して _knownFiles を構築
       final files = dir.listSync();
-      // logd('📂 キャッシュファイル数: ${files.length}');
-      for (int i = 0; i < files.length && i < 10; i++) {
-        final file = files[i];
+      for (var file in files) {
         if (file is File) {
-          final size = await file.length();
-          // logd('  [$i] ${file.path.split('/').last} (${size} bytes)');
+          final name = file.path.split(Platform.pathSeparator).last;
+          if (name.endsWith('.json')) {
+            // .json を除いた名前を登録
+            _knownFiles.add(name.substring(0, name.length - 5));
+          }
         }
       }
-      if (files.length > 10) {
-        // logd('  ... 他 ${files.length - 10}個のファイル');
-      }
-      // logd('============================================');
-      // logd('');
     } catch (e) {
       // logd('❌ キャッシュ初期化エラー: $e');
     }
@@ -48,18 +57,28 @@ class CacheService {
 
   static Future<File> _file(String name) async {
     final dir = await getApplicationSupportDirectory();
-    // logd('📂 キャッシュディレクトリ: ${dir.path}');
     return File('${dir.path}/$name.json');
   }
 
   /// List キャッシュ用（コメント配列など）
   static Future<List<dynamic>> loadList(String name) async {
+    // 1. メモリキャッシュ確認
+    if (_memoryCache.containsKey(name)) {
+      final data = _memoryCache[name]!.data;
+      if (data is List) return data;
+    }
+
     try {
       final file = await _file(name);
-      if (await file.exists()) {
-        // print('💾 [loadList] Loading cache: $name');
+      if (_knownFiles.contains(name) || await file.exists()) {
         final text = await file.readAsString();
         final decoded = jsonDecode(text);
+        final stat = await file.stat();
+        
+        // メモリに保存
+        _memoryCache[name] = _CacheEntry(decoded, stat.modified);
+        _knownFiles.add(name); // 念のため
+
         if (decoded is List) {
           return decoded;
         }
@@ -75,7 +94,10 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
-      // logd('💾 [saveList] ✅ Saved: $name');
+      
+      // メモリ更新
+      _memoryCache[name] = _CacheEntry(data, DateTime.now());
+      _knownFiles.add(name);
     } catch (e) {
       logd('❌ saveList error: $e');
     }
@@ -83,11 +105,21 @@ class CacheService {
 
   /// Map キャッシュ用（メタ情報など）
   static Future<Map<String, dynamic>?> loadMap(String name) async {
+    if (_memoryCache.containsKey(name)) {
+      final data = _memoryCache[name]!.data;
+      if (data is Map<String, dynamic>) return data;
+    }
+
     try {
       final file = await _file(name);
-      if (await file.exists()) {
+      if (_knownFiles.contains(name) || await file.exists()) {
         final text = await file.readAsString();
         final decoded = jsonDecode(text);
+        final stat = await file.stat();
+
+        _memoryCache[name] = _CacheEntry(decoded, stat.modified);
+        _knownFiles.add(name);
+
         if (decoded is Map<String, dynamic>) {
           return decoded;
         }
@@ -103,6 +135,9 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
+      
+      _memoryCache[name] = _CacheEntry(data, DateTime.now());
+      _knownFiles.add(name);
       logd('💾 [saveMap] ✅ Saved: $name');
     } catch (e) {
       logd('❌ saveMap error: $e');
@@ -111,11 +146,21 @@ class CacheService {
 
   /// int キャッシュ用（単一値など）
   static Future<int?> loadInt(String name) async {
+    if (_memoryCache.containsKey(name)) {
+      final data = _memoryCache[name]!.data;
+      if (data is int) return data;
+    }
+
     try {
       final file = await _file(name);
-      if (await file.exists()) {
+      if (_knownFiles.contains(name) || await file.exists()) {
         final text = await file.readAsString();
         final decoded = jsonDecode(text);
+        final stat = await file.stat();
+
+        _memoryCache[name] = _CacheEntry(decoded, stat.modified);
+        _knownFiles.add(name);
+
         if (decoded is int) {
           return decoded;
         }
@@ -134,7 +179,9 @@ class CacheService {
     try {
       final file = await _file(name);
       await file.writeAsString(jsonEncode(data));
-      // logd('💾 [saveInt] ✅ Saved: $name = $data');
+      
+      _memoryCache[name] = _CacheEntry(data, DateTime.now());
+      _knownFiles.add(name);
     } catch (e) {
       logd('❌ saveInt error: $e');
     }
@@ -142,28 +189,34 @@ class CacheService {
 
   // キャッシュが存在するかチェック
   static Future<bool> exists(String name) async {
+    // メモリまたは既知のファイルリストにあれば true
+    if (_memoryCache.containsKey(name) || _knownFiles.contains(name)) {
+      return true;
+    }
+    
+    // 念のためファイルシステムもチェック（初期化漏れなどの場合）
     try {
       final file = await _file(name);
       final exists = await file.exists();
-      // デバッグログ: キャッシュ存在確認
-      // ignore: avoid_print
-      // print('[CacheService] exists: $name -> $exists (path: [36m${file.path}[0m)');
+      if (exists) _knownFiles.add(name);
       return exists;
     } catch (e) {
-      // logd('❌ Cache exists check error: $e');
       return false;
     }
   }
 
   /// キャッシュファイルの作成/更新日時を取得
   static Future<DateTime?> getModifiedTime(String name) async {
+    if (_memoryCache.containsKey(name)) {
+      return _memoryCache[name]!.modified;
+    }
+
     try {
       final file = await _file(name);
-      if (await file.exists()) {
-        final stat = file.statSync();
-        // デバッグログ: キャッシュ更新日時取得
-        // ignore: avoid_print
-        // print('[CacheService] getModifiedTime: $name -> ${stat.modified} (path: [36m${file.path}[0m)');
+      if (_knownFiles.contains(name) || await file.exists()) {
+        final stat = await file.stat();
+        // メモリにはデータがないので日時だけキャッシュはできない（データ構造上）
+        // 必要ならロードするが、ここではstatだけ返す
         return stat.modified;
       }
     } catch (e) {
@@ -174,12 +227,12 @@ class CacheService {
 
   static Future<void> clear(String name) async {
     try {
+      _memoryCache.remove(name);
+      _knownFiles.remove(name);
+
       final file = await _file(name);
       if (await file.exists()) {
         await file.delete();
-        // デバッグログ: キャッシュ削除
-        // ignore: avoid_print
-        // print('[CacheService] clear: $name 削除 (path: [36m${file.path}[0m)');
       }
     } catch (e) {
       logd('Cache clear error: $e');
@@ -190,9 +243,14 @@ class CacheService {
 
   /// 下書きを保存
   static Future<void> saveDraft(int topicId, String text) async {
+    final name = 'draft_$topicId';
     try {
-      final file = await _file('draft_$topicId');
+      final file = await _file(name);
       await file.writeAsString(jsonEncode(text));
+      
+      _memoryCache[name] = _CacheEntry(text, DateTime.now());
+      _knownFiles.add(name);
+      
       logd('💾 [saveDraft] ✅ Saved draft for topic $topicId');
     } catch (e) {
       logd('❌ saveDraft error: $e');
@@ -201,11 +259,22 @@ class CacheService {
 
   /// 下書きを読み込む
   static Future<String?> loadDraft(int topicId) async {
+    final name = 'draft_$topicId';
+    if (_memoryCache.containsKey(name)) {
+      final data = _memoryCache[name]!.data;
+      if (data is String) return data;
+    }
+
     try {
-      final file = await _file('draft_$topicId');
-      if (await file.exists()) {
+      final file = await _file(name);
+      if (_knownFiles.contains(name) || await file.exists()) {
         final text = await file.readAsString();
         final decoded = jsonDecode(text);
+        final stat = await file.stat();
+
+        _memoryCache[name] = _CacheEntry(decoded, stat.modified);
+        _knownFiles.add(name);
+
         if (decoded is String) {
           logd('💾 [loadDraft] ✅ Loaded draft for topic $topicId');
           return decoded;
@@ -219,8 +288,12 @@ class CacheService {
 
   /// 下書きを削除
   static Future<void> deleteDraft(int topicId) async {
+    final name = 'draft_$topicId';
     try {
-      final file = await _file('draft_$topicId');
+      _memoryCache.remove(name);
+      _knownFiles.remove(name);
+
+      final file = await _file(name);
       if (await file.exists()) {
         await file.delete();
         logd('💾 [deleteDraft] ✅ Deleted draft for topic $topicId');
@@ -232,12 +305,6 @@ class CacheService {
 
   /// 下書きが存在するかチェック
   static Future<bool> hasDraft(int topicId) async {
-    try {
-      final file = await _file('draft_$topicId');
-      return await file.exists();
-    } catch (e) {
-      logd('❌ hasDraft error: $e');
-      return false;
-    }
+    return exists('draft_$topicId');
   }
 }

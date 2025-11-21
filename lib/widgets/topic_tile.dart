@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 
 
 import '../services/cache_service.dart';
@@ -100,7 +100,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     int? cachedCount;
 
     if (hasCached) {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await CacheService.getPrefs();
       saved = prefs.getInt('scroll_$id') ?? 0;
       modifiedTime = await CacheService.getModifiedTime('comments_$id');
       
