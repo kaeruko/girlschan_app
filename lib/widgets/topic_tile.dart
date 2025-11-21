@@ -37,6 +37,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   bool _hasCachedComments = false;
   int _savedCommentNo = 0;
   DateTime? _cacheModifiedTime;
+  bool _hasDraft = false; // ★ 下書き状態を管理
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
         _hasCachedComments = false;
         _savedCommentNo = 0;
         _cacheModifiedTime = null;
+        _hasDraft = false; // ★ 下書き状態もリセット
       });
       // ignore: discarded_futures
       refreshCacheState();
@@ -107,11 +109,15 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       cachedCount = cachedList.length;
     }
 
+    // ★ 3. 下書きの存在確認
+    final hasDraft = await CacheService.hasDraft(id);
+
     if (!mounted) return;
     setState(() {
       _hasCachedComments = hasCached;
       _savedCommentNo = saved;
       _cacheModifiedTime = modifiedTime;
+      _hasDraft = hasDraft; // ★ 下書き状態を更新
       
       if (cachedCount != null && cachedCount > 0) {
         widget.topic['comments'] = cachedCount;
@@ -297,6 +303,24 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                             CupertinoIcons.check_mark,
                             color: CupertinoColors.white,
                             size: 16,
+                          ),
+                        ),
+                      ),
+                    // ★ 下書きマーク（右下・枠内）
+                    if (_hasDraft)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: CupertinoColors.systemOrange,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(
+                            CupertinoIcons.pencil,
+                            color: CupertinoColors.white,
+                            size: 14, // 少し小さくして収まりよくする
                           ),
                         ),
                       ),

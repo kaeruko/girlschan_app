@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'comment_post_webview.dart';
+import '../services/cache_service.dart';
 
 class CommentComposePage extends StatefulWidget {
   final int topicId;
@@ -20,17 +21,73 @@ class CommentComposePage extends StatefulWidget {
 class _CommentComposePageState extends State<CommentComposePage> {
   late final TextEditingController _ctrl;
   bool _posting = false;
+  bool _canPop = false; // PopScopeで戻るを制御
 
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: widget.initialText ?? '');
+    _ctrl = TextEditingController();
+    _loadDraft();
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  /// 下書きを読み込む
+  Future<void> _loadDraft() async {
+    // initialTextが指定されている場合は優先
+    if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+      _ctrl.text = widget.initialText!;
+      return;
+    }
+
+    // 下書きがあれば読み込む
+    final draft = await CacheService.loadDraft(widget.topicId);
+    if (draft != null && draft.isNotEmpty) {
+      _ctrl.text = draft;
+    }
+  }
+
+  /// 下書き保存ダイアログを表示
+  Future<bool> _showSaveDraftDialog() async {
+    final result = await showCupertinoDialog<String>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('下書きに保存しますか？'),
+        content: const Text('入力中のテキストを下書きとして保存できます。'),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(context).pop('no'),
+            child: const Text('いいえ'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(context).pop('cancel'),
+            child: const Text('キャンセル'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(context).pop('yes'),
+            child: const Text('はい'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'yes') {
+      // 下書きを保存
+      await CacheService.saveDraft(widget.topicId, _ctrl.text.trim());
+      return true; // 画面を閉じる
+    } else if (result == 'no') {
+      // 保存せずに閉じる
+      return true;
+    } else {
+      // キャンセル（画面を閉じない）
+      return false;
+    }
   }
 
   Future<void> _goToConfirm() async {
@@ -57,31 +114,63 @@ class _CommentComposePageState extends State<CommentComposePage> {
 
     // WebView 側で投稿完了したら pop(true) する想定
     if (result == true) {
-      Navigator.of(context).pop(text); // 一個前の画面に「投稿したよ」と返す（テキストも渡す）
+      // ★ 投稿成功時に下書きを削除
+      await CacheService.deleteDraft(widget.topicId);
+      
+      if (mounted) {
+        setState(() => _canPop = true);
+        Navigator.of(context).pop(text); // 一個前の画面に「投稿したよ」と返す（テキストも渡す）
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: Text('コメント入力'),
-        previousPageTitle: '戻る',
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _posting ? null : _goToConfirm,
-          child: _posting
-              ? const CupertinoActivityIndicator()
-              : const Icon(CupertinoIcons.paperplane),
+    return PopScope(
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        
+        // テキストが入力されている場合のみダイアログを表示
+        final text = _ctrl.text.trim();
+        if (text.isEmpty) {
+          // 空の場合はそのまま閉じる
+          setState(() => _canPop = true);
+          if (mounted) {
+            final nav = Navigator.of(context);
+            nav.pop();
+          }
+          return;
+        }
+
+        // 下書き保存ダイアログを表示
+        final shouldPop = await _showSaveDraftDialog();
+        if (shouldPop && mounted) {
+          setState(() => _canPop = true);
+          final nav = Navigator.of(context);
+          nav.pop();
+        }
+      },
+      child: CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          middle: const Text('コメント入力'),
+          previousPageTitle: '戻る',
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _posting ? null : _goToConfirm,
+            child: _posting
+                ? const CupertinoActivityIndicator()
+                : const Icon(CupertinoIcons.paperplane),
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: CupertinoTextField(
-            controller: _ctrl,
-            maxLines: null,
-            placeholder: 'コメントを書く',
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: CupertinoTextField(
+              controller: _ctrl,
+              maxLines: null,
+              placeholder: 'コメントを書く',
+            ),
           ),
         ),
       ),

@@ -33,7 +33,7 @@ class CacheService {
         final file = files[i];
         if (file is File) {
           final size = await file.length();
-          logd('  [$i] ${file.path.split('/').last} (${size} bytes)');
+          // logd('  [$i] ${file.path.split('/').last} (${size} bytes)');
         }
       }
       if (files.length > 10) {
@@ -183,6 +183,61 @@ class CacheService {
       }
     } catch (e) {
       logd('Cache clear error: $e');
+    }
+  }
+
+  // ========== 下書き関連メソッド ==========
+
+  /// 下書きを保存
+  static Future<void> saveDraft(int topicId, String text) async {
+    try {
+      final file = await _file('draft_$topicId');
+      await file.writeAsString(jsonEncode(text));
+      logd('💾 [saveDraft] ✅ Saved draft for topic $topicId');
+    } catch (e) {
+      logd('❌ saveDraft error: $e');
+    }
+  }
+
+  /// 下書きを読み込む
+  static Future<String?> loadDraft(int topicId) async {
+    try {
+      final file = await _file('draft_$topicId');
+      if (await file.exists()) {
+        final text = await file.readAsString();
+        final decoded = jsonDecode(text);
+        if (decoded is String) {
+          logd('💾 [loadDraft] ✅ Loaded draft for topic $topicId');
+          return decoded;
+        }
+      }
+    } catch (e) {
+      logd('❌ loadDraft error: $e');
+    }
+    return null;
+  }
+
+  /// 下書きを削除
+  static Future<void> deleteDraft(int topicId) async {
+    try {
+      final file = await _file('draft_$topicId');
+      if (await file.exists()) {
+        await file.delete();
+        logd('💾 [deleteDraft] ✅ Deleted draft for topic $topicId');
+      }
+    } catch (e) {
+      logd('❌ deleteDraft error: $e');
+    }
+  }
+
+  /// 下書きが存在するかチェック
+  static Future<bool> hasDraft(int topicId) async {
+    try {
+      final file = await _file('draft_$topicId');
+      return await file.exists();
+    } catch (e) {
+      logd('❌ hasDraft error: $e');
+      return false;
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import '../screens/topic_detail.dart';
 import '../widgets/common/app_spinner.dart';
 import '../widgets/common/app_toast.dart';
@@ -93,11 +94,11 @@ with WidgetsBindingObserver {
     await _loadClips();
     if (mounted) setState(() => _refreshing = false);
     
-    // バックグラウンド更新を開始
-    _startBackgroundThreadUpdate();
+    // バックグラウンド更新を開始（現在のラベルのみ）
+    _startBackgroundThreadUpdate(targetLabelId: _selectedLabelId);
   }
 
-  void _startBackgroundThreadUpdate() {
+  void _startBackgroundThreadUpdate({int? targetLabelId}) {
     if (_metaUpdating) {
       debugPrint('⏭️ [Clips] thread update already running');
       return;
@@ -107,7 +108,7 @@ with WidgetsBindingObserver {
     clipsUpdatingNotifier.value = true;
     debugPrint('🔄 [Clips] Starting background thread update, icon rotation started');
 
-    _backgroundUpdateThreads().whenComplete(() {
+    _backgroundUpdateThreads(targetLabelId: targetLabelId).whenComplete(() {
       _metaUpdating = false;
       clipsUpdatingNotifier.value = false;
       debugPrint('✅ [Clips] Background thread update complete, icon rotation stopped');
@@ -132,13 +133,21 @@ with WidgetsBindingObserver {
   }
 
   // Fetch comment thread for each clip to refresh plus/minus and anchor counts
-  Future<void> _backgroundUpdateThreads() async {
-    debugPrint('🚀 [Clips] background thread update start');
-    final clips = List<Map<String, dynamic>>.from(_clips);
+  Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
+    debugPrint('🚀 [Clips] background thread update start (targetLabelId=$targetLabelId)');
+    
     final now = DateTime.now();
+    bool hasUpdates = false;
 
-    for (final clip in clips) {
+    for (int i = 0; i < _clips.length; i++) {
       if (!mounted) break;
+      
+      final clip = _clips[i];
+      
+      // フィルタリング: targetLabelId が指定されている場合はそのラベルのみ
+      if (targetLabelId != null && (clip['labelId'] ?? 0) != targetLabelId) {
+        continue;
+      }
 
       final topicId = clip['topicId'] as int;
       final commentNo = clip['no'] as int;
@@ -169,13 +178,20 @@ with WidgetsBindingObserver {
           final first = (thread['comments'] as List).first as Map<String, dynamic>;
           final newPlus = first['plus'] as int? ?? clip['plus'];
           final newMinus = first['minus'] as int? ?? clip['minus'];
+          final newAnchors = (first['anchors'] as List?)?.length ?? 0;
+          final newReverseAnchors = (first['reverse_anchors'] as List?)?.length ?? 0;
+          
           final oldPlus = clip['plus'] as int? ?? 0;
           final oldMinus = clip['minus'] as int? ?? 0;
+          final oldAnchors = (clip['anchors'] as List?)?.length ?? 0;
+          final oldReverseAnchors = (clip['reverse_anchors'] as List?)?.length ?? 0;
 
-          clip['plus'] = newPlus;
-          clip['minus'] = newMinus;
-          clip['anchors'] = first['anchors'] ?? [];
-          clip['reverse_anchors'] = first['reverse_anchors'] ?? [];
+          // ★ _clips を直接更新
+          _clips[i]['plus'] = newPlus;
+          _clips[i]['minus'] = newMinus;
+          _clips[i]['anchors'] = first['anchors'] ?? [];
+          _clips[i]['reverse_anchors'] = first['reverse_anchors'] ?? [];
+          hasUpdates = true;
 
           // ★ SharedPreferences にも保存
           await updateClippedCommentStats(
@@ -183,16 +199,49 @@ with WidgetsBindingObserver {
             commentNo: commentNo,
             plus: newPlus,
             minus: newMinus,
-            anchors: clip['anchors'],
-            reverse_anchors: clip['reverse_anchors'],
+            anchors: _clips[i]['anchors'],
+            reverse_anchors: _clips[i]['reverse_anchors'],
           );
 
-          // ★ 変化があったらトースト
-          if (newPlus != oldPlus || newMinus != oldMinus) {
+          // ★ TopicDetailScreen のキャッシュも更新
+          try {
+            final cacheKey = 'comments_$topicId';
+            final cachedComments = await CacheService.loadList(cacheKey);
+            if (cachedComments.isNotEmpty) {
+              bool cacheUpdated = false;
+              for (int j = 0; j < cachedComments.length; j++) {
+                final cached = cachedComments[j] as Map<String, dynamic>;
+                if (cached['no'] == commentNo) {
+                  cached['plus'] = newPlus;
+                  cached['minus'] = newMinus;
+                  cached['anchors'] = _clips[i]['anchors'];
+                  cached['reverse_anchors'] = _clips[i]['reverse_anchors'];
+                  cachedComments[j] = cached;
+                  cacheUpdated = true;
+                  break;
+                }
+              }
+              if (cacheUpdated) {
+                await CacheService.saveList(cacheKey, cachedComments);
+                debugPrint('✅ [Clips] Updated topic cache for topicId=$topicId, commentNo=$commentNo');
+              }
+            }
+          } catch (e) {
+            debugPrint('❌ [Clips] Failed to update topic cache: $e');
+          }
+
+          // ★ 変化を検出してトースト
+          final changes = <String>[];
+          if (newPlus > oldPlus) changes.add('プラスがつきました (+${newPlus - oldPlus})');
+          if (newMinus > oldMinus) changes.add('マイナスがつきました (+${newMinus - oldMinus})');
+          if (newAnchors > oldAnchors) changes.add('アンカーがつきました (+${newAnchors - oldAnchors})');
+          if (newReverseAnchors > oldReverseAnchors) changes.add('コメントがつきました (+${newReverseAnchors - oldReverseAnchors})');
+          
+          if (changes.isNotEmpty) {
             if (mounted) {
               AppToast.show(
                 context,
-                '「$bodyPreview」が更新 (＋$oldPlus→$newPlus −$oldMinus→$newMinus)',
+                '「$bodyPreview」に${changes.join('、')}',
               );
             }
           } else {
@@ -209,7 +258,7 @@ with WidgetsBindingObserver {
       await Future.delayed(const Duration(seconds: 3));
     }
 
-    if (mounted) setState(() {});
+    if (mounted && hasUpdates) setState(() {});
     debugPrint('✅ [Clips] background thread update complete');
   }
 
@@ -328,10 +377,35 @@ with WidgetsBindingObserver {
           padding: EdgeInsets.zero,
           child: const Icon(CupertinoIcons.bars),
           onPressed: () async {
-            await Navigator.of(context).push(
-              CupertinoPageRoute(builder: (_) => const LabelManagementScreen()),
+            await showCupertinoModalPopup(
+              context: context,
+              builder: (context) => CupertinoActionSheet(
+                actions: [
+                  CupertinoActionSheetAction(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await Navigator.of(context).push(
+                        CupertinoPageRoute(builder: (_) => const LabelManagementScreen()),
+                      );
+                      _loadClips(); // 戻ってきたらリロード（ラベル変更反映）
+                    },
+                    child: const Text('ラベル管理'),
+                  ),
+                  CupertinoActionSheetAction(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _startBackgroundThreadUpdate(targetLabelId: null); // 全ラベル更新
+                    },
+                    child: const Text('全ラベルを更新'),
+                  ),
+                ],
+                cancelButton: CupertinoActionSheetAction(
+                  isDestructiveAction: true,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('キャンセル'),
+                ),
+              ),
             );
-            _loadClips(); // 戻ってきたらリロード（ラベル変更反映）
           },
         ),
       ),
@@ -414,15 +488,18 @@ with WidgetsBindingObserver {
                       ),
                     )
                   else
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final filtered = _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).toList();
-                          if (index >= filtered.length) return null;
-                          final clip = filtered[index];
-                          return _buildClipItem(clip);
-                        },
-                        childCount: _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).length,
+                    SliverPadding(
+                      padding: const EdgeInsets.only(bottom: 100),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final filtered = _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).toList();
+                            if (index >= filtered.length) return null;
+                            final clip = filtered[index];
+                            return _buildClipItem(clip);
+                          },
+                          childCount: _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).length,
+                        ),
                       ),
                     ),
                 ],

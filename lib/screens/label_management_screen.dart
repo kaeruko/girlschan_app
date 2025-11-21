@@ -25,7 +25,7 @@ class _LabelManagementScreenState extends State<LabelManagementScreen> {
       final labels = await getClipLabels();
       if (mounted) {
         setState(() {
-          _labels = labels;
+          _labels = labels.where((l) => l['id'] != 0).toList();
           _loading = false;
         });
       }
