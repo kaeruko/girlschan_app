@@ -110,6 +110,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     }
 
     // ★ 3. 下書きの存在確認
+    // ファイル書き込みの遅延を考慮して少し待つ
+    await Future.delayed(const Duration(milliseconds: 100));
     final hasDraft = await CacheService.hasDraft(id);
 
     if (!mounted) return;
@@ -309,8 +311,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                     // ★ 下書きマーク（右下・枠内）
                     if (_hasDraft)
                       Positioned(
-                        bottom: 0,
-                        right: 0,
+                        bottom: -4,
+                        right: -4,
                         child: Container(
                           decoration: const BoxDecoration(
                             color: CupertinoColors.systemOrange,
@@ -334,8 +336,31 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: title),
+                            if (!widget.showThumb && _hasDraft)
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: CupertinoColors.systemOrange,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    padding: const EdgeInsets.all(2),
+                                    child: const Icon(
+                                      CupertinoIcons.pencil,
+                                      color: CupertinoColors.white,
+                                      size: 10,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

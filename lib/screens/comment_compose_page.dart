@@ -168,7 +168,8 @@ class _CommentComposePageState extends State<CommentComposePage> {
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
-                Expanded(
+                Container(
+                  height: MediaQuery.of(context).size.height * 0.4,
                   child: CupertinoTextField(
                     controller: _ctrl,
                     maxLines: null,

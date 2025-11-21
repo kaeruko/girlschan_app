@@ -93,6 +93,9 @@ class TopicDetailController extends ChangeNotifier {
   int _savedCommentNo = 0;
   int _savedSyncedCount = 0;
 
+  bool _hasDraft = false; // ★ 追加
+  bool get hasDraft => _hasDraft; // ★ 追加
+
   // getters
   List<dynamic> get comments => _allComments;
   bool get loading => _loading;
@@ -202,8 +205,18 @@ class TopicDetailController extends ChangeNotifier {
     savedLocalFraction = loadedFrac;
   }
 
+  /// 下書きがあるかチェック
+  Future<void> checkDraft() async {
+    final exists = await CacheService.hasDraft(topicId);
+    if (_hasDraft != exists) {
+      _hasDraft = exists;
+      notifyListeners();
+    }
+  }
+
   // ==== init ====
   Future<void> init() async {
+    await checkDraft(); // ★ 追加
     await _loadSavedScroll();
     logd('[init] after _loadSavedScroll: savedCommentNo=$_savedCommentNo, savedLocalFraction=$savedLocalFraction');
 

@@ -520,11 +520,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _fetchMoreDelta,
-                child: const Icon(CupertinoIcons.refresh),
-              ),
+              // ★ 下書きがある場合のみ鉛筆マークを表示
+              if (_vm.hasDraft)
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _openPostDialog(),
+                  child: const Icon(CupertinoIcons.pencil),
+                ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: _showMenu,
@@ -1324,6 +1326,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
 
     if (!mounted) return;
+
+    // ★ 戻ってきたら下書き状態を更新（保存したかもしれないし、削除したかもしれない）
+    await _vm.checkDraft();
 
     if (result != null) {
       // 投稿されたのでコメント一覧を再読込

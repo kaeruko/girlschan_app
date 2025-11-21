@@ -149,6 +149,8 @@ class FavoritesScreenState extends State<FavoritesScreen>
   Future<void> _onDetailReturned() async {
     debugPrint('🔔 [Favorites] _onDetailReturned START');
     await _loadWatchedTopics();
+    // ★ 詳細から戻ったらキャッシュ状態（既読・下書きなど）を更新
+    await _controller.refreshAll();
     debugPrint('✅ [Favorites] _onDetailReturned END');
   }
 
@@ -312,6 +314,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
                   itemBuilder: (context, i) {
                     final topic = _watchedTopics[i];
                     return TopicTile(
+                      key: ValueKey(topic['id']), // ★ keyを追加
                       topic: topic,
                       controller: _controller,
                       showThumb: false,
