@@ -479,6 +479,8 @@ class TopicDetailController extends ChangeNotifier {
         posted_at: comment['posted_at'] ?? '',
         plus: comment['plus'] ?? 0,
         minus: comment['minus'] ?? 0,
+        anchors: comment['anchors'] ?? [],
+        reverse_anchors: comment['reverse_anchors'] ?? [],
         labelId: labelId,
       );
       _clippedNos.add(no);

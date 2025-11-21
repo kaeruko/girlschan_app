@@ -553,6 +553,8 @@ Future<void> addClippedComment({
   required String posted_at,
   required int plus,
   required int minus,
+  List<dynamic> anchors = const [],
+  List<dynamic> reverse_anchors = const [],
   int labelId = 0, // Default label ID
 }) async {
   final prefs = await SharedPreferences.getInstance();
@@ -566,6 +568,8 @@ Future<void> addClippedComment({
     'posted_at': posted_at,
     'plus': plus,
     'minus': minus,
+    'anchors': anchors,
+    'reverse_anchors': reverse_anchors,
     'clipDate': DateTime.now().toIso8601String(),
     'labelId': labelId,
   };

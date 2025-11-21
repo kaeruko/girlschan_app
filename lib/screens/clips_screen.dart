@@ -565,8 +565,6 @@ with WidgetsBindingObserver {
                   .textTheme
                   .textStyle
                   .copyWith(fontSize: 14),
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
             ),
             if (memo.isNotEmpty) ...[
               const SizedBox(height: 8),

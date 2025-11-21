@@ -166,10 +166,19 @@ class _CommentComposePageState extends State<CommentComposePage> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: CupertinoTextField(
-              controller: _ctrl,
-              maxLines: null,
-              placeholder: 'コメントを書く',
+            child: Column(
+              children: [
+                Expanded(
+                  child: CupertinoTextField(
+                    controller: _ctrl,
+                    maxLines: null,
+                    minLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    placeholder: 'コメントを書く',
+                  ),
+                ),
+              ],
             ),
           ),
         ),

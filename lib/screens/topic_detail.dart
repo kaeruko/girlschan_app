@@ -1266,6 +1266,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       ],
     );
 
+    final isClipped = _vm.clippedNos.contains(no);
+    
     return GestureDetector(
       onLongPress: () {
         showCupertinoModalPopup(
@@ -1277,7 +1279,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   Navigator.pop(context);
                   await _handleClipAction(Map<String, dynamic>.from(c));
                 },
-                child: const Text('クリップに登録する'),
+                isDestructiveAction: isClipped,
+                child: Text(isClipped ? 'クリップから削除する' : 'クリップに登録する'),
               ),
               CupertinoActionSheetAction(
                 onPressed: () {
