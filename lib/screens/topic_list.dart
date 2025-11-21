@@ -47,7 +47,7 @@ class TopicListScreenState extends State<TopicListScreen>
     debugPrint('🔔 ENTER _onAfterPopFromTile index=$idx id=$id');
     logd('🔔 [TopicList] onAfterPop received index=$idx id=$id', name: 'TopicList');
 
-    await _moveTopicToTop(idx, id);
+    await _updateTopicInList(idx, id);
 
     debugPrint('✅ LEAVE _onAfterPopFromTile index=$idx id=$id');
   }
@@ -70,16 +70,16 @@ class TopicListScreenState extends State<TopicListScreen>
     _controller.refreshAll();
   }
 
-  Future<void> _moveTopicToTop(int index, int topicId) async {
-    debugPrint('🔄 ENTER _updateTopicInPlace index=$index id=$topicId');
-    logd('🔄 [_updateTopicInPlace] Start processing index=$index, id=$topicId', name: 'TopicList');
+  Future<void> _updateTopicInList(int index, int topicId) async {
+    debugPrint('🔄 ENTER _updateTopicInList index=$index id=$topicId');
+    logd('🔄 [_updateTopicInList] Start processing index=$index, id=$topicId', name: 'TopicList');
 
     try {
       final metaKey = 'topic_meta_$topicId';
       final meta = await CacheService.loadMap(metaKey);
       
       if (!mounted) {
-        debugPrint('⚠️ _updateTopicInPlace: state not mounted, abort');
+        debugPrint('⚠️ _updateTopicInList: state not mounted, abort');
         return;
       }
 
@@ -93,7 +93,7 @@ class TopicListScreenState extends State<TopicListScreen>
            currentIdx = newList.indexWhere((t) => t['id'] == topicId);
         }
         if (currentIdx == -1) {
-          debugPrint('⚠️ _updateTopicInPlace: target not found id=$topicId');
+          debugPrint('⚠️ _updateTopicInList: target not found id=$topicId');
           return; // 見つからなければ終了
         }
 
@@ -114,16 +114,16 @@ class TopicListScreenState extends State<TopicListScreen>
         // 6. 画面用リストを差し替え
         _topics = newList;
         
-        logd('✅ [_updateTopicInPlace] Updated in place: ${updatedTopic['title']}', name: 'TopicList');
+        logd('✅ [_updateTopicInList] Updated in place: ${updatedTopic['title']}', name: 'TopicList');
       });
       
       // 7. タイルコントローラーのリフレッシュ（重要）
       await _controller.refreshAll();
-      debugPrint('✅ LEAVE _updateTopicInPlace id=$topicId');
+      debugPrint('✅ LEAVE _updateTopicInList id=$topicId');
 
     } catch (e, st) {
-      debugPrint('❌ _updateTopicInPlace exception: $e\n$st');
-      logd('❌ [_updateTopicInPlace] Error: $e', name: 'TopicList');
+      debugPrint('❌ _updateTopicInList exception: $e\n$st');
+      logd('❌ [_updateTopicInList] Error: $e', name: 'TopicList');
     }
   }
 
