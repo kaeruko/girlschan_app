@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 
 
@@ -191,11 +192,19 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
             width: 60,
             height: 60,
             child: (thumbUrl != null && thumbUrl.isNotEmpty)
-                ? Image.network(
-                    thumbUrl,
-                    headers: const {'Referer': 'https://girlschannel.net/'},
+                ? CachedNetworkImage(
+                    imageUrl: thumbUrl,
+                    httpHeaders: const {'Referer': 'https://girlschannel.net/'},
+                    memCacheWidth: 120, // 60 * 2 (Retina考慮)
+                    width: 60,
+                    height: 60,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    placeholder: (context, url) => const Icon(
+                      CupertinoIcons.photo,
+                      size: 28,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                    errorWidget: (context, url, error) => const Icon(
                       CupertinoIcons.photo,
                       size: 28,
                       color: CupertinoColors.systemGrey,
