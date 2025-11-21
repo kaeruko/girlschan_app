@@ -15,6 +15,8 @@ import 'comment_compose_page.dart';
 import 'comment_post_webview.dart';
 import 'image_viewer_page.dart';
 import '../widgets/comment_tile.dart';
+import '../widgets/anchor_preview_sheet.dart';
+import '../widgets/topic_menu_sheet.dart';
 
 class TopicDetailScreen extends StatefulWidget {
   final int topicId;
@@ -429,7 +431,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (ctx2, i) {
                       final c = pageItems.isNotEmpty ? pageItems[i] : const {};
-                      final globalIndex = page * _pageSize + i;
+
 
                       return MeasureSize(
                         onChange: (sz) => meas.onItemSize(i, sz.height, sc: sc),
@@ -694,235 +696,40 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       return;
     }
 
-    final anchors    = (c['anchors'] as List?)?.cast<int>() ?? const <int>[];
-    final revAnchors = (c['reverse_anchors'] as List?)?.cast<int>() ?? const <int>[];
-    final body       = c['body'] as String? ?? '';
-    final imgUrl     = (c['image_url'] as String?)?.trim();
-    final hasImage   = imgUrl != null && imgUrl.isNotEmpty;
-    final plus       = (c['plus'] as int?) ?? 0;
-    final minus      = (c['minus'] as int?) ?? 0;
-    final noText     = (c['no']?.toString()) ?? '?';
-    final postedAt   = c['posted_at'] as String? ?? '';
-
     showCupertinoModalPopup(
       context: context,
-      builder: (modalCtx) {
-        // ローカル関数：アンカーのバッジ
-        Widget anchorChips(List<int> list) {
-          if (list.isEmpty) return const SizedBox.shrink();
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Wrap(
-                  spacing: 4,
-                  children: list.map((n) {
-                    final ok = _vm.getCommentByNo(n).isNotEmpty;
-                    return GestureDetector(
-                      onTap: () => _showAnchorPreview(n),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: ok
-                              ? CupertinoColors.systemBlue.withOpacity(0.1)
-                              : CupertinoColors.systemGrey.withOpacity(0.1),
-                          border: Border.all(
-                            color: ok ? CupertinoColors.systemBlue : CupertinoColors.systemGrey3,
-                            width: 1,
-                          ),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '>>$n',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: ok ? CupertinoColors.systemBlue : CupertinoColors.secondaryLabel,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
+      builder: (modalCtx) => AnchorPreviewSheet(
+        comment: c,
+        isClipped: _vm.clippedNos.contains(no),
+        onAnchorTap: (targetNo) => _showAnchorPreview(targetNo),
+        onImageTap: (url) {
+          Navigator.of(modalCtx).push(
+            CupertinoPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => ImageViewerPage(url: url),
             ),
           );
-        }
-
-        // ローカル関数：逆アンカーのバッジ
-        Widget revAnchorChips(List<int> list) {
-          if (list.isEmpty) return const SizedBox.shrink();
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 4,
-                    children: list.take(5).map((n) {
-                      return GestureDetector(
-                        onTap: () => _showAnchorPreview(n),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: CupertinoColors.systemOrange.withOpacity(0.1),
-                            border: Border.all(color: CupertinoColors.systemOrange, width: 1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '<<$n',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: CupertinoColors.systemOrange,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                if (list.length > 5)
-                  Text(
-                    ' +${list.length - 5}件',
-                    style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
-                  ),
-              ],
-            ),
-          );
-        }
-
-        final header = Container(
-          padding: const EdgeInsets.all(12),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: CupertinoColors.separator)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'No.$noText  $postedAt',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: CupertinoColors.secondaryLabel,
-                ),
-              ),
-              CupertinoButton(
-                padding: const EdgeInsets.all(4),
-                onPressed: () => Navigator.pop(modalCtx),
-                child: const Icon(CupertinoIcons.xmark, size: 20),
-              ),
-            ],
-          ),
-        );
-
-        Widget? imageSection;
-        if (hasImage) {
-          imageSection = GestureDetector(
-            onTap: () {
-              Navigator.of(modalCtx).push(
-                CupertinoPageRoute(
-                  fullscreenDialog: true,
-                  builder: (_) => ImageViewerPage(url: imgUrl!),
-                ),
-              );
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                imgUrl!,
-                height: 200,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return const SizedBox(
-                    height: 200,
-                    child: Center(child: CupertinoActivityIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stack) => const SizedBox(
-                  height: 200,
-                  child: Center(
-                    child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.systemGrey),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-
-        final reactionRow = Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Text('＋$plus',  style: const TextStyle(color: Color(0xFFED6D74))),
-                const SizedBox(width: 16),
-                Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
-              ],
-            ),
-            CupertinoButton(
-              padding: const EdgeInsets.all(4),
-              onPressed: () async {
-                await _handleClipAction(c);
-                if (!modalCtx.mounted) return;
-                Navigator.pop(modalCtx);
-              },
-              child: Icon(
-                _vm.clippedNos.contains(c['no']) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                color: _vm.clippedNos.contains(c['no'])
-                    ? CupertinoColors.systemRed
-                    : CupertinoColors.secondaryLabel,
-                size: 22,
-              ),
-            ),
-          ],
-        );
-
-        return SafeArea(
-          top: false,
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(modalCtx).size.height * 0.9,
-              ),
-              decoration: const BoxDecoration(
-                color: CupertinoColors.systemBackground,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: Column(
-                children: [
-                  header,
-                  Expanded(
-                    child: CupertinoScrollbar(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (anchors.isNotEmpty) anchorChips(anchors),
-                            if (revAnchors.isNotEmpty) revAnchorChips(revAnchors),
-                            Text(body, style: const TextStyle(fontSize: 15)),
-                            if (imageSection != null) ...[
-                              const SizedBox(height: 12),
-                              imageSection,
-                            ],
-                            const SizedBox(height: 12),
-                            reactionRow,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+        },
+        onClipToggle: () async {
+          await _handleClipAction(c);
+          if (mounted) setState(() {});
+        },
+        onVote: (isPlus) async {
+          if (c['isLocal'] == true) return;
+          final commentId = 'vbox${c['no']}';
+          final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
+          if (!mounted) return;
+          if (success) {
+            setState(() {
+              if (isPlus) {
+                c['plus'] = (c['plus'] ?? 0) + 1;
+              } else {
+                c['minus'] = (c['minus'] ?? 0) + 1;
+              }
+            });
+          }
+        },
+      ),
     );
   }
 
@@ -931,45 +738,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void _showMenu() {
     showCupertinoModalPopup(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showJumpDialog();
-            },
-            child: const Text('指定のコメントへ移動'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _vm.hardReload();
-            },
-            child: const Text('再読み込み'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openPostDialog();
-            },
-            child: const Text('コメントを投稿する'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final url = Uri.parse('https://girlschannel.net/topics/${widget.topicId}/');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: const Text('ブラウザで開く'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDestructiveAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('キャンセル'),
-        ),
+      builder: (ctx) => TopicMenuSheet(
+        onJump: _showJumpDialog,
+        onReload: _vm.hardReload,
+        onPost: _openPostDialog,
+        onBrowser: () async {
+          final url = Uri.parse('https://girlschannel.net/topics/${widget.topicId}/');
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          }
+        },
       ),
     );
   }
