@@ -608,6 +608,50 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     ));
   }
 
+  Future<void> _handleClipAction(Map<String, dynamic> comment) async {
+    final no = comment['no'] as int;
+    final isClipped = _vm.clippedNos.contains(no);
+    
+    if (isClipped) {
+      await _vm.toggleClip(comment);
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final labels = await getClipLabels();
+    if (labels.length <= 1) {
+      await _vm.toggleClip(comment, labelId: 0);
+      if (mounted) setState(() {});
+      return;
+    }
+
+    if (!mounted) return;
+    await showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('ラベルを選択してクリップ'),
+        actions: labels.map((label) {
+          final id = label['id'] as int;
+          final name = label['name'] as String;
+          final displayName = id == 0 && name.isEmpty ? '未分類' : name;
+          return CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _vm.toggleClip(comment, labelId: id);
+              if (mounted) setState(() {});
+            },
+            child: Text(displayName),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
   void _showAnchorPreview(int no) {
     final c = _vm.getCommentByNo(no);
     if (c.isEmpty) {
@@ -787,7 +831,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             CupertinoButton(
               padding: const EdgeInsets.all(4),
               onPressed: () async {
-                await _vm.toggleClip(c);
+                await _handleClipAction(c);
                 if (!modalCtx.mounted) return;
                 Navigator.pop(modalCtx);
               },
@@ -1231,8 +1275,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               CupertinoActionSheetAction(
                 onPressed: () async {
                   Navigator.pop(context);
-                  await _vm.toggleClip(Map<String, dynamic>.from(c));
-                  if (mounted) setState(() {});
+                  await _handleClipAction(Map<String, dynamic>.from(c));
                 },
                 child: const Text('クリップに登録する'),
               ),

@@ -553,6 +553,7 @@ Future<void> addClippedComment({
   required String posted_at,
   required int plus,
   required int minus,
+  int labelId = 0, // Default label ID
 }) async {
   final prefs = await SharedPreferences.getInstance();
   final clips = prefs.getStringList('clipped_comments') ?? [];
@@ -566,6 +567,7 @@ Future<void> addClippedComment({
     'plus': plus,
     'minus': minus,
     'clipDate': DateTime.now().toIso8601String(),
+    'labelId': labelId,
   };
   
   // 重複チェック（同じトピックの同じコメント）
@@ -639,5 +641,89 @@ Future<void> updateClippedCommentStats({
   
   if (updated) {
     await prefs.setStringList('clipped_comments', clips);
+  }
+}
+
+// ========== クリップラベル関連 ==========
+
+Future<List<Map<String, dynamic>>> getClipLabels() async {
+  final prefs = await SharedPreferences.getInstance();
+  final jsonList = prefs.getStringList('clip_labels') ?? [];
+  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  
+  // デフォルトラベルがなければ追加（表示用、保存はしない）
+  if (!labels.any((l) => l['id'] == 0)) {
+    labels.insert(0, {'id': 0, 'name': '', 'createdAt': DateTime.now().toIso8601String()});
+  }
+  
+  return labels;
+}
+
+Future<void> addClipLabel(String name) async {
+  final prefs = await SharedPreferences.getInstance();
+  final jsonList = prefs.getStringList('clip_labels') ?? [];
+  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  
+  // ID生成 (max ID + 1)
+  int maxId = 0;
+  for (final l in labels) {
+    final id = l['id'] as int;
+    if (id > maxId) maxId = id;
+  }
+  final newId = maxId + 1;
+  
+  final newLabel = {
+    'id': newId,
+    'name': name,
+    'createdAt': DateTime.now().toIso8601String(),
+  };
+  
+  labels.add(newLabel);
+  await prefs.setStringList('clip_labels', labels.map((e) => jsonEncode(e)).toList());
+}
+
+Future<void> updateClipLabel(int id, String name) async {
+  if (id == 0) return; // デフォルトラベルは編集不可
+  
+  final prefs = await SharedPreferences.getInstance();
+  final jsonList = prefs.getStringList('clip_labels') ?? [];
+  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  
+  final index = labels.indexWhere((l) => l['id'] == id);
+  if (index != -1) {
+    labels[index]['name'] = name;
+    await prefs.setStringList('clip_labels', labels.map((e) => jsonEncode(e)).toList());
+  }
+}
+
+Future<void> deleteClipLabel(int id) async {
+  if (id == 0) return; // デフォルトラベルは削除不可
+  
+  final prefs = await SharedPreferences.getInstance();
+  
+  // 1. ラベル削除
+  final jsonList = prefs.getStringList('clip_labels') ?? [];
+  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  labels.removeWhere((l) => l['id'] == id);
+  await prefs.setStringList('clip_labels', labels.map((e) => jsonEncode(e)).toList());
+  
+  // 2. 削除されたラベルのクリップをデフォルト(0)に移動
+  final clipsJson = prefs.getStringList('clipped_comments') ?? [];
+  bool clipsUpdated = false;
+  final newClips = <String>[];
+  
+  for (final c in clipsJson) {
+    final clip = jsonDecode(c) as Map<String, dynamic>;
+    if (clip['labelId'] == id) {
+      clip['labelId'] = 0;
+      newClips.add(jsonEncode(clip));
+      clipsUpdated = true;
+    } else {
+      newClips.add(c);
+    }
+  }
+  
+  if (clipsUpdated) {
+    await prefs.setStringList('clipped_comments', newClips);
   }
 }

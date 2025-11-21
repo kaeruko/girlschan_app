@@ -5,6 +5,7 @@ import '../screens/topic_detail.dart';
 import '../widgets/common/app_spinner.dart';
 import '../widgets/common/app_toast.dart';
 import '../app/app_tabs.dart';
+import 'label_management_screen.dart';
 
 class ClipsScreen extends StatefulWidget {
   const ClipsScreen({super.key});
@@ -20,6 +21,10 @@ with WidgetsBindingObserver {
   bool _refreshing = false;
   bool _inFlight = false;  // ★ 重複ロード防止
   bool _metaUpdating = false;  // ★ バックグラウンド更新中かどうか
+  
+  // ★ ラベル関連
+  List<Map<String, dynamic>> _labels = [];
+  int _selectedLabelId = 0;
 
   /// ★ app_tab 側から叩くための公開メソッド
   void reloadFromOutside() {
@@ -50,6 +55,7 @@ with WidgetsBindingObserver {
     _inFlight = true;
     try {
       final clips = await getClippedComments();
+      final labels = await getClipLabels(); // ★ ラベルも取得
       
       clips.sort((a, b) {
         DateTime parseDate(String s) {
@@ -66,6 +72,7 @@ with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _clips = clips;
+        _labels = labels;
         _loading = false;
       });
     } catch (e) {
@@ -315,7 +322,19 @@ with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: null,
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('クリップ'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.bars),
+          onPressed: () async {
+            await Navigator.of(context).push(
+              CupertinoPageRoute(builder: (_) => const LabelManagementScreen()),
+            );
+            _loadClips(); // 戻ってきたらリロード（ラベル変更反映）
+          },
+        ),
+      ),
       child: SafeArea(
         bottom: false,
         child: _loading
@@ -327,26 +346,69 @@ with WidgetsBindingObserver {
                   // ← MaterialのRefreshIndicatorの代わり
                   CupertinoSliverRefreshControl(onRefresh: _refresh),
 
-                  if (_clips.isEmpty)
+                  // ★ ラベルフィルタリングバー
+                  SliverToBoxAdapter(
+                    child: Container(
+                      height: 50,
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: CupertinoColors.systemGrey5)),
+                      ),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _labels.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final label = _labels[index];
+                          final id = label['id'] as int;
+                          final name = label['name'] as String;
+                          final isDefault = id == 0;
+                          final displayName = isDefault && name.isEmpty ? '未分類' : name;
+                          final isSelected = id == _selectedLabelId;
+                          
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() => _selectedLabelId = id);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? CupertinoColors.activeBlue : CupertinoColors.systemGrey6,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                displayName,
+                                style: TextStyle(
+                                  color: isSelected ? CupertinoColors.white : CupertinoColors.black,
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  if (_clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(CupertinoIcons.heart,
+                          children: [
+                            const Icon(CupertinoIcons.heart,
                                 size: 56,
                                 color: CupertinoColors.systemGrey3),
-                            SizedBox(height: 12),
-                            Text('クリップはまだありません',
-                                style: TextStyle(
-                                    fontSize: 15,
-                                    color: CupertinoColors.systemGrey)),
-                            SizedBox(height: 6),
-                            Text('コメント右の ❤️ をタップして保存',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: CupertinoColors.systemGrey2)),
+                            const SizedBox(height: 16),
+                            Text(
+                              _selectedLabelId == 0 ? 'クリップはありません' : 'このラベルにクリップはありません',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: CupertinoColors.systemGrey,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -354,8 +416,13 @@ with WidgetsBindingObserver {
                   else
                     SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, i) => _buildClipItem(context, _clips[i]),
-                        childCount: _clips.length,
+                        (context, index) {
+                          final filtered = _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).toList();
+                          if (index >= filtered.length) return null;
+                          final clip = filtered[index];
+                          return _buildClipItem(clip);
+                        },
+                        childCount: _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).length,
                       ),
                     ),
                 ],
@@ -364,7 +431,7 @@ with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildClipItem(BuildContext context, Map<String, dynamic> clip) {
+  Widget _buildClipItem(Map<String, dynamic> clip) {
     final topicTitle = clip['topicTitle'] as String;
     final commentBody = clip['body'] as String;
     final commentNo = clip['no'] as int;

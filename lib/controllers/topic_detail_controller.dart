@@ -465,7 +465,7 @@ class TopicDetailController extends ChangeNotifier {
   }
 
   // ==== clips ====
-  Future<void> toggleClip(Map<String, dynamic> comment) async {
+  Future<void> toggleClip(Map<String, dynamic> comment, {int labelId = 0}) async {
     final no = comment['no'] as int;
     if (_clippedNos.contains(no)) {
       await removeClippedComment(topicId, no);
@@ -479,6 +479,7 @@ class TopicDetailController extends ChangeNotifier {
         posted_at: comment['posted_at'] ?? '',
         plus: comment['plus'] ?? 0,
         minus: comment['minus'] ?? 0,
+        labelId: labelId,
       );
       _clippedNos.add(no);
     }

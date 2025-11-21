@@ -201,7 +201,6 @@ class FavoritesScreenState extends State<FavoritesScreen>
       final beforeComments = (t['comments'] as int?) ?? 0;
 
       try {
-        // ★ 現在チェック中のトピック名を表示（トーストだと邪魔かもしれないので、一旦ログか、あるいは「チェック中...」みたいなのを出す？）
         // ユーザー要望: 「トースト、現在取得中のトピック名を出してほしい」
         final currentTitle = t['title'] as String? ?? 'トピック';
         if (mounted) {
