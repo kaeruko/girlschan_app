@@ -1,10 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import '../models/comment.dart';
 import 'vote_bar_graph.dart';
 import 'url_preview_list.dart';
 import 'anchor_chips.dart';
 
 class CommentTile extends StatelessWidget {
-  final Map<String, dynamic> comment;
+  final Comment comment;
   final bool isClipped;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -27,22 +28,22 @@ class CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final no = (comment['no'] as int?) ?? -1;
-    final postedAt = comment['posted_at'] ?? '';
-    final name = comment['name'] ?? '';
-    final body = comment['body'] ?? '';
-    final plus = comment['plus'] ?? 0;
-    final minus = comment['minus'] ?? 0;
-    final anchors = List<int>.from(comment['anchors'] ?? []);
-    final reverseAnchors = List<int>.from(comment['reverse_anchors'] ?? []);
-    final urls = (comment['urls'] as List?) ?? [];
-    final imageUrl = comment['image_url'] as String?;
+    final no = comment.id;
+    final postedAt = comment.time;
+    final name = ''; // name not present in Comment model
+    final body = comment.text;
+    final plus = comment.plus;
+    final minus = comment.minus;
+    final anchors = comment.anchors;
+    final reverseAnchors = comment.reverseAnchors;
+    final urls = comment.urls;
+    final imageUrl = comment.imageUrl;
 
     final innerWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'No.$no  $name  $postedAt${comment['isLocal'] == true ? ' （ローカル）' : ''}',
+          'No.$no  $name  $postedAt${comment.isLocal ? ' （ローカル）' : ''}',
           style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
         ),
         const SizedBox(height: 8),
@@ -65,7 +66,7 @@ class CommentTile extends StatelessWidget {
         if (imageUrl != null) ...[
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () => onImageTap?.call(imageUrl),
+            onTap: () => onImageTap?.call(imageUrl!),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
@@ -98,7 +99,7 @@ class CommentTile extends StatelessWidget {
             CupertinoButton(
               padding: EdgeInsets.zero,
               onPressed: () {
-                if (comment['isLocal'] == true) return;
+                if (comment.isLocal) return;
                 onVote?.call(true);
               },
               child: Padding(
@@ -109,7 +110,7 @@ class CommentTile extends StatelessWidget {
             CupertinoButton(
               padding: EdgeInsets.zero,
               onPressed: () {
-                if (comment['isLocal'] == true) return;
+                if (comment.isLocal) return;
                 onVote?.call(false);
               },
               child: Padding(
@@ -126,19 +127,6 @@ class CommentTile extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
-        // key: no > 0 ? _vm.keyForCommentNo(no) : null, // Key handling should be done by parent if needed, or passed in.
-        // The parent (TopicDetailScreen) uses the key for scrolling. 
-        // We should probably allow passing a Key to the widget itself, or let the parent wrap it.
-        // But the original code put the key on the Container.
-        // If I put the key on CommentTile, it's on the widget.
-        // The parent wraps CommentTile in MeasureSize.
-        // The original code: Container(key: ...).
-        // If I pass the key to CommentTile constructor, it applies to CommentTile.
-        // If CommentTile builds a Container, that Container doesn't necessarily need the key if CommentTile has it?
-        // Wait, Scrollable.ensureVisible(ctx) uses the context of the key.
-        // If the key is on CommentTile, ctx refers to CommentTile.
-        // If the key is on Container, ctx refers to Container.
-        // It should be fine if it's on CommentTile.
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
         ),

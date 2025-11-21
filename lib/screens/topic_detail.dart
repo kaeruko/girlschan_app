@@ -135,11 +135,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void _goNextPage() => _hasNext ? _goToPage(_currentPage + 1) : null;
   void _goPrevPage() => _hasPrev ? _goToPage(_currentPage - 1) : null;
 
-  List<dynamic> _itemsOfPage(int page, List<dynamic> all) {
-  final start = page * _pageSize;
-  final end = (start + _pageSize > all.length) ? all.length : (start + _pageSize);
-  if (start >= all.length || start >= end) return <dynamic>[];
-  return all.sublist(start, end);
+  List<Comment> _itemsOfPage(int page, List<Comment> all) {
+    final start = page * _pageSize;
+    final end = (start + _pageSize > all.length) ? all.length : (start + _pageSize);
+    if (start >= all.length || start >= end) return <Comment>[];
+    return all.sublist(start, end);
   }
 
   ScrollController _scForPage(int page) {
@@ -352,6 +352,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       await Future.delayed(const Duration(milliseconds: 16));
     }
 
+
     return false; // タイムアウト
   }
 
@@ -359,7 +360,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void _performApproximateJump(int page, int targetNo, ScrollController sc, VariableListMeasurer meas) {
     final all = _vm.comments;
     final pageItems = _itemsOfPage(page, all);
-    final roughIndex = pageItems.indexWhere((item) => item['no'] == targetNo);
+    final roughIndex = pageItems.indexWhere((item) => item.id == targetNo);
 
     if (roughIndex >= 0) {
       meas.markRestoreTargetIndex(roughIndex); // 追従モードON
@@ -459,15 +460,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (ctx2, i) {
-                      final c = pageItems.isNotEmpty ? pageItems[i] : const {};
+                      final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, time: '', text: '', plus: 0, minus: 0);
 
 
                       final bool shouldMeasure = _restoring || meas.needsUpdate;
                       Widget content = Container(
-                        key: (c['no'] as int) > 0 ? _vm.keyForCommentNo(c['no'] as int) : null,
+                        key: c.id > 0 ? _vm.keyForCommentNo(c.id) : null,
                         child: CommentTile(
                           comment: c,
-                          isClipped: _vm.clippedNos.contains(c['no']),
+                          isClipped: _vm.clippedNos.contains(c.id),
                           onLongPress: () => _showCommentActionSheet(ctx2, c),
                           onAnchorTap: (no) => _showAnchorPreview(no),
                           onImageTap: (url) {
@@ -479,21 +480,21 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                             );
                           },
                           onVote: (isPlus) async {
-                            final no = c['no'] as int;
+                            final no = c.id;
                             final commentId = 'vbox$no';
                             final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
                             if (!mounted) return;
                             if (success) {
                               setState(() {
                                 if (isPlus) {
-                                  c['plus'] = (c['plus'] ?? 0) + 1;
+                                  c.plus += 1;
                                 } else {
-                                  c['minus'] = (c['minus'] ?? 0) + 1;
+                                  c.minus += 1;
                                 }
                               });
                             }
                           },
-                          checkAnchorAvailability: (no) => _vm.getCommentByNo(no).isNotEmpty,
+                          checkAnchorAvailability: (no) => _vm.getCommentByNo(no) != null,
                         ),
                       );
                       if (shouldMeasure) {
@@ -684,8 +685,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     ));
   }
 
-  Future<void> _handleClipAction(Map<String, dynamic> comment) async {
-    final no = comment['no'] as int;
+  Future<void> _handleClipAction(Comment comment) async {
+    final no = comment.id;
     final isClipped = _vm.clippedNos.contains(no);
     
     if (isClipped) {
@@ -730,7 +731,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   void _showAnchorPreview(int no) {
     final c = _vm.getCommentByNo(no);
-    if (c.isEmpty) {
+    if (c == null) {
       PlatformHelper.showSnackBar(context, 'コメントが見つからない');
       return;
     }
@@ -754,20 +755,20 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           if (mounted) setState(() {});
         },
         onVote: (isPlus) async {
-          if (c['isLocal'] == true) return;
-          final commentId = 'vbox${c['no']}';
-          final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
-          if (!mounted) return;
-          if (success) {
-            setState(() {
-              if (isPlus) {
-                c['plus'] = (c['plus'] ?? 0) + 1;
-              } else {
-                c['minus'] = (c['minus'] ?? 0) + 1;
-              }
-            });
-          }
-        },
+        if (c.isLocal) return;
+        final commentId = 'vbox${c.id}';
+        final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
+        if (!mounted) return;
+        if (success) {
+          setState(() {
+            if (isPlus) {
+              c.plus += 1;
+            } else {
+              c.minus += 1;
+            }
+          });
+        }
+      },
       ),
     );
   }
@@ -829,8 +830,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
 
 
-  void _showCommentActionSheet(BuildContext context, Map<String, dynamic> c) {
-    final no = c['no'] as int;
+  void _showCommentActionSheet(BuildContext context, Comment c) {
+    final no = c.id;
     final isClipped = _vm.clippedNos.contains(no);
 
     showCupertinoModalPopup(
@@ -840,7 +841,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           CupertinoActionSheetAction(
             onPressed: () async {
               Navigator.pop(context);
-              await _handleClipAction(Map<String, dynamic>.from(c));
+              await _handleClipAction(c);
             },
             isDestructiveAction: isClipped,
             child: Text(isClipped ? 'クリップから削除する' : 'クリップに登録する'),
@@ -883,21 +884,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
     if (result != null) {
       // 投稿されたのでコメント一覧を再読込
-      final addedCount = await _vm.fetchDelta();
+      await _vm.fetchDelta();
       
       // テキストが返ってきた場合は、その本文を持つコメントを探してクリップする
       if (result is String && result.isNotEmpty) {
         final postedText = result;
-        // 追加されたコメント（あるいは全コメント）から探す
-        // 直近の投稿なので末尾付近にあるはず
-        final candidates = _vm.comments.reversed.take(addedCount + 5); 
-        
-        Map<String, dynamic>? target;
-        for (final c in candidates) {
-          final body = c['body'] as String? ?? '';
-          // 改行やスペースの揺れを考慮して、ある程度緩く比較するか、完全一致か
-          // ここでは単純に trim して比較
-          if (body.trim() == postedText.trim()) {
+        Comment? target;
+        // 最新のコメントから探す
+        for (final c in _vm.comments.reversed) {
+          if (c.text.trim() == postedText.trim()) {
             target = c;
             break;
           }
@@ -917,6 +912,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       }
     }
   }
+
 
 
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 
 
+import '../models/comment.dart';
+
 class AnchorPreviewSheet extends StatelessWidget {
-  final Map<String, dynamic> comment;
+  final Comment comment;
   final bool isClipped;
   
   // 親から機能を借りるためのコールバック
@@ -24,14 +26,14 @@ class AnchorPreviewSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // データ取り出し（安全に）
-    final no = comment['no']?.toString() ?? '?';
-    final body = comment['body'] as String? ?? '';
-    final postedAt = comment['posted_at'] as String? ?? '';
-    final imgUrl = comment['image_url'] as String?;
-    final anchors = (comment['anchors'] as List?)?.cast<int>() ?? [];
-    final revAnchors = (comment['reverse_anchors'] as List?)?.cast<int>() ?? [];
-    final plus = comment['plus'] as int? ?? 0;
-    final minus = comment['minus'] as int? ?? 0;
+    final no = comment.id.toString();
+    final body = comment.text;
+    final postedAt = comment.time;
+    final imgUrl = comment.imageUrl;
+    final anchors = comment.anchors;
+    final revAnchors = comment.reverseAnchors;
+    final plus = comment.plus;
+    final minus = comment.minus;
 
     return Container(
       constraints: BoxConstraints(

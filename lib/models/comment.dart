@@ -31,6 +31,7 @@ class Comment {
   final List<int> anchors;
   final List<int> reverseAnchors;
   final List<CommentUrl> urls;
+  final bool isLocal;
 
   Comment({
     required this.id,
@@ -42,6 +43,7 @@ class Comment {
     this.anchors = const [],
     this.reverseAnchors = const [],
     this.urls = const [],
+    this.isLocal = false,
   });
 
   factory Comment.fromCsv(List<String> row) {
@@ -69,6 +71,7 @@ class Comment {
           ?.map((e) => CommentUrl.fromJson(e as Map<String, dynamic>))
           .toList() ??
           [],
+      isLocal: json['isLocal'] ?? false,
     );
   }
 
@@ -89,5 +92,6 @@ class Comment {
                   'thumbnail': u.thumbnail,
                 })
             .toList(),
+        'isLocal': isLocal,
       };
 }

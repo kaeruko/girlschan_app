@@ -42,7 +42,7 @@ class TopicDetailController extends ChangeNotifier {
   Future<void> ensureContainsNo(int no) async {
     // すでに入っていれば何もしない
     if (indexByNo[no] != null ||
-        comments.indexWhere((e) => (e['no'] as int?) == no) >= 0) {
+        comments.indexWhere((e) => e.id == no) >= 0) {
       return;
     }
     // 無限ループ防止で上限を決める
@@ -51,7 +51,7 @@ class TopicDetailController extends ChangeNotifier {
       final added = await fetchDelta();
       if (added <= 0) break;
       if (indexByNo[no] != null ||
-          comments.indexWhere((e) => (e['no'] as int?) == no) >= 0) {
+          comments.indexWhere((e) => e.id == no) >= 0) {
         break;
       }
     }
@@ -98,7 +98,7 @@ class TopicDetailController extends ChangeNotifier {
   bool get hasDraft => _hasDraft; // ★ 追加
 
   // getters
-  List<dynamic> get comments => _allComments;
+  List<Comment> get comments => _allComments;
   bool get loading => _loading;
   bool get loadingMore => _loadingMore;
   bool get isWatched => _isWatched;
@@ -109,7 +109,7 @@ class TopicDetailController extends ChangeNotifier {
   int get savedSyncedCount => _savedSyncedCount;
   DateTime? get lastSync => _lastSync;
 
-  int serverSyncedCount() => _allComments.where((c) => c['isLocal'] != true).length;
+  int serverSyncedCount() => _allComments.where((c) => !c.isLocal).length;
 
   // 既存のローカルキー関数（君の方針に合わせて）:
   String _kScrollNo(int id)   => 'scroll_$id';
@@ -152,7 +152,7 @@ class TopicDetailController extends ChangeNotifier {
 
       if (_allComments.isEmpty) return;
       final safe = i.clamp(0, _allComments.length - 1);
-      final no = (_allComments[safe]['no'] as int?) ?? 0;
+      final no = _allComments[safe].id;
 
       final prefs = await SharedPreferences.getInstance();
       final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
@@ -185,7 +185,7 @@ class TopicDetailController extends ChangeNotifier {
 
     if (_allComments.isEmpty) return;
     final safe = i.clamp(0, _allComments.length - 1);
-    final no = (_allComments[safe]['no'] as int?) ?? 0;
+    final no = _allComments[safe].id;
 
     final prefs = await SharedPreferences.getInstance();
     final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
@@ -244,7 +244,10 @@ class TopicDetailController extends ChangeNotifier {
     final cached = await CacheService.loadList(cacheKey);
     if (cached.isNotEmpty) {
       final locals = await _loadLocalComments();
-      _allComments = [...cached, ...locals];
+    _allComments = [
+      ...cached.map((e) => Comment.fromJson(e as Map<String, dynamic>)),
+      ...locals
+    ];
       _totalComments = cached.length;
       _rebuildIndexByNo();
       _freezeSaving(); // ★ここを追加（レイアウト安定まで保存を遅延）
@@ -260,14 +263,15 @@ class TopicDetailController extends ChangeNotifier {
   Future<void> fetchFirstPage() async {
     try {
       final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage, old: _isOld);
-      final list = (page['comments'] as List<dynamic>? ?? []).toList();
+      final rawList = (page['comments'] as List<dynamic>? ?? []);
+      final list = rawList.map((e) => Comment.fromJson(e as Map<String, dynamic>)).toList();
       final total = (page['total'] as int?) ?? list.length;
 
       _allComments = list;
       _totalComments = total;
       _hasMore = list.length == commentsPerPage;
 
-      await CacheService.saveList('comments_$topicId', _allComments);
+      await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
 
       final locals = await _loadLocalComments();
       _allComments = [..._allComments, ...locals];
@@ -328,12 +332,13 @@ class TopicDetailController extends ChangeNotifier {
       }
 
       // 重複排除
-      final List<Map<String, dynamic>> newOnes = [];
+      final List<Comment> newOnes = [];
       for (final c in fetchedList) {
-        final no = (c['no'] as int?) ?? 0;
+        final map = c as Map<String, dynamic>;
+        final no = (map['no'] as int?) ?? 0;
         if (no <= 0) continue;
         if (_byNo.containsKey(no)) continue;
-        newOnes.add(Map<String, dynamic>.from(c));
+        newOnes.add(Comment.fromJson(map));
       }
       // ignore: avoid_print
       print('[delta] added=${newOnes.length}');
@@ -352,7 +357,7 @@ class TopicDetailController extends ChangeNotifier {
       _rebuildIndexByNo();
       // インデックスと lastRemoteNo を更新
       for (int i = 0; i < newOnes.length; i++) {
-        final no = newOnes[i]['no'] as int;
+        final no = newOnes[i].id;
         _byNo[no] = _allComments.length - newOnes.length + i;
         if (no > _lastRemoteNo) _lastRemoteNo = no;
       }
@@ -366,7 +371,7 @@ class TopicDetailController extends ChangeNotifier {
       }
       
       // ★ 追加: キャッシュ保存
-      await CacheService.saveList('comments_$topicId', _allComments);
+      await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
       _freezeSaving();
 
       _loadingMore = false;
@@ -417,7 +422,8 @@ class TopicDetailController extends ChangeNotifier {
       //       API仕様的に limit が効くなら指定する。
       const reloadLimit = 500;
       final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: reloadLimit, old: _isOld);
-      final list = (page['comments'] as List<dynamic>? ?? []).toList();
+      final rawList = (page['comments'] as List<dynamic>? ?? []);
+      final list = rawList.map((e) => Comment.fromJson(e as Map<String, dynamic>)).toList();
       final total = (page['total'] as int?) ?? list.length;
 
       _allComments = list;
@@ -429,13 +435,13 @@ class TopicDetailController extends ChangeNotifier {
       
       // インデックスと lastRemoteNo を更新
       for (int i = 0; i < list.length; i++) {
-        final no = list[i]['no'] as int;
+        final no = list[i].id;
         _byNo[no] = i; // indexByNo と重複するが _byNo は fetchDelta 用
         if (no > _lastRemoteNo) _lastRemoteNo = no;
       }
 
       // 6. 新しいデータをキャッシュ保存
-      await CacheService.saveList('comments_$topicId', _allComments);
+      await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
       
       // 7. 履歴も更新
       await updateWatchedTopicsComments([
@@ -457,7 +463,7 @@ class TopicDetailController extends ChangeNotifier {
     _byNo.clear();                 // ★ 初回ページも含めて dedupe 用に埋め直す
 
     for (int i = 0; i < _allComments.length; i++) {
-      final no = (_allComments[i]['no'] as int?) ?? -1;
+      final no = _allComments[i].id;
       if (no <= 0) continue;
       _indexByNo[no] = i;
       _byNo[no] = i;               // ★ これが重要。fetchDelta の重複判定が効く
@@ -471,16 +477,16 @@ class TopicDetailController extends ChangeNotifier {
   int get lastRemoteNo {
     var mx = 0;
     for (final c in _allComments) {
-      if (c['isLocal'] == true) continue;
-      final n = (c['no'] as int?) ?? 0;
+      if (c.isLocal) continue;
+      final n = c.id;
       if (n > mx) mx = n;
     }
     return mx;
   }
 
   // ==== clips ====
-  Future<void> toggleClip(Map<String, dynamic> comment, {int labelId = 0}) async {
-    final no = comment['no'] as int;
+  Future<void> toggleClip(Comment comment, {int labelId = 0}) async {
+    final no = comment.id;
     if (_clippedNos.contains(no)) {
       await removeClippedComment(topicId, no);
       _clippedNos.remove(no);
@@ -489,12 +495,12 @@ class TopicDetailController extends ChangeNotifier {
         topicId: topicId,
         topicTitle: title,
         commentNo: no,
-        commentBody: comment['body'] ?? '',
-        posted_at: comment['posted_at'] ?? '',
-        plus: comment['plus'] ?? 0,
-        minus: comment['minus'] ?? 0,
-        anchors: comment['anchors'] ?? [],
-        reverse_anchors: comment['reverse_anchors'] ?? [],
+        commentBody: comment.text,
+        posted_at: comment.time,
+        plus: comment.plus,
+        minus: comment.minus,
+        anchors: comment.anchors,
+        reverse_anchors: comment.reverseAnchors,
         labelId: labelId,
       );
       _clippedNos.add(no);
@@ -502,25 +508,25 @@ class TopicDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
-  dynamic getCommentByNo(int no) {
+  Comment? getCommentByNo(int no) {
     try {
-      return _allComments.firstWhere((c) => c['no'] == no);
+      return _allComments.firstWhere((c) => c.id == no);
     } catch (_) {
-      return {};
+      return null;
     }
   }
 
   // ==== locals ====
-  Future<List<Map<String, dynamic>>> _loadLocalComments() async {
+  Future<List<Comment>> _loadLocalComments() async {
     final prefs = await SharedPreferences.getInstance();
     final key = 'local_comments_$topicId';
     final stored = prefs.getStringList(key) ?? [];
-    final list = <Map<String, dynamic>>[];
+    final list = <Comment>[];
     for (final e in stored) {
       try {
         final m = jsonDecode(e) as Map<String, dynamic>;
         m['isLocal'] = true;
-        list.add(m);
+        list.add(Comment.fromJson(m));
       } catch (_) {
         // 壊れたデータはスキップ
       }
