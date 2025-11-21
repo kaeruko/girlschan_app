@@ -29,9 +29,9 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final no = comment.id;
-    final postedAt = comment.time;
+    final postedAt = comment.postedAt;
     final name = ''; // name not present in Comment model
-    final body = comment.text;
+    final body = comment.body;
     final plus = comment.plus;
     final minus = comment.minus;
     final anchors = comment.anchors;

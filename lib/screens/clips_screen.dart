@@ -56,7 +56,7 @@ with WidgetsBindingObserver {
     _inFlight = true;
     try {
       final clips = await getClippedComments();
-      final labels = await getClipLabels(); // ★ ラベルも取得
+      final labels = await getClipLabels();
       
       clips.sort((a, b) {
         DateTime parseDate(String s) {
@@ -536,3 +536,117 @@ with WidgetsBindingObserver {
       ),
     );
   }
+
+  Widget _buildClipItem(Map<String, dynamic> clip) {
+    final topicTitle = clip['topicTitle'] as String;
+    final commentBody = clip['body'] as String;
+    final commentNo = clip['no'] as int;
+    final posted_at = clip['posted_at'] as String;
+    final plus = clip['plus'] as int;
+    final minus = clip['minus'] as int;
+    final topicId = clip['topicId'] as int;
+    final memo = clip['memo'] as String? ?? '';
+
+    return GestureDetector(
+      onLongPress: () => _showClipMenu(clip),
+      onTap: () {
+        Navigator.of(context).push(
+          CupertinoPageRoute(
+            builder: (_) => TopicDetailScreen(
+              topicId: topicId,
+              title: topicTitle,
+              commentCount: 0,
+              posted_at: posted_at,
+              initialJumpTo: commentNo, // ★ コメント番号を渡す
+              saveReadPosition: false,  // ★ クリップからの遷移では既読位置を保存しない
+            ),
+          ),
+        ).then((_) {
+          // ★ 詳細から戻ってきたら再読込
+          _loadClips();
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: CupertinoColors.white,
+          border: Border.all(color: CupertinoColors.separator, width: 0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              topicTitle,
+              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                    fontSize: 13,
+                    color: CupertinoColors.secondaryLabel,
+                    fontWeight: FontWeight.w500,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              commentBody,
+              style: CupertinoTheme.of(context)
+                  .textTheme
+                  .textStyle
+                  .copyWith(fontSize: 14),
+            ),
+            if (memo.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemYellow.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  memo,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.black,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'No.$commentNo • $posted_at • ＋$plus −$minus',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: CupertinoColors.secondaryLabel,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Show anchor counts if present
+                    if ((clip['anchors'] as List?)?.isNotEmpty == true || (clip['reverse_anchors'] as List?)?.isNotEmpty == true)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          '${((clip['anchors'] as List?)?.length ?? 0) > 0 ? "↔${(clip['anchors'] as List).length}" : ""}${((clip['reverse_anchors'] as List?)?.length ?? 0) > 0 ? " ⟸${(clip['reverse_anchors'] as List).length}" : ""}',
+                          style: const TextStyle(fontSize: 12, color: CupertinoColors.systemBlue),
+                        ),
+                      ),
+                    CupertinoButton(
+                      padding: const EdgeInsets.all(4),
+                      minSize: 26,
+                      onPressed: () => _removeClip(clip),
+                      child: const Icon(CupertinoIcons.xmark,
+                          size: 18, color: CupertinoColors.secondaryLabel),
+                    ),
+                  ],
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}

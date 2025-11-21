@@ -23,8 +23,8 @@ class CommentUrl {
 
 class Comment {
   final int id;
-  final String time;
-  final String text;
+  final String postedAt;
+  final String body;
   int plus; // mutable
   int minus; // mutable
   final String? imageUrl;
@@ -35,8 +35,8 @@ class Comment {
 
   Comment({
     required this.id,
-    required this.time,
-    required this.text,
+    required this.postedAt,
+    required this.body,
     required this.plus,
     required this.minus,
     this.imageUrl,
@@ -49,8 +49,8 @@ class Comment {
   factory Comment.fromCsv(List<String> row) {
     return Comment(
       id: int.tryParse(row[0]) ?? 0,
-      time: row[1],
-      text: row[2],
+      postedAt: row[1],
+      body: row[2],
       plus: int.tryParse(row[3]) ?? 0,
       minus: int.tryParse(row[4]) ?? 0,
       imageUrl: row.length > 5 ? row[5] : null,
@@ -60,8 +60,8 @@ class Comment {
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
       id: json['no'] ?? 0,
-      time: json['time'] ?? '',
-      text: json['body'] ?? '',
+      postedAt: json['posted_at'] ?? json['time'] ?? '',
+      body: json['body'] ?? '',
       plus: json['plus'] ?? 0,
       minus: json['minus'] ?? 0,
       imageUrl: json['image_url'],
@@ -77,8 +77,8 @@ class Comment {
 
   Map<String, dynamic> toJson() => {
         'no': id,
-        'time': time,
-        'body': text,
+        'time': postedAt,
+        'body': body,
         'plus': plus,
         'minus': minus,
         'image_url': imageUrl,

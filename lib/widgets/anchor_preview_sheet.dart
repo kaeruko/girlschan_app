@@ -27,8 +27,8 @@ class AnchorPreviewSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     // データ取り出し（安全に）
     final no = comment.id.toString();
-    final body = comment.text;
-    final postedAt = comment.time;
+    final body = comment.body;
+    final postedAt = comment.postedAt;
     final imgUrl = comment.imageUrl;
     final anchors = comment.anchors;
     final revAnchors = comment.reverseAnchors;

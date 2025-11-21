@@ -461,7 +461,7 @@ _vm.clearScrollFractionOnly();
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (ctx2, i) {
-                      final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, time: '', text: '', plus: 0, minus: 0);
+                      final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, postedAt: '', body: '', plus: 0, minus: 0);
 
 
                       final bool shouldMeasure = _restoring || meas.needsUpdate;
@@ -588,8 +588,8 @@ _vm.clearScrollFractionOnly();
             children: [
               Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
               Text(
-                'コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}',
-                style: const TextStyle(fontSize: 11),
+                '${widget.posted_at} • コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}',
+                style: const TextStyle(fontSize: 11, color: CupertinoColors.secondaryLabel),
               ),
             ],
           ),
@@ -893,7 +893,7 @@ _vm.clearScrollFractionOnly();
         Comment? target;
         // 最新のコメントから探す
         for (final c in _vm.comments.reversed) {
-          if (c.text.trim() == postedText.trim()) {
+          if (c.body.trim() == postedText.trim()) {
             target = c;
             break;
           }
@@ -906,14 +906,11 @@ _vm.clearScrollFractionOnly();
             PlatformHelper.showSnackBar(context, 'コメントを投稿し、クリップしました');
           }
         } else {
-           if (mounted) {
+          if (mounted) {
             PlatformHelper.showSnackBar(context, 'コメントを投稿しました');
           }
         }
       }
     }
   }
-
-
-
 }
