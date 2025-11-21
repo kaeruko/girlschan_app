@@ -611,3 +611,33 @@ Future<void> updateClippedCommentMemo(int topicId, int commentNo, String memo) a
     await prefs.setStringList('clipped_comments', clips);
   }
 }
+
+Future<void> updateClippedCommentStats({
+  required int topicId,
+  required int commentNo,
+  required int plus,
+  required int minus,
+  required List<dynamic> anchors,
+  required List<dynamic> reverse_anchors,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final clips = prefs.getStringList('clipped_comments') ?? [];
+  
+  bool updated = false;
+  for (int i = 0; i < clips.length; i++) {
+    final clip = jsonDecode(clips[i]) as Map<String, dynamic>;
+    if (clip['topicId'] == topicId && clip['no'] == commentNo) {
+      clip['plus'] = plus;
+      clip['minus'] = minus;
+      clip['anchors'] = anchors;
+      clip['reverse_anchors'] = reverse_anchors;
+      clips[i] = jsonEncode(clip);
+      updated = true;
+      break;
+    }
+  }
+  
+  if (updated) {
+    await prefs.setStringList('clipped_comments', clips);
+  }
+}

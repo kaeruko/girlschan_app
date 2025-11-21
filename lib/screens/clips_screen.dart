@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../screens/topic_detail.dart';
 import '../widgets/common/app_spinner.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/common/app_toast.dart';
+import '../app/app_tabs.dart';
 
 class ClipsScreen extends StatefulWidget {
   const ClipsScreen({super.key});
@@ -18,6 +19,7 @@ with WidgetsBindingObserver {
   bool _loading = true;
   bool _refreshing = false;
   bool _inFlight = false;  // ★ 重複ロード防止
+  bool _metaUpdating = false;  // ★ バックグラウンド更新中かどうか
 
   /// ★ app_tab 側から叩くための公開メソッド
   void reloadFromOutside() {
@@ -29,12 +31,6 @@ with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadClips();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // RouteAware を使わずに .then() コールバックで検知
   }
 
   @override
@@ -50,12 +46,11 @@ with WidgetsBindingObserver {
   }
 
   Future<void> _loadClips() async {
-    if (_inFlight) return;  // ★ 既に読込中なら実行しない
+    if (_inFlight) return;
     _inFlight = true;
     try {
       final clips = await getClippedComments();
       
-      // ★ パース失敗時のフォールバック付き
       clips.sort((a, b) {
         DateTime parseDate(String s) {
           try {
@@ -73,22 +68,142 @@ with WidgetsBindingObserver {
         _clips = clips;
         _loading = false;
       });
-  } catch (e) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _clips = [];
       });
     } finally {
-      _inFlight = false;  // ★ ロード終了
+      _inFlight = false;
     }
   }
 
   Future<void> _refresh() async {
+    debugPrint('🔄 [Clips] _refresh called');
     if (_refreshing) return;
     setState(() => _refreshing = true);
     await _loadClips();
     if (mounted) setState(() => _refreshing = false);
+    
+    // バックグラウンド更新を開始
+    _startBackgroundThreadUpdate();
+  }
+
+  void _startBackgroundThreadUpdate() {
+    if (_metaUpdating) {
+      debugPrint('⏭️ [Clips] thread update already running');
+      return;
+    }
+
+    _metaUpdating = true;
+    clipsUpdatingNotifier.value = true;
+    debugPrint('🔄 [Clips] Starting background thread update, icon rotation started');
+
+    _backgroundUpdateThreads().whenComplete(() {
+      _metaUpdating = false;
+      clipsUpdatingNotifier.value = false;
+      debugPrint('✅ [Clips] Background thread update complete, icon rotation stopped');
+    });
+  }
+
+  DateTime? parseGirlsChanPostedAt(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    if (s.contains('前')) return DateTime.now();
+    final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2}).*?(\d{1,2}):(\d{2})').firstMatch(s);
+    if (m != null) {
+      return DateTime(
+        int.parse(m.group(1)!),
+        int.parse(m.group(2)!),
+        int.parse(m.group(3)!),
+        int.parse(m.group(4)!),
+        int.parse(m.group(5)!),
+      );
+    }
+    return DateTime.now();
+  }
+
+  // Fetch comment thread for each clip to refresh plus/minus and anchor counts
+  Future<void> _backgroundUpdateThreads() async {
+    debugPrint('🚀 [Clips] background thread update start');
+    final clips = List<Map<String, dynamic>>.from(_clips);
+    final now = DateTime.now();
+
+    for (final clip in clips) {
+      if (!mounted) break;
+
+      final topicId = clip['topicId'] as int;
+      final commentNo = clip['no'] as int;
+      final commentBody = clip['body'] as String? ?? '';
+      final bodyPreview = commentBody.length > 30 ? '${commentBody.substring(0, 30)}...' : commentBody;
+      
+      // ★ dat落ちチェック
+      final postedAtStr = clip['posted_at'] as String? ?? '';
+      final postedAt = parseGirlsChanPostedAt(postedAtStr);
+      if (postedAt != null) {
+        final diffDays = now.difference(postedAt).inDays;
+        if (diffDays > 31) {
+          debugPrint('⏭️ [Clips] skip topicId=$topicId (dat落ち: $diffDays days, postedAt="$postedAtStr")');
+          continue;
+        }
+      }
+
+      // ★ チェック中トースト
+      if (mounted) {
+        AppToast.show(context, '「$bodyPreview」をチェック中...');
+      }
+
+      try {
+        debugPrint('📡 [Clips] fetch thread for topicId=$topicId, commentNo=$commentNo');
+        final thread = await fetchCommentThread(topicId, commentNo);
+
+        if (thread != null && thread['comments'] is List && (thread['comments'] as List).isNotEmpty) {
+          final first = (thread['comments'] as List).first as Map<String, dynamic>;
+          final newPlus = first['plus'] as int? ?? clip['plus'];
+          final newMinus = first['minus'] as int? ?? clip['minus'];
+          final oldPlus = clip['plus'] as int? ?? 0;
+          final oldMinus = clip['minus'] as int? ?? 0;
+
+          clip['plus'] = newPlus;
+          clip['minus'] = newMinus;
+          clip['anchors'] = first['anchors'] ?? [];
+          clip['reverse_anchors'] = first['reverse_anchors'] ?? [];
+
+          // ★ SharedPreferences にも保存
+          await updateClippedCommentStats(
+            topicId: topicId,
+            commentNo: commentNo,
+            plus: newPlus,
+            minus: newMinus,
+            anchors: clip['anchors'],
+            reverse_anchors: clip['reverse_anchors'],
+          );
+
+          // ★ 変化があったらトースト
+          if (newPlus != oldPlus || newMinus != oldMinus) {
+            if (mounted) {
+              AppToast.show(
+                context,
+                '「$bodyPreview」が更新 (＋$oldPlus→$newPlus −$oldMinus→$newMinus)',
+              );
+            }
+          } else {
+            if (mounted) {
+              AppToast.show(context, '「$bodyPreview」は変更なし');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('❌ [Clips] thread update error for topicId=$topicId, commentNo=$commentNo: $e');
+      }
+
+      // ★ サーバー負荷を抑えるためのウェイト
+      await Future.delayed(const Duration(seconds: 3));
+    }
+
+    if (mounted) setState(() {});
+    debugPrint('✅ [Clips] background thread update complete');
   }
 
   Future<void> _removeClip(Map<String, dynamic> clip) async {
@@ -275,7 +390,7 @@ with WidgetsBindingObserver {
           ),
         ).then((_) {
           // ★ 詳細から戻ってきたら再読込
-          if (mounted) _loadClips();
+          _loadClips();
         });
       },
       child: Container(
@@ -329,30 +444,38 @@ with WidgetsBindingObserver {
             ],
             const SizedBox(height: 8),
             Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'No.$commentNo • $posted_at • ＋$plus −$minus',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'No.$commentNo • $posted_at • ＋$plus −$minus',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: CupertinoColors.secondaryLabel,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    // Show anchor counts if present
+                    if ((clip['anchors'] as List?)?.isNotEmpty == true || (clip['reverse_anchors'] as List?)?.isNotEmpty == true)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          '${((clip['anchors'] as List?)?.length ?? 0) > 0 ? "↔${(clip['anchors'] as List).length}" : ""}${((clip['reverse_anchors'] as List?)?.length ?? 0) > 0 ? " ⟸${(clip['reverse_anchors'] as List).length}" : ""}',
+                          style: const TextStyle(fontSize: 12, color: CupertinoColors.systemBlue),
+                        ),
+                      ),
+                    CupertinoButton(
+                      padding: const EdgeInsets.all(4),
+                      minSize: 26,
+                      onPressed: () => _removeClip(clip),
+                      child: const Icon(CupertinoIcons.xmark,
+                          size: 18, color: CupertinoColors.secondaryLabel),
+                    ),
+                  ],
                 ),
-                CupertinoButton(
-                  padding: const EdgeInsets.all(4),
-                  minSize: 26,
-                  onPressed: () => _removeClip(clip),
-                  child: const Icon(CupertinoIcons.xmark,
-                      size: 18, color: CupertinoColors.secondaryLabel),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 }
-

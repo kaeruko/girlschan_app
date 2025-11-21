@@ -38,6 +38,9 @@ final _searchKey = GlobalKey<SearchScreenState>();
 // ★ 履歴更新中かどうかを通知する Notifier
 final ValueNotifier<bool> historyUpdatingNotifier = ValueNotifier(false);
 
+// ★ クリップ更新中かどうかを通知する Notifier
+final ValueNotifier<bool> clipsUpdatingNotifier = ValueNotifier(false);
+
 final List<TabSpec> kAppTabs = [
   TabSpec(
     id: 'tab_new',

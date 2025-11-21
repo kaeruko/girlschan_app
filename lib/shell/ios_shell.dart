@@ -69,6 +69,14 @@ class _IOSShellState extends State<IOSShell> {
                 ),
                 label: t.label,
               )
+            else if (t.id == 'tab_clips')
+              BottomNavigationBarItem(
+                icon: _RotatingIcon(
+                  loadingNotifier: clipsUpdatingNotifier,
+                  child: Icon(t.icon),
+                ),
+                label: t.label,
+              )
             else
               BottomNavigationBarItem(icon: Icon(t.icon), label: t.label),
         ],
