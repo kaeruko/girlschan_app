@@ -218,21 +218,23 @@ class FavoritesScreenState extends State<FavoritesScreen>
         if (hasNew && mounted) {
           final afterComments = (meta['total'] as int?) ?? beforeComments;
           final title = (meta['title'] as String?) ?? 'トピック';
-          final topicId = id!;
+          final topicId = id;
           final postedAtStr = meta['posted_at'] as String? ?? '';
 
-          // ★ UI上のコメント数を即座に更新
-          setState(() {
-            final index = _watchedTopics.indexWhere((wt) => wt['id'] == topicId);
-            if (index >= 0) {
-              _watchedTopics[index]['comments'] = afterComments;
-              _watchedTopics[index]['title'] = title;
-              _watchedTopics[index]['posted_at'] = postedAtStr;
-            }
-          });
+          // ★ setStateを使わず、リストの中身だけ直接書き換える
+          final index = _watchedTopics.indexWhere((wt) => wt['id'] == topicId);
+          if (index >= 0) {
+            _watchedTopics[index]['comments'] = afterComments;
+            _watchedTopics[index]['title'] = title;
+            _watchedTopics[index]['posted_at'] = postedAtStr;
+          }
+
+          // ★ 該当のタイルだけピンポイント更新
+          await _controller.refreshTopic(topicId);
 
           debugPrint('🚨 [Favorites] showing toast for id=$topicId: beforeComments=$beforeComments, afterComments=$afterComments, title="$title"');
 
+          if (!mounted) return;
           AppToast.show(
             context,
             '「$title」に新着 ($beforeComments → $afterComments)',

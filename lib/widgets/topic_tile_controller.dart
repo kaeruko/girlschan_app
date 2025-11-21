@@ -4,6 +4,9 @@ import 'dart:collection';
 abstract class TileRefreshable {
   /// 自分のキャッシュ・表示状態を再評価して反映する
   Future<void> refreshCacheState();
+  
+  /// 自分が担当しているトピックID
+  int get topicId;
 }
 
 /// TopicTile 群の更新をまとめて指示する超薄いコントローラ
@@ -29,6 +32,16 @@ class TopicTileController {
       await Future.wait(list.map((s) => s.refreshCacheState()));
     } else {
       for (final s in list) {
+        await s.refreshCacheState();
+      }
+    }
+  }
+
+  /// 特定のトピックIDを持つタイルだけ再評価
+  Future<void> refreshTopic(int topicId) async {
+    final list = List<TileRefreshable>.from(_subs);
+    for (final s in list) {
+      if (s.topicId == topicId) {
         await s.refreshCacheState();
       }
     }

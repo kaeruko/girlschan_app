@@ -41,6 +41,9 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   bool _hasDraft = false; // ★ 下書き状態を管理
 
   @override
+  int get topicId => widget.topic['id'] as int;
+
+  @override
   void initState() {
     super.initState();
     widget.controller.register(this);
