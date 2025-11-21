@@ -137,14 +137,210 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final posted_at = widget.topic['posted_at'] as String? ?? '';
     final thumb = widget.topic['thumb'] as String?;
 
-    final showRemove = widget.onRemove != null;
+    // 表示用データの計算
+    final displayData = _calculateDisplayData(comments, posted_at);
+    final bgColor = _calculateBackgroundColor(displayData.isOld);
 
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: _hasCachedComments
+            ? const Border(left: BorderSide(color: CupertinoColors.systemBlue, width: 4))
+            : null,
+      ),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _handleTap(context, id, title, comments, posted_at),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // サムネイル部分
+              if (widget.showThumb) ...[
+                _buildThumbnail(thumb),
+                const SizedBox(width: 12),
+              ],
+              // トピック情報
+              Expanded(
+                child: _buildTopicInfo(
+                  title,
+                  displayData.isBold,
+                  displayData.isOld,
+                  displayData.commentDisplay,
+                  displayData.cacheTimeDisplay,
+                ),
+              ),
+              // 削除ボタン
+              if (widget.onRemove != null) _buildRemoveButton(id),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    // ① 必ず初期化しておく（未初期化エラー対策）
+  /// サムネイル部分のWidget
+  Widget _buildThumbnail(String? thumbUrl) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            width: 60,
+            height: 60,
+            child: (thumbUrl != null && thumbUrl.isNotEmpty)
+                ? Image.network(
+                    thumbUrl,
+                    headers: const {'Referer': 'https://girlschannel.net/'},
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      CupertinoIcons.photo,
+                      size: 28,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                  )
+                : const Icon(
+                    CupertinoIcons.photo,
+                    size: 28,
+                    color: CupertinoColors.systemGrey,
+                  ),
+          ),
+        ),
+        if (_hasCachedComments)
+          Positioned(
+            top: -8,
+            right: -8,
+            child: _buildBadge(CupertinoIcons.check_mark, CupertinoColors.activeBlue),
+          ),
+        if (_hasDraft)
+          Positioned(
+            bottom: -4,
+            right: -4,
+            child: _buildBadge(CupertinoIcons.pencil, CupertinoColors.systemOrange, size: 14),
+          ),
+      ],
+    );
+  }
+
+  /// バッジWidget（チェックマーク、鉛筆マークなど）
+  Widget _buildBadge(IconData icon, Color color, {double size = 16}) {
+    return Container(
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      padding: const EdgeInsets.all(4),
+      child: Icon(icon, color: CupertinoColors.white, size: size),
+    );
+  }
+
+  /// トピック情報部分のWidget
+  Widget _buildTopicInfo(
+    String title,
+    bool isBold,
+    bool isOld,
+    String commentDisplay,
+    String cacheTimeDisplay,
+  ) {
+    return DefaultTextStyle(
+      style: CupertinoTheme.of(context).textTheme.textStyle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: title),
+                if (!widget.showThumb && _hasDraft)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: _buildBadge(CupertinoIcons.pencil, CupertinoColors.systemOrange, size: 10),
+                    ),
+                  ),
+              ],
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: (isBold && !isOld) ? FontWeight.w800 : FontWeight.w400,
+              color: (!isOld) ? CupertinoColors.activeBlue : null,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _hasCachedComments && cacheTimeDisplay.isNotEmpty
+                ? 'コメント: $commentDisplay (キャッシュ: $cacheTimeDisplay)'
+                : 'コメント: $commentDisplay',
+            style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 削除ボタンWidget
+  Widget _buildRemoveButton(int id) {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(28, 28),
+      onPressed: () async {
+        await widget.onRemove!(id);
+        if (mounted) await refreshCacheState();
+        await widget.controller.refreshAll();
+      },
+      child: const Icon(CupertinoIcons.xmark, size: 20),
+    );
+  }
+
+  /// タップ処理
+  Future<void> _handleTap(
+    BuildContext context,
+    int id,
+    String title,
+    int comments,
+    String posted_at,
+  ) async {
+    logd('👆 [TopicTile] Tap detected: ID=$id', name: 'TileNav');
+
+    await Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) => TopicDetailScreen(
+          topicId: id,
+          title: title,
+          commentCount: comments,
+          posted_at: posted_at,
+        ),
+      ),
+    );
+
+    logd('🔙 [TopicTile] Returned from Detail: ID=$id', name: 'TileNav');
+
+    final cb = widget.onAfterPop;
+    if (cb != null) {
+      logd('📞 [TopicTile] Calling onAfterPop hash=${identityHashCode(cb)}', name: 'TileNav');
+      try {
+        await cb();
+        logd('✅ [TopicTile] onAfterPop completed hash=${identityHashCode(cb)}', name: 'TileNav');
+      } catch (e, st) {
+        logd('❌ [TopicTile] onAfterPop error: $e\n$st', name: 'TileNav');
+      }
+    } else {
+      logd('⚠️ [TopicTile] onAfterPop is NULL', name: 'TileNav');
+    }
+
+    if (mounted) await refreshCacheState();
+  }
+
+  /// 表示データの計算
+  _DisplayData _calculateDisplayData(int comments, String posted_at) {
     String commentDisplay = '$comments $posted_at';
-
-    // ② ここで cacheTimeDisplay を定義・計算（この行より下で使えるスコープに置く）
     String cacheTimeDisplay = '';
+    bool isBold = false;
+    bool isOld = false;
+
+    // キャッシュ時刻の表示計算
     if (_cacheModifiedTime != null) {
       final now = DateTime.now();
       final diff = now.difference(_cacheModifiedTime!);
@@ -159,7 +355,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       }
     }
 
-    bool isBold = false;
+    // キャッシュがある場合の表示計算
     if (_hasCachedComments) {
       final total = comments;
       int shown = _savedCommentNo;
@@ -173,19 +369,15 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
 
       final savedText = shown > 0 ? '$shown' : '0';
       commentDisplay = '$savedText/$total $posted_at';
-      
-      // ★ 未読がある場合（表示済み < 総数）は太字にする
+
+      // 未読がある場合は太字
       if (shown < total) {
         isBold = true;
       }
     }
 
-    final blue = CupertinoColors.systemBlue;
-    
-    // ★ 1ヶ月以上前かどうか判定
-    bool isOld = false;
+    // 1ヶ月以上前かどうか判定
     if (posted_at.isNotEmpty) {
-      // "2025/11/19(水) 20:28" 形式を想定
       final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(posted_at);
       if (m != null) {
         final y = int.parse(m.group(1)!);
@@ -199,203 +391,39 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       }
     }
 
-    // 背景色の決定
-    Color? bgColor;
-    if (_hasCachedComments) {
-      if (isOld) {
-        // 既読かつ古い -> グレー（少し濃いめにする）
-        bgColor = CupertinoColors.systemGrey6;
-      } else {
-        // 既読かつ新しい -> 青
-        bgColor = blue.withOpacity(0.05);
-      }
-    } else {
-      // 未読 -> 透明（古くても透明）
-      bgColor = CupertinoColors.transparent;
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: bgColor,
-        border: _hasCachedComments
-            ? Border(left: BorderSide(color: blue, width: 4))
-            : null,
-      ),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () async {
-          // ① まず“今このタイルに紐づいている”コールバックを確保（ここが重要）
-          final afterPop = widget.onAfterPop;
-
-          logd('👆 [TopicTile] Tap detected: ID=${widget.topic['id']}', name: 'TileNav');
-
-          await Navigator.of(context).push(
-            CupertinoPageRoute(
-              builder: (_) => TopicDetailScreen(
-                topicId: id,
-                title: title,
-                commentCount: comments,
-                posted_at: posted_at,
-              ),
-            ),
-          );
-
-          logd('🔙 [TopicTile] Returned from Detail: ID=${widget.topic['id']}', name: 'TileNav');
-
-          // ② “キャプチャ済み” のコールバックを呼ぶ（await してOK）
-          final cb = widget.onAfterPop;
-          if (cb != null) {
-            logd('📞 [TopicTile] Calling onAfterPop hash=${identityHashCode(cb)}', name: 'TileNav');
-            try {
-              await cb();
-              logd('✅ [TopicTile] onAfterPop completed hash=${identityHashCode(cb)}', name: 'TileNav');
-            } catch (e, st) {
-              logd('❌ [TopicTile] onAfterPop error: $e\n$st', name: 'TileNav');
-            }
-          } else {
-            logd('⚠️ [TopicTile] onAfterPop is NULL', name: 'TileNav');
-          }
-
-          if (mounted) await refreshCacheState();
-          // await widget.controller.refreshAll(); // 親でやっているなら不要のままでOK
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (widget.showThumb)
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: (thumb != null && thumb.isNotEmpty)
-                            ? Image.network(
-                                thumb,
-                                headers: const {'Referer': 'https://girlschannel.net/'},
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  CupertinoIcons.photo,
-                                  size: 28,
-                                  color: CupertinoColors.systemGrey,
-                                ),
-                              )
-                            : const Icon(
-                                CupertinoIcons.photo,
-                                size: 28,
-                                color: CupertinoColors.systemGrey,
-                              ),
-                      ),
-                    ),
-                    if (_hasCachedComments)
-                      Positioned(
-                        top: -8,
-                        right: -8,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: CupertinoColors.activeBlue,
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: const Icon(
-                            CupertinoIcons.check_mark,
-                            color: CupertinoColors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    // ★ 下書きマーク（右下・枠内）
-                    if (_hasDraft)
-                      Positioned(
-                        bottom: -4,
-                        right: -4,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: CupertinoColors.systemOrange,
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: const Icon(
-                            CupertinoIcons.pencil,
-                            color: CupertinoColors.white,
-                            size: 14, // 少し小さくして収まりよくする
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              if (widget.showThumb) const SizedBox(width: 12),
-              // タイトル + サブ
-              Expanded(
-                child: DefaultTextStyle(
-                  style: CupertinoTheme.of(context).textTheme.textStyle,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: title),
-                            if (!widget.showThumb && _hasDraft)
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 4),
-                                  child: Container(
-                                    decoration: const BoxDecoration(
-                                      color: CupertinoColors.systemOrange,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    padding: const EdgeInsets.all(2),
-                                    child: const Icon(
-                                      CupertinoIcons.pencil,
-                                      color: CupertinoColors.white,
-                                      size: 10,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: (isBold && !isOld) ? FontWeight.w800 : FontWeight.w400,
-                          color: (!isOld) ? CupertinoColors.activeBlue : null,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _hasCachedComments && cacheTimeDisplay.isNotEmpty
-                            ? 'コメント: $commentDisplay (キャッシュ: $cacheTimeDisplay)'
-                            : 'コメント: $commentDisplay',
-                        style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // 右端 × ボタン（キャッシュあり時だけ）
-              if (showRemove)
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(28, 28),
-                  onPressed: () async {
-                    await widget.onRemove!(id);
-                    if (mounted) await refreshCacheState();
-                    await widget.controller.refreshAll();
-                  },
-                  child: const Icon(CupertinoIcons.xmark, size: 20),
-                ),
-            ],
-          ),
-        ),
-      ),
+    return _DisplayData(
+      commentDisplay: commentDisplay,
+      cacheTimeDisplay: cacheTimeDisplay,
+      isBold: isBold,
+      isOld: isOld,
     );
   }
+
+  /// 背景色の計算
+  Color _calculateBackgroundColor(bool isOld) {
+    if (_hasCachedComments) {
+      if (isOld) {
+        return CupertinoColors.systemGrey6;
+      } else {
+        return CupertinoColors.systemBlue.withOpacity(0.05);
+      }
+    } else {
+      return CupertinoColors.transparent;
+    }
+  }
+}
+
+/// 表示データを保持するクラス
+class _DisplayData {
+  final String commentDisplay;
+  final String cacheTimeDisplay;
+  final bool isBold;
+  final bool isOld;
+
+  _DisplayData({
+    required this.commentDisplay,
+    required this.cacheTimeDisplay,
+    required this.isBold,
+    required this.isOld,
+  });
 }
