@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../models/comment.dart';
 // 既存の watch/clip ユーティリティを import
 import '../utils/log.dart';
 
@@ -82,7 +83,7 @@ class TopicDetailController extends ChangeNotifier {
   bool _hasMore = true;   // まだ続きを取れるか
   bool get hasMore => _hasMore;
 
-  List<dynamic> _allComments = [];
+  List<Comment> _allComments = [];
   bool _loading = true;
   bool _loadingMore = false;
   bool _isWatched = false;

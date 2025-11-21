@@ -25,8 +25,8 @@ class Comment {
   final int id;
   final String time;
   final String text;
-  final int plus;
-  final int minus;
+  int plus; // mutable
+  int minus; // mutable
   final String? imageUrl;
   final List<int> anchors;
   final List<int> reverseAnchors;
@@ -66,9 +66,28 @@ class Comment {
       anchors: List<int>.from(json['anchors'] ?? []),
       reverseAnchors: List<int>.from(json['reverse_anchors'] ?? []),
       urls: (json['urls'] as List<dynamic>?)
-          ?.map((url) => CommentUrl.fromJson(url as Map<String, dynamic>))
+          ?.map((e) => CommentUrl.fromJson(e as Map<String, dynamic>))
           .toList() ??
           [],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'no': id,
+        'time': time,
+        'body': text,
+        'plus': plus,
+        'minus': minus,
+        'image_url': imageUrl,
+        'anchors': anchors,
+        'reverse_anchors': reverseAnchors,
+        'urls': urls
+            .map((u) => {
+                  'url': u.url,
+                  'title': u.title,
+                  'description': u.description,
+                  'thumbnail': u.thumbnail,
+                })
+            .toList(),
+      };
 }
