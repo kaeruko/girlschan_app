@@ -18,6 +18,9 @@ class VariableListMeasurer {
   List<double> _itemHeights = [];
   List<double> _prefix = [0.0];
   bool _dirty = true;
+  
+  /// ★ 復元後など、継続的にサイズ計測が必要な場合に true にする
+  bool needsUpdate = false;
 
   final Map<int, GlobalKey> _itemKeys = {}; // commentNo -> key
   int? _restoreTargetIndex;

@@ -285,9 +285,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     _restoring = false;
     _boostCacheDuringRestore = false;
     _restoreTargetPageNo = null;
-    
+
     if (mounted) setState(() {}); // CacheExtentなどを元に戻す
-    
+
+    // Enable measurement for the current page after restore
+    _measForPage(_currentPage).needsUpdate = true;
+
     // 今回のターゲットへの復元が終わったら完了フラグを立てる
     if (targetNo == null || targetNo == _vm.savedCommentNo) {
       // 成功/失敗に関わらず「一度試した」とする場合
@@ -459,42 +462,52 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                       final c = pageItems.isNotEmpty ? pageItems[i] : const {};
 
 
-                      return MeasureSize(
-                        onChange: (sz) => meas.onItemSize(i, sz.height, sc: sc),
-                        child: Container(
-                          key: (c['no'] as int) > 0 ? _vm.keyForCommentNo(c['no'] as int) : null,
-                          child: CommentTile(
-                            comment: c,
-                            isClipped: _vm.clippedNos.contains(c['no']),
-                            onLongPress: () => _showCommentActionSheet(ctx2, c),
-                            onAnchorTap: (no) => _showAnchorPreview(no),
-                            onImageTap: (url) {
-                              Navigator.of(context).push(
-                                CupertinoPageRoute(
-                                  fullscreenDialog: true,
-                                  builder: (_) => ImageViewerPage(url: url),
-                                ),
-                              );
-                            },
-                            onVote: (isPlus) async {
-                              final no = c['no'] as int;
-                              final commentId = 'vbox$no';
-                              final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
-                              if (!mounted) return;
-                              if (success) {
-                                setState(() {
-                                  if (isPlus) {
-                                    c['plus'] = (c['plus'] ?? 0) + 1;
-                                  } else {
-                                    c['minus'] = (c['minus'] ?? 0) + 1;
-                                  }
-                                });
-                              }
-                            },
-                            checkAnchorAvailability: (no) => _vm.getCommentByNo(no).isNotEmpty,
-                          ),
+                      final bool shouldMeasure = _restoring || meas.needsUpdate;
+                      Widget content = Container(
+                        key: (c['no'] as int) > 0 ? _vm.keyForCommentNo(c['no'] as int) : null,
+                        child: CommentTile(
+                          comment: c,
+                          isClipped: _vm.clippedNos.contains(c['no']),
+                          onLongPress: () => _showCommentActionSheet(ctx2, c),
+                          onAnchorTap: (no) => _showAnchorPreview(no),
+                          onImageTap: (url) {
+                            Navigator.of(context).push(
+                              CupertinoPageRoute(
+                                fullscreenDialog: true,
+                                builder: (_) => ImageViewerPage(url: url),
+                              ),
+                            );
+                          },
+                          onVote: (isPlus) async {
+                            final no = c['no'] as int;
+                            final commentId = 'vbox$no';
+                            final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
+                            if (!mounted) return;
+                            if (success) {
+                              setState(() {
+                                if (isPlus) {
+                                  c['plus'] = (c['plus'] ?? 0) + 1;
+                                } else {
+                                  c['minus'] = (c['minus'] ?? 0) + 1;
+                                }
+                              });
+                            }
+                          },
+                          checkAnchorAvailability: (no) => _vm.getCommentByNo(no).isNotEmpty,
                         ),
                       );
+                      if (shouldMeasure) {
+                        return MeasureSize(
+                          onChange: (sz) {
+                            meas.onItemSize(i, sz.height, sc: sc);
+                            // Reset flag after measurement to avoid repeated calls
+                            meas.needsUpdate = false;
+                          },
+                          child: content,
+                        );
+                      } else {
+                        return content;
+                      }
                     },
                     childCount: pageItems.length,
                     addAutomaticKeepAlives: false,
