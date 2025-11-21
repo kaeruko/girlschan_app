@@ -217,7 +217,7 @@ class TopicDetailController extends ChangeNotifier {
 
   // ==== init ====
   Future<void> init() async {
-    await checkDraft(); // ★ 追加
+    await checkDraft();
     await _loadSavedScroll();
     logd('[init] after _loadSavedScroll: savedCommentNo=$_savedCommentNo, savedLocalFraction=$savedLocalFraction');
 

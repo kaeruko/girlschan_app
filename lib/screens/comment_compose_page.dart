@@ -60,6 +60,11 @@ class _CommentComposePageState extends State<CommentComposePage> {
         content: const Text('入力中のテキストを下書きとして保存できます。'),
         actions: [
           CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(context).pop('yes'),
+            child: const Text('はい'),
+          ),
+          CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(context).pop('no'),
             child: const Text('いいえ'),
@@ -67,11 +72,6 @@ class _CommentComposePageState extends State<CommentComposePage> {
           CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop('cancel'),
             child: const Text('キャンセル'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(context).pop('yes'),
-            child: const Text('はい'),
           ),
         ],
       ),
@@ -82,8 +82,9 @@ class _CommentComposePageState extends State<CommentComposePage> {
       await CacheService.saveDraft(widget.topicId, _ctrl.text.trim());
       return true; // 画面を閉じる
     } else if (result == 'no') {
-      // 保存せずに閉じる
-      return true;
+      // ★ 修正ポイント: 「保存しない」を選んだら、既存の下書きも削除する
+      await CacheService.deleteDraft(widget.topicId); 
+      return true; // 画面を閉じる
     } else {
       // キャンセル（画面を閉じない）
       return false;

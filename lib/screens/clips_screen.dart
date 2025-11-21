@@ -368,8 +368,13 @@ with WidgetsBindingObserver {
     );
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
+    // ★ 1. 描画前にリストを確定させる（高速化のキモ）
+    final filteredClips = _clips
+        .where((c) => (c['labelId'] ?? 0) == _selectedLabelId)
+        .toList();
+
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('クリップ'),
@@ -417,18 +422,19 @@ with WidgetsBindingObserver {
                 physics: const AlwaysScrollableScrollPhysics(),
                 controller: _scrollController,
                 slivers: [
-                  // ← MaterialのRefreshIndicatorの代わり
                   CupertinoSliverRefreshControl(onRefresh: _refresh),
 
-                  // ★ ラベルフィルタリングバー
+                  // ★ ラベルバー
                   SliverToBoxAdapter(
                     child: Container(
                       height: 50,
                       decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: CupertinoColors.systemGrey5)),
+                        border: Border(
+                            bottom: BorderSide(color: CupertinoColors.systemGrey5)),
                       ),
                       child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         scrollDirection: Axis.horizontal,
                         itemCount: _labels.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -437,26 +443,49 @@ with WidgetsBindingObserver {
                           final id = label['id'] as int;
                           final name = label['name'] as String;
                           final isDefault = id == 0;
-                          final displayName = isDefault && name.isEmpty ? '未分類' : name;
+                          final displayName =
+                              isDefault && name.isEmpty ? '未分類' : name;
                           final isSelected = id == _selectedLabelId;
                           
+                          // ★ バッジ機能（件数表示）をつけるとさらにリッチになります
+                          final count = _clips.where((c) => (c['labelId'] ?? 0) == id).length;
+
                           return GestureDetector(
-                            onTap: () {
-                              setState(() => _selectedLabelId = id);
-                            },
+                            onTap: () => setState(() => _selectedLabelId = id),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: isSelected ? CupertinoColors.activeBlue : CupertinoColors.systemGrey6,
+                                color: isSelected
+                                    ? CupertinoColors.activeBlue
+                                    : CupertinoColors.systemGrey6,
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Text(
-                                displayName,
-                                style: TextStyle(
-                                  color: isSelected ? CupertinoColors.white : CupertinoColors.black,
-                                  fontSize: 13,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? CupertinoColors.white
+                                          : CupertinoColors.black,
+                                      fontSize: 13,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  if (count > 0) ...[
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '($count)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isSelected ? CupertinoColors.white.withOpacity(0.8) : CupertinoColors.systemGrey,
+                                      ),
+                                    ),
+                                  ]
+                                ],
                               ),
                             ),
                           );
@@ -465,7 +494,8 @@ with WidgetsBindingObserver {
                     ),
                   ),
 
-                  if (_clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).isEmpty)
+                  // ★ 2. 判定ロジックをシンプルに
+                  if (filteredClips.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
@@ -473,11 +503,12 @@ with WidgetsBindingObserver {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(CupertinoIcons.heart,
-                                size: 56,
-                                color: CupertinoColors.systemGrey3),
+                                size: 56, color: CupertinoColors.systemGrey3),
                             const SizedBox(height: 16),
                             Text(
-                              _selectedLabelId == 0 ? 'クリップはありません' : 'このラベルにクリップはありません',
+                              _selectedLabelId == 0
+                                  ? 'クリップはありません'
+                                  : 'このラベルにクリップはありません',
                               style: const TextStyle(
                                 fontSize: 16,
                                 color: CupertinoColors.systemGrey,
@@ -493,12 +524,10 @@ with WidgetsBindingObserver {
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            final filtered = _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).toList();
-                            if (index >= filtered.length) return null;
-                            final clip = filtered[index];
+                            final clip = filteredClips[index];
                             return _buildClipItem(clip);
                           },
-                          childCount: _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).length,
+                          childCount: filteredClips.length,
                         ),
                       ),
                     ),
@@ -507,117 +536,3 @@ with WidgetsBindingObserver {
       ),
     );
   }
-
-  Widget _buildClipItem(Map<String, dynamic> clip) {
-    final topicTitle = clip['topicTitle'] as String;
-    final commentBody = clip['body'] as String;
-    final commentNo = clip['no'] as int;
-    final posted_at = clip['posted_at'] as String;
-    final plus = clip['plus'] as int;
-    final minus = clip['minus'] as int;
-    final topicId = clip['topicId'] as int;
-    final memo = clip['memo'] as String? ?? '';
-
-    return GestureDetector(
-      onLongPress: () => _showClipMenu(clip),
-      onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(
-            builder: (_) => TopicDetailScreen(
-              topicId: topicId,
-              title: topicTitle,
-              commentCount: 0,
-              posted_at: posted_at,
-              initialJumpTo: commentNo, // ★ コメント番号を渡す
-              saveReadPosition: false,  // ★ クリップからの遷移では既読位置を保存しない
-            ),
-          ),
-        ).then((_) {
-          // ★ 詳細から戻ってきたら再読込
-          _loadClips();
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: CupertinoColors.white,
-          border: Border.all(color: CupertinoColors.separator, width: 0.5),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              topicTitle,
-              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                    fontSize: 13,
-                    color: CupertinoColors.secondaryLabel,
-                    fontWeight: FontWeight.w500,
-                  ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              commentBody,
-              style: CupertinoTheme.of(context)
-                  .textTheme
-                  .textStyle
-                  .copyWith(fontSize: 14),
-            ),
-            if (memo.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemYellow.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  memo,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: CupertinoColors.black,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'No.$commentNo • $posted_at • ＋$plus −$minus',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: CupertinoColors.secondaryLabel,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    // Show anchor counts if present
-                    if ((clip['anchors'] as List?)?.isNotEmpty == true || (clip['reverse_anchors'] as List?)?.isNotEmpty == true)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Text(
-                          '${((clip['anchors'] as List?)?.length ?? 0) > 0 ? "↔${(clip['anchors'] as List).length}" : ""}${((clip['reverse_anchors'] as List?)?.length ?? 0) > 0 ? " ⟸${(clip['reverse_anchors'] as List).length}" : ""}',
-                          style: const TextStyle(fontSize: 12, color: CupertinoColors.systemBlue),
-                        ),
-                      ),
-                    CupertinoButton(
-                      padding: const EdgeInsets.all(4),
-                      minSize: 26,
-                      onPressed: () => _removeClip(clip),
-                      child: const Icon(CupertinoIcons.xmark,
-                          size: 18, color: CupertinoColors.secondaryLabel),
-                    ),
-                  ],
-                ),
-          ],
-        ),
-      ),
-    );
-  }
-}

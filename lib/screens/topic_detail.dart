@@ -74,6 +74,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     _vm.init().then((_) {
       if (!mounted) return;
       if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
+_vm.clearScrollFractionOnly();
         _tryRestoreIfNeeded(targetNo: widget.initialJumpTo);
       } else {
         _tryRestoreIfNeeded();
@@ -797,7 +798,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     showCupertinoDialog(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('コメントへ移動'),
+        title: const Text('コメントへジャンプ'),
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
           child: CupertinoTextField(
@@ -821,7 +822,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 _tryRestoreIfNeeded(targetNo: no);
               }
             },
-            child: const Text('移動'),
+            child: const Text('ジャンプ'),
           ),
         ],
       ),

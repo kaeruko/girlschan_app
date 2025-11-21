@@ -24,7 +24,7 @@ class TopicMenuSheet extends StatelessWidget {
             Navigator.pop(context);
             onJump();
           },
-          child: const Text('指定のコメントへ移動'),
+          child: const Text('指定のコメントへジャンプ'),
         ),
         CupertinoActionSheetAction(
           onPressed: () {
