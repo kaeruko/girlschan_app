@@ -192,9 +192,12 @@ class TopicListScreenState extends State<TopicListScreen>
       final cached = await CacheService.loadList(cacheKey);
       if (!mounted) return;
       setState(() {
-        if (cached.isNotEmpty) {
+        // ★ 修正: 既にデータがある場合はキャッシュで上書きしない
+        if (_topics.isEmpty && cached.isNotEmpty) {
           _topics = cached.cast<Map<String, dynamic>>();
           logd('❌ [fetchFromServer] エラー時にキャッシュから${_topics.length}件読み込み', name: 'TopicList');
+        } else {
+             logd('❌ [fetchFromServer] エラー発生。既存データがあるためキャッシュ復元はスキップ', name: 'TopicList');
         }
         _loading = false;
       });

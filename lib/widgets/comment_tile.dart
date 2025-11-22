@@ -42,11 +42,20 @@ class CommentTile extends StatelessWidget {
     final innerWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        Row(
+          children: [
+            Text(
           'No.$no  $name  $postedAt${comment.isLocal ? ' （ローカル）' : ''}',
           style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
         ),
-        const SizedBox(height: 8),
+        if (isClipped)
+          const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Icon(CupertinoIcons.heart_fill, size: 14, color: CupertinoColors.systemPink),
+          ),
+      ],
+    ),
+    const SizedBox(height: 8),
         if (anchors.isNotEmpty)
           AnchorChips(
             anchors: anchors,

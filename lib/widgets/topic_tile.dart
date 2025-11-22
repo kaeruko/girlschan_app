@@ -373,7 +373,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       int shown = _savedCommentNo;
 
       if (shown > 0 && total > 0) {
-        const pad = 4;
+        const pad = 6;
         shown = shown + pad;
         if (shown > total) shown = total;
         if (shown < 0) shown = 0;
