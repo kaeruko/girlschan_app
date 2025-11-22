@@ -30,7 +30,7 @@ class CommentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final no = comment.id;
     final postedAt = comment.postedAt;
-    final name = ''; // name not present in Comment model
+    final name = comment.name; // ★ 修正
     final body = comment.body;
     final plus = comment.plus;
     final minus = comment.minus;

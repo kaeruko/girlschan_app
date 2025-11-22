@@ -25,6 +25,7 @@ class Comment {
   final int id;
   final String postedAt;
   final String body;
+  final String name; // ★ 追加
   int plus; // mutable
   int minus; // mutable
   final String? imageUrl;
@@ -37,6 +38,7 @@ class Comment {
     required this.id,
     required this.postedAt,
     required this.body,
+    this.name = '匿名', // ★ 追加
     required this.plus,
     required this.minus,
     this.imageUrl,
@@ -62,6 +64,7 @@ class Comment {
       id: json['no'] ?? 0,
       postedAt: json['posted_at'] ?? json['time'] ?? '',
       body: json['body'] ?? '',
+      name: json['name'] ?? '匿名', // ★ 追加
       plus: json['plus'] ?? 0,
       minus: json['minus'] ?? 0,
       imageUrl: json['image_url'],
@@ -79,6 +82,7 @@ class Comment {
         'no': id,
         'time': postedAt,
         'body': body,
+        'name': name, // ★ 追加
         'plus': plus,
         'minus': minus,
         'image_url': imageUrl,

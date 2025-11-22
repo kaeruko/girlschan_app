@@ -25,9 +25,9 @@ class AnchorChips extends StatelessWidget {
     final color = isReverse ? CupertinoColors.systemOrange : CupertinoColors.systemBlue;
     final prefix = isReverse ? '<<' : '>>';
 
-    // --- 表示するリストの生成（逆アンカーは最大5件） ---
-    final displayList = (isReverse && anchors.length > 5)
-        ? anchors.take(5).toList()
+    // --- 表示するリストの生成（逆アンカーは最大30件） ---
+    final displayList = (isReverse && anchors.length > 30)
+        ? anchors.take(30).toList()
         : anchors;
     
     final remainder = anchors.length - displayList.length;

@@ -551,6 +551,7 @@ Future<void> addClippedComment({
   required int commentNo,
   required String commentBody,
   required String posted_at,
+  required String name, // ★ 追加
   required int plus,
   required int minus,
   List<dynamic> anchors = const [],
@@ -566,6 +567,7 @@ Future<void> addClippedComment({
     'no': commentNo,
     'body': commentBody,
     'posted_at': posted_at,
+    'name': name, // ★ 追加
     'plus': plus,
     'minus': minus,
     'anchors': anchors,
