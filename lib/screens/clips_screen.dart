@@ -541,6 +541,7 @@ with WidgetsBindingObserver {
     final plus = clip['plus'] as int;
     final minus = clip['minus'] as int;
     final topicId = clip['topicId'] as int;
+    final name = clip['name'] as String? ?? '匿名';
     final memo = clip['memo'] as String? ?? '';
 
     return GestureDetector(
@@ -614,7 +615,7 @@ with WidgetsBindingObserver {
                   children: [
                     Expanded(
                       child: Text(
-                        'No.$commentNo • $posted_at • ＋$plus −$minus',
+                        'No.$commentNo • $name • $posted_at • ＋$plus −$minus',
                         style: const TextStyle(
                           fontSize: 12,
                           color: CupertinoColors.secondaryLabel,

@@ -497,7 +497,7 @@ class TopicDetailController extends ChangeNotifier {
         commentNo: no,
         commentBody: comment.body,
         posted_at: comment.postedAt,
-        name: comment.name, // ★ 追加
+        name: comment.name,
         plus: comment.plus,
         minus: comment.minus,
         anchors: comment.anchors,
