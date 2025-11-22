@@ -51,6 +51,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   final Map<int, VariableListMeasurer> _pageMeas = {};           // page -> measurer
   int _currentPage = 0;
 
+  // ★ 追加: 連打防止用のクールダウン変数
+  DateTime _lastFetchTime = DateTime.fromMillisecondsSinceEpoch(0);
+
   bool _restoring = false;          // 復元中は保存/ロードを止める
   bool _restoredOnce = false;       // 一度でも復元が成功したか
   bool _loadingMore = false;        // 末尾ページの追加ロード中
@@ -165,6 +168,12 @@ _vm.clearScrollFractionOnly();
     final lastPage = _pageCountFor(_vm.comments.length) - 1;
     if (page == lastPage && !_loadingMore) {
       if (sc.position.extentAfter <= _loadMoreThreshold) {
+        
+        // ★ 追加: 前回のロードから2秒未満なら何もしない（間引き）
+        if (DateTime.now().difference(_lastFetchTime) < const Duration(seconds: 2)) {
+          return;
+        }
+
         _fetchMoreDelta();
       }
     }
@@ -172,6 +181,10 @@ _vm.clearScrollFractionOnly();
 
   Future<void> _fetchMoreDelta() async {
     if (_loadingMore) return;
+    
+    // ★ 追加: 実行開始時刻を記録
+    _lastFetchTime = DateTime.now();
+    
     _loadingMore = true;
     try {
       final added = await _vm.fetchDelta();
