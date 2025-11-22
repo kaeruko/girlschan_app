@@ -83,9 +83,9 @@ class FavoritesScreenState extends State<FavoritesScreen>
   }
 
   Future<void> _loadWatchedTopics() async {
-    debugPrint('🔄 [Favorites] _loadWatchedTopics START');
+    
     if (_inFlight) {
-      debugPrint('⏭️ [Favorites] _loadWatchedTopics skipped: inFlight');
+      
       return;
     }
     _inFlight = true;
@@ -102,22 +102,22 @@ class FavoritesScreenState extends State<FavoritesScreen>
       });
 
       if (!mounted) {
-        debugPrint('⚠️ [Favorites] _loadWatchedTopics: not mounted');
+        
         return;
       }
       setState(() {
         _watchedTopics = topics;
         _loading = false;
       });
-      debugPrint('✅ [Favorites] _loadWatchedTopics setState done, count=${topics.length}');
+      
     } catch (e, st) {
-      debugPrint('❌ [Favorites] _loadWatchedTopics error: $e\n$st');
+      
       // エラー処理
       if (!mounted) return;
       setState(() => _loading = false);
     } finally {
       _inFlight = false;
-      debugPrint('🔚 [Favorites] _loadWatchedTopics FINALLY');
+      
     }
   }
 
@@ -147,16 +147,16 @@ class FavoritesScreenState extends State<FavoritesScreen>
   }
 
   Future<void> _onDetailReturned() async {
-    debugPrint('🔔 [Favorites] _onDetailReturned START');
+    
     await _loadWatchedTopics();
     // ★ 詳細から戻ったらキャッシュ状態（既読・下書きなど）を更新
     await _controller.refreshAll();
-    debugPrint('✅ [Favorites] _onDetailReturned END');
+    
   }
 
   void _startBackgroundMetaUpdate() {
     if (_metaUpdating) {
-      debugPrint('⏭️ [Favorites] meta update already running');
+      
       return;
     }
 
@@ -170,7 +170,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
   }
 
   Future<void> _runMetaUpdateLoop() async {
-    debugPrint('🚀 [Favorites] meta update loop start');
+    
 
     // スナップショットを取っておく（途中で _watchedTopics が変わっても安全に処理できる）
     final topics = List<Map<String, dynamic>>.from(_watchedTopics);
@@ -195,7 +195,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
       if (postedAt != null) {
         final diffDays = now.difference(postedAt).inDays;
         if (diffDays > 31) {
-          debugPrint('⏭️ [Favorites] skip id=$id (dat落ち: $diffDays days, postedAt="$postedAtStr")');
+          
           continue;
         }
       }
@@ -209,11 +209,11 @@ class FavoritesScreenState extends State<FavoritesScreen>
           AppToast.show(context, '「$currentTitle」をチェック中...');
         }
 
-        debugPrint('📡 [Favorites] fetch meta for id=$id');
+        
         final meta = await fetchTopicMeta(id);
-        debugPrint('📡 [Favorites] meta result for id=$id: $meta');
+        
         final hasNew = await updateWatchedTopicFromMeta(meta);
-        debugPrint('📡 [Favorites] hasNew for id=$id: $hasNew');
+        
 
         if (hasNew && mounted) {
           final afterComments = (meta['total'] as int?) ?? beforeComments;
@@ -232,14 +232,14 @@ class FavoritesScreenState extends State<FavoritesScreen>
           // ★ 該当のタイルだけピンポイント更新
           await _controller.refreshTopic(topicId);
 
-          debugPrint('🚨 [Favorites] showing toast for id=$topicId: beforeComments=$beforeComments, afterComments=$afterComments, title="$title"');
+          
 
           if (!mounted) return;
           AppToast.show(
             context,
             '「$title」に新着 ($beforeComments → $afterComments)',
             onTap: () {
-              debugPrint('👉 [Favorites] toast tapped for id=$topicId');
+              
               Navigator.of(context).push(
                 CupertinoPageRoute(
                   builder: (_) => TopicDetailScreen(
@@ -257,10 +257,10 @@ class FavoritesScreenState extends State<FavoritesScreen>
           if (mounted) {
             AppToast.show(context, '「$currentTitle」は新着なし');
           }
-          debugPrint('🚨 [Favorites] NOT showing toast for id=$id: hasNew=$hasNew, mounted=$mounted');
+          
         }
     } catch (e, st) {
-      debugPrint('❌ [Favorites] meta update error id=$id: $e\n$st');
+      
     }
 
       // ガルちゃん側へのスクレイプ負荷を抑えるためにウェイト
@@ -272,7 +272,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
       await _loadWatchedTopics();
     }
 
-    debugPrint('🏁 [Favorites] meta update loop end');
+    
   }
 
 

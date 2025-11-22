@@ -30,7 +30,6 @@ class _LabelManagementScreenState extends State<LabelManagementScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Failed to load labels: $e');
       if (mounted) {
         setState(() => _loading = false);
       }

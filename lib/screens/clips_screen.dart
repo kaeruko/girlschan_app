@@ -88,7 +88,6 @@ with WidgetsBindingObserver {
   }
 
   Future<void> _refresh() async {
-    debugPrint('🔄 [Clips] _refresh called');
     if (_refreshing) return;
     setState(() => _refreshing = true);
     await _loadClips();
@@ -100,18 +99,17 @@ with WidgetsBindingObserver {
 
   void _startBackgroundThreadUpdate({int? targetLabelId}) {
     if (_metaUpdating) {
-      debugPrint('⏭️ [Clips] thread update already running');
+
       return;
     }
 
     _metaUpdating = true;
     clipsUpdatingNotifier.value = true;
-    debugPrint('🔄 [Clips] Starting background thread update, icon rotation started');
 
     _backgroundUpdateThreads(targetLabelId: targetLabelId).whenComplete(() {
       _metaUpdating = false;
       clipsUpdatingNotifier.value = false;
-      debugPrint('✅ [Clips] Background thread update complete, icon rotation stopped');
+
     });
   }
 
@@ -134,7 +132,6 @@ with WidgetsBindingObserver {
 
   // Fetch comment thread for each clip to refresh plus/minus and anchor counts
   Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
-    debugPrint('🚀 [Clips] background thread update start (targetLabelId=$targetLabelId)');
     
     final now = DateTime.now();
     bool hasUpdates = false;
@@ -160,7 +157,7 @@ with WidgetsBindingObserver {
       if (postedAt != null) {
         final diffDays = now.difference(postedAt).inDays;
         if (diffDays > 31) {
-          debugPrint('⏭️ [Clips] skip topicId=$topicId (dat落ち: $diffDays days, postedAt="$postedAtStr")');
+    
           continue;
         }
       }
@@ -171,7 +168,7 @@ with WidgetsBindingObserver {
       }
 
       try {
-        debugPrint('📡 [Clips] fetch thread for topicId=$topicId, commentNo=$commentNo');
+  
         final thread = await fetchCommentThread(topicId, commentNo);
 
         if (thread != null && thread['comments'] is List && (thread['comments'] as List).isNotEmpty) {
@@ -223,11 +220,11 @@ with WidgetsBindingObserver {
               }
               if (cacheUpdated) {
                 await CacheService.saveList(cacheKey, cachedComments);
-                debugPrint('✅ [Clips] Updated topic cache for topicId=$topicId, commentNo=$commentNo');
+          
               }
             }
           } catch (e) {
-            debugPrint('❌ [Clips] Failed to update topic cache: $e');
+      
           }
 
           // ★ 変化を検出してトースト
@@ -251,7 +248,7 @@ with WidgetsBindingObserver {
           }
         }
       } catch (e) {
-        debugPrint('❌ [Clips] thread update error for topicId=$topicId, commentNo=$commentNo: $e');
+  
       }
 
       // ★ サーバー負荷を抑えるためのウェイト
@@ -259,7 +256,6 @@ with WidgetsBindingObserver {
     }
 
     if (mounted && hasUpdates) setState(() {});
-    debugPrint('✅ [Clips] background thread update complete');
   }
 
   Future<void> _removeClip(Map<String, dynamic> clip) async {

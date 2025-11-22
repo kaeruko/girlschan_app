@@ -21,7 +21,6 @@ class AppToast {
     // ★ 常にルート Navigator の Overlay を使う
     final overlay = Navigator.of(context, rootNavigator: true).overlay;
     if (overlay == null) {
-      debugPrint('⚠️ [AppToast] overlay is null for context=$context');
       return;
     }
 

@@ -176,7 +176,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                 ),
               ),
               // 削除ボタン
-              if (widget.onRemove != null) _buildRemoveButton(id),
+              if (widget.onRemove != null && _hasCachedComments) _buildRemoveButton(id),
             ],
           ),
         ),

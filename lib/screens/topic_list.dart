@@ -44,12 +44,11 @@ class TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _onAfterPopFromTile(int idx, int id) async {
-    debugPrint('🔔 ENTER _onAfterPopFromTile index=$idx id=$id');
     logd('🔔 [TopicList] onAfterPop received index=$idx id=$id', name: 'TopicList');
 
     await _updateTopicInList(idx, id);
 
-    debugPrint('✅ LEAVE _onAfterPopFromTile index=$idx id=$id');
+    
   }
 
   @override
@@ -71,7 +70,7 @@ class TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _updateTopicInList(int index, int topicId) async {
-    debugPrint('🔄 ENTER _updateTopicInList index=$index id=$topicId');
+    
     logd('🔄 [_updateTopicInList] Start processing index=$index, id=$topicId', name: 'TopicList');
 
     try {
@@ -79,7 +78,7 @@ class TopicListScreenState extends State<TopicListScreen>
       final meta = await CacheService.loadMap(metaKey);
       
       if (!mounted) {
-        debugPrint('⚠️ _updateTopicInList: state not mounted, abort');
+        
         return;
       }
 
@@ -93,7 +92,7 @@ class TopicListScreenState extends State<TopicListScreen>
            currentIdx = newList.indexWhere((t) => t['id'] == topicId);
         }
         if (currentIdx == -1) {
-          debugPrint('⚠️ _updateTopicInList: target not found id=$topicId');
+          
           return; // 見つからなければ終了
         }
 
@@ -119,10 +118,10 @@ class TopicListScreenState extends State<TopicListScreen>
       
       // 7. タイルコントローラーのリフレッシュ（重要）
       await _controller.refreshAll();
-      debugPrint('✅ LEAVE _updateTopicInList id=$topicId');
+      
 
     } catch (e, st) {
-      debugPrint('❌ _updateTopicInList exception: $e\n$st');
+      
       logd('❌ [_updateTopicInList] Error: $e', name: 'TopicList');
     }
   }
