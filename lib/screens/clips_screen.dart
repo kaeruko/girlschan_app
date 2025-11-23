@@ -188,7 +188,7 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
+Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
     final now = DateTime.now();
     
     // 更新対象の抽出
@@ -243,24 +243,34 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
           final newReverseAnchorsList = (first['reverse_anchors'] as List?) ?? [];
           final oldReverseAnchorsList = (_clips[index]['reverse_anchors'] as List?) ?? [];
           
-          // 差分チェック
+          // 差分チェック (プラス・マイナス)
           final diffMessages = <String>[];
           if (newPlus > oldPlus) diffMessages.add('＋${newPlus - oldPlus}');
           if (newMinus > oldMinus) diffMessages.add('−${newMinus - oldMinus}');
 
-          // ★ 返信チェック
+          // ★ 返信チェック & プレビュー取得
           bool hasNewReply = false;
-          String? replyPreview;
+          String? replyPreview; // ポップアップ用（長め）
+          String? badgePreview; // カードの赤帯用（短め）
+
           if (newReverseAnchorsList.length > oldReverseAnchorsList.length) {
             hasNewReply = true;
             final addedIds = newReverseAnchorsList.where((id) => !oldReverseAnchorsList.contains(id)).toList();
+            
             if (addedIds.isNotEmpty) {
               final latestNewId = addedIds.last;
               final replyComment = commentsList.firstWhere((c) => c['no'] == latestNewId, orElse: () => null);
+              
               if (replyComment != null) {
                 String body = replyComment['body'] as String? ?? '';
+                // アンカー(>>123)と改行を除去
                 body = body.replaceFirst(RegExp(r'^>>\d+\s*'), '').replaceAll('\n', ' ');
+                
+                // ポップアップ用は30文字
                 replyPreview = body.length > 30 ? '${body.substring(0, 30)}...' : body;
+                
+                // カードの赤帯用はスペースがないので10文字程度に詰める
+                badgePreview = body.length > 12 ? '${body.substring(0, 12)}...' : body;
               }
             }
           }
@@ -273,18 +283,27 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
               _clips[index]['anchors'] = first['anchors'] ?? [];
               _clips[index]['reverse_anchors'] = newReverseAnchorsList;
 
-              // 差分保存
+              // ★ 差分保存（ここを変更しました）
+              // 「返信あり」ではなく「返信: プレビュー」を表示
               if (diffMessages.isNotEmpty || hasNewReply) {
                 final key = '$topicId-$commentNo';
+                
+                // 返信メッセージの作成
+                String replyMsg = '';
+                if (hasNewReply) {
+                   replyMsg = badgePreview != null ? '返信「$badgePreview」' : '新着返信あり';
+                }
+
                 final msg = [
-                  if (hasNewReply) '返信あり',
+                  if (replyMsg.isNotEmpty) replyMsg,
                   ...diffMessages
                 ].join(', ');
+                
                 _updateDiffs[key] = msg;
               }
             });
 
-            // ★ 返信があったらポップアップ通知
+            // ★ 返信があったらポップアップ通知（ここは変更なし）
             if (hasNewReply) {
               _showInAppNotification(
                 title: '返信がつきました！',
@@ -316,8 +335,6 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
             anchors: _clips[index]['anchors'],
             reverse_anchors: _clips[index]['reverse_anchors'],
           );
-          
-          // キャッシュ更新（省略可）...
         }
       } catch (e) {
         debugPrint('Update failed: $e');
@@ -334,9 +351,6 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
       });
     }
   }
-
-  // _removeClip, _updateMemo, _showMemoDialog, _showClipMenu は変更なしのため省略...
-  // 必要に応じて元のコードからコピペしてください
 
   Future<void> _removeClip(Map<String, dynamic> clip) async {
     final topicId = clip['topicId'] as int;
@@ -678,7 +692,7 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        '更新: $diffMessage',
+                        diffMessage,
                         style: const TextStyle(
                           fontSize: 12,
                           color: CupertinoColors.systemRed,
