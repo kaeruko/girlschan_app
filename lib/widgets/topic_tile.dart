@@ -138,7 +138,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final comments = widget.topic['comments'] is int
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
-    final posted_at = widget.topic['posted_at'] as String? ?? '';
+    final posted_at = (widget.topic['posted_at'] as String? ?? '').replaceAllMapped(
+        RegExp(r'(\d{1,2}:\d{2}):\d{2}'), (match) => match.group(1)!);
     final thumb = widget.topic['thumb'] as String?;
 
     // 表示用データの計算
@@ -283,7 +284,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
           const SizedBox(height: 4),
           Text(
             _hasCachedComments && cacheTimeDisplay.isNotEmpty
-                ? 'コメント: $commentDisplay (キャッシュ: $cacheTimeDisplay)'
+                // ? 'コメント: $commentDisplay (キャッシュ: $cacheTimeDisplay)'
+                ? 'コメント: $commentDisplay'
                 : 'コメント: $commentDisplay',
             style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
           ),
@@ -363,7 +365,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       } else if (diff.inHours < 24) {
         cacheTimeDisplay = '${diff.inHours}時間前';
       } else {
-        cacheTimeDisplay = '${_cacheModifiedTime!.month}/${_cacheModifiedTime!.day}';
+        cacheTimeDisplay = '${_cacheModifiedTime!.year}/${_cacheModifiedTime!.month}/${_cacheModifiedTime!.day}';
       }
     }
 

@@ -62,7 +62,7 @@ class Comment {
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
       id: json['no'] ?? 0,
-      postedAt: json['posted_at'] ?? json['time'] ?? '',
+      postedAt: json['posted_at'] ?? '',
       body: json['body'] ?? '',
       name: json['name'] ?? '匿名', // ★ 追加
       plus: json['plus'] ?? 0,
@@ -80,7 +80,7 @@ class Comment {
 
   Map<String, dynamic> toJson() => {
         'no': id,
-        'time': postedAt,
+        'posted_at': postedAt,
         'body': body,
         'name': name, // ★ 追加
         'plus': plus,
