@@ -35,6 +35,7 @@ class Comment {
   int plus; // mutable
   int minus; // mutable
   final String? imageUrl;
+  final String? originalImageUrl;
   final List<int> anchors;
   final List<int> reverseAnchors;
   final List<CommentUrl> urls;
@@ -51,6 +52,7 @@ class Comment {
     this.anchors = const [],
     this.reverseAnchors = const [],
     this.urls = const [],
+    this.originalImageUrl, // added field
     this.isLocal = false,
   });
 
@@ -74,6 +76,7 @@ class Comment {
       plus: json['plus'] ?? 0,
       minus: json['minus'] ?? 0,
       imageUrl: json['image_url'],
+      originalImageUrl: json['original_image_url'],
       anchors: List<int>.from(json['anchors'] ?? []),
       reverseAnchors: List<int>.from(json['reverse_anchors'] ?? []),
       urls: (json['urls'] as List<dynamic>?)
@@ -91,6 +94,7 @@ class Comment {
         'name': name,
         'plus': plus,
         'minus': minus,
+        'original_image_url': originalImageUrl,
         'image_url': imageUrl,
         'anchors': anchors,
         'reverse_anchors': reverseAnchors,

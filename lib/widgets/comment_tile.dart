@@ -83,7 +83,7 @@ class CommentTile extends StatelessWidget {
         if (imageUrl != null) ...[
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () => onImageTap?.call(imageUrl),
+            onTap: () => onImageTap?.call(comment.originalImageUrl ?? imageUrl),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(

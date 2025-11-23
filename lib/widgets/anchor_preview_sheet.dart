@@ -30,7 +30,7 @@ class AnchorPreviewSheet extends StatelessWidget {
     final name = comment.name;
     final body = comment.body;
     final postedAt = comment.postedAt;
-    final imgUrl = comment.imageUrl;
+    final imgUrl = comment.originalImageUrl ?? comment.imageUrl;
     final anchors = comment.anchors;
     final revAnchors = comment.reverseAnchors;
     final plus = comment.plus;
