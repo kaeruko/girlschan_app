@@ -88,14 +88,16 @@ class TopicDetailController extends ChangeNotifier {
   bool _loadingMore = false;
   bool _isWatched = false;
   int _totalComments = 0;
-  Set<int> _clippedNos = {};
+  final Map<int, int> _clipStatusMap = {}; // commentNo -> labelId
   DateTime? _lastSync;
 
   int _savedCommentNo = 0;
   int _savedSyncedCount = 0;
 
-  bool _hasDraft = false; // ★ 追加
-  bool get hasDraft => _hasDraft; // ★ 追加
+  bool _hasDraft = false;
+  bool get hasDraft => _hasDraft;
+  
+  int? _myCommentLabelId; // "My Comments" label ID cache
 
   // getters
   List<Comment> get comments => _allComments;
@@ -103,7 +105,7 @@ class TopicDetailController extends ChangeNotifier {
   bool get loadingMore => _loadingMore;
   bool get isWatched => _isWatched;
   int get totalComments => _totalComments;
-  Set<int> get clippedNos => _clippedNos;
+  int? get myCommentLabelId => _myCommentLabelId; // ★ 公開
   int get savedCommentNo => _savedCommentNo;
   set savedCommentNo(int value) => _savedCommentNo = value;
   int get savedSyncedCount => _savedSyncedCount;
@@ -225,10 +227,17 @@ class TopicDetailController extends ChangeNotifier {
     final watched = await getWatchedTopicIds();
     final clips = await getClippedComments();
     _isWatched = watched.contains(topicId);
-    _clippedNos = clips
-        .where((c) => c['topicId'] == topicId)
-        .map<int>((c) => c['no'] as int)
-        .toSet();
+    
+    // ★ クリップされたコメントのラベルIDをマップに保存
+    _clipStatusMap.clear();
+    for (final clip in clips.where((c) => c['topicId'] == topicId)) {
+      final no = clip['no'] as int;
+      final labelId = clip['labelId'] as int? ?? 0;
+      _clipStatusMap[no] = labelId;
+    }
+    
+    // ★ "My Comments" label ID をキャッシュ
+    _myCommentLabelId = await getOrCreateMyCommentLabel();
 
     // ★ ここで必ず watchedAt を「今」にする（新規でも既存でも）
     await _touchWatchedTopic(
@@ -413,13 +422,6 @@ class TopicDetailController extends ChangeNotifier {
 
       // 3. キャッシュをクリア
       await CacheService.saveList('comments_$topicId', []);
-
-      // 4. 最新500件を取得 (offset=0, limit=500)
-      //    ※ fetchFirstPage() は limit=commentsPerPage(100) なので、
-      //       ここでは明示的に 500 を指定して呼ぶか、あるいは
-      //       fetchFirstPage() を呼んでから追加ロードするか。
-      //       要望は「offset0から最大500まで」なので一括で取れるなら取る。
-      //       API仕様的に limit が効くなら指定する。
       const reloadLimit = 500;
       final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: reloadLimit, old: _isOld);
       final rawList = (page['comments'] as List<dynamic>? ?? []);
@@ -487,9 +489,9 @@ class TopicDetailController extends ChangeNotifier {
   // ==== clips ====
   Future<void> toggleClip(Comment comment, {int labelId = 0}) async {
     final no = comment.id;
-    if (_clippedNos.contains(no)) {
+    if (_clipStatusMap.containsKey(no)) {
       await removeClippedComment(topicId, no);
-      _clippedNos.remove(no);
+      _clipStatusMap.remove(no);
     } else {
       await addClippedComment(
         topicId: topicId,
@@ -504,9 +506,20 @@ class TopicDetailController extends ChangeNotifier {
         reverse_anchors: comment.reverseAnchors,
         labelId: labelId,
       );
-      _clippedNos.add(no);
+      _clipStatusMap[no] = labelId;
     }
     notifyListeners();
+  }
+
+  bool isClipped(int no) => _clipStatusMap.containsKey(no);
+
+  CommentUserStatus getUserStatus(int no) {
+    if (!_clipStatusMap.containsKey(no)) return CommentUserStatus.none;
+    final labelId = _clipStatusMap[no]!;
+    if (_myCommentLabelId != null && labelId == _myCommentLabelId) {
+      return CommentUserStatus.myComment;
+    }
+    return CommentUserStatus.clipped;
   }
 
   Comment? getCommentByNo(int no) {

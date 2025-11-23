@@ -482,7 +482,7 @@ _vm.clearScrollFractionOnly();
                         key: c.id > 0 ? _vm.keyForCommentNo(c.id) : null,
                         child: CommentTile(
                           comment: c,
-                          isClipped: _vm.clippedNos.contains(c.id),
+                          userStatus: _vm.getUserStatus(c.id),
                           onLongPress: () => _showCommentActionSheet(ctx2, c),
                           onAnchorTap: (no) => _showAnchorPreview(no),
                           onImageTap: (url) {
@@ -846,7 +846,7 @@ _vm.clearScrollFractionOnly();
 
   void _showCommentActionSheet(BuildContext context, Comment c) {
     final no = c.id;
-    final isClipped = _vm.clippedNos.contains(no);
+    final isClipped = _vm.isClipped(no);
 
     showCupertinoModalPopup(
       context: context,
@@ -913,8 +913,10 @@ _vm.clearScrollFractionOnly();
         }
 
         if (target != null) {
-          // クリップ実行
-          await _vm.toggleClip(target);
+          // クリップ実行（自分のコメントラベルで）
+          // ★ Controller内のキャッシュを使用
+          final labelId = _vm.myCommentLabelId ?? 0;
+          await _vm.toggleClip(target, labelId: labelId);
           if (mounted) {
             PlatformHelper.showSnackBar(context, 'コメントを投稿し、クリップしました');
           }

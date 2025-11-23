@@ -6,7 +6,7 @@ import 'anchor_chips.dart';
 
 class CommentTile extends StatelessWidget {
   final Comment comment;
-  final bool isClipped;
+  final CommentUserStatus userStatus;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Function(int no)? onAnchorTap;
@@ -17,7 +17,7 @@ class CommentTile extends StatelessWidget {
   const CommentTile({
     super.key,
     required this.comment,
-    this.isClipped = false,
+    this.userStatus = CommentUserStatus.none,
     this.onTap,
     this.onLongPress,
     this.onAnchorTap,
@@ -30,7 +30,7 @@ class CommentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final no = comment.id;
     final postedAt = comment.postedAt;
-    final name = comment.name; // ★ 修正
+    final name = comment.name;
     final body = comment.body;
     final plus = comment.plus;
     final minus = comment.minus;
@@ -48,7 +48,12 @@ class CommentTile extends StatelessWidget {
           'No.$no  $name  $postedAt${comment.isLocal ? ' （ローカル）' : ''}',
           style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
         ),
-        if (isClipped)
+        if (userStatus == CommentUserStatus.myComment)
+          const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Icon(CupertinoIcons.person_fill, size: 14, color: CupertinoColors.activeBlue),
+          ),
+        if (userStatus != CommentUserStatus.none)
           const Padding(
             padding: EdgeInsets.only(left: 8),
             child: Icon(CupertinoIcons.heart_fill, size: 14, color: CupertinoColors.systemPink),
@@ -144,10 +149,4 @@ class CommentTile extends StatelessWidget {
       ),
     );
   }
-
-
-
-
-
-
 }

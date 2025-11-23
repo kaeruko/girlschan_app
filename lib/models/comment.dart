@@ -21,6 +21,12 @@ class CommentUrl {
   }
 }
 
+enum CommentUserStatus {
+  none,      // 何もなし
+  clipped,   // クリップ済み（通常）
+  myComment, // 自分のコメント（かつクリップ済み）
+}
+
 class Comment {
   final int id;
   final String postedAt;

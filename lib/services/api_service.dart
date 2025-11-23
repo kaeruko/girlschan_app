@@ -650,7 +650,10 @@ Future<void> updateClippedCommentStats({
   }
 }
 
+
 // ========== クリップラベル関連 ==========
+
+const String kMyCommentsLabelName = 'マイコメント';
 
 Future<List<Map<String, dynamic>>> getClipLabels() async {
   final prefs = await SharedPreferences.getInstance();
@@ -663,6 +666,30 @@ Future<List<Map<String, dynamic>>> getClipLabels() async {
   }
   
   return labels;
+}
+
+Future<int> getOrCreateMyCommentLabel() async {
+  final labels = await getClipLabels();
+  final existing = labels.firstWhere(
+    (l) => l['name'] == kMyCommentsLabelName,
+    orElse: () => {},
+  );
+
+  if (existing.isNotEmpty) {
+    return existing['id'] as int;
+  }
+
+  await addClipLabel(kMyCommentsLabelName);
+  final newLabels = await getClipLabels();
+  final newLabel = newLabels.firstWhere((l) => l['name'] == kMyCommentsLabelName);
+  return newLabel['id'] as int;
+}
+
+Future<bool> isMyCommentLabel(int labelId) async {
+  if (labelId == 0) return false;
+  final labels = await getClipLabels();
+  final label = labels.firstWhere((l) => l['id'] == labelId, orElse: () => {});
+  return label.isNotEmpty && label['name'] == kMyCommentsLabelName;
 }
 
 Future<void> addClipLabel(String name) async {
