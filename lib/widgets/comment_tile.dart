@@ -13,6 +13,7 @@ class CommentTile extends StatelessWidget {
   final Function(String url)? onImageTap;
   final Function(bool isPlus)? onVote;
   final bool Function(int no)? checkAnchorAvailability;
+  final double fontSize;
 
   const CommentTile({
     super.key,
@@ -24,6 +25,7 @@ class CommentTile extends StatelessWidget {
     this.onImageTap,
     this.onVote,
     this.checkAnchorAvailability,
+    this.fontSize = 15.0,
   });
 
   @override
@@ -76,27 +78,27 @@ class CommentTile extends StatelessWidget {
             isReverse: true,
             checkExists: checkAnchorAvailability,
           ),
-        Text(body, style: const TextStyle(fontSize: 15)),
+        Text(body, style: TextStyle(fontSize: fontSize)),
         if (urls.isNotEmpty) UrlPreviewList(urls: urls),
         if (imageUrl != null) ...[
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () => onImageTap?.call(imageUrl!),
+            onTap: () => onImageTap?.call(imageUrl),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
                 imageUrl,
-                height: 200,
+                height: 40,
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return const SizedBox(
-                    height: 200,
+                    height: 40,
                     child: Center(child: CupertinoActivityIndicator()),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) => const SizedBox(
-                  height: 200,
+                  height: 40,
                   child: Center(
                     child: Icon(CupertinoIcons.photo, size: 40, color: CupertinoColors.secondaryLabel),
                   ),

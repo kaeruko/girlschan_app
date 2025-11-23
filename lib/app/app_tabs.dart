@@ -3,6 +3,7 @@ import '../screens/topic_list.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/clips_screen.dart';
 import '../screens/search_screen.dart';
+import '../screens/settings_screen.dart';
 
 /// タブの仕様定義
 class TabSpec {
@@ -34,6 +35,7 @@ final _popularTopicListKey = GlobalKey<TopicListScreenState>();
 final favoritesScreenStateKey = GlobalKey<FavoritesScreenState>();  // ★ 型付き
 final clipsScreenStateKey = GlobalKey<ClipsScreenState>();  // ★ 型付き
 final _searchKey = GlobalKey<SearchScreenState>();
+final _settingsKey = GlobalKey<SettingsScreenState>();
 
 // ★ 履歴更新中かどうかを通知する Notifier
 final ValueNotifier<bool> historyUpdatingNotifier = ValueNotifier(false);
@@ -91,5 +93,13 @@ final List<TabSpec> kAppTabs = [
     title: '検索',
     stateKey: _searchKey,
     builder: (_) => SearchScreen(key: _searchKey),
+  ),
+  TabSpec(
+    id: 'tab_settings',
+    label: '設定',
+    icon: CupertinoIcons.settings,
+    title: '設定',
+    stateKey: _settingsKey,
+    builder: (_) => SettingsScreen(key: _settingsKey),
   ),
 ];

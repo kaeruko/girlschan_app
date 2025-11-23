@@ -17,6 +17,7 @@ import 'image_viewer_page.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/anchor_preview_sheet.dart';
 import '../widgets/topic_menu_sheet.dart';
+import '../services/settings_service.dart';
 
 // ★ 追加: フィルタレベルの定義
 enum CommentFilterLevel {
@@ -73,6 +74,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // ★ 追加: 現在のフィルター設定
   CommentFilterLevel _currentFilter = CommentFilterLevel.all;
 
+  // ★ 追加: 設定サービス
+  final _settings = SettingsService();
+
   // ★ 追加: フィルタリングされたコメントリストを取得するゲッター
   List<Comment> get _displayComments {
     if (_currentFilter == CommentFilterLevel.all) {
@@ -105,6 +109,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       saveReadPosition: widget.saveReadPosition,
     )..addListener(_onVmChanged);
 
+    _settings.addListener(_onSettingsChanged);
+
     _vm.init().then((_) {
       if (!mounted) return;
       if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
@@ -125,6 +131,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     _pc.dispose();
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
+    _settings.removeListener(_onSettingsChanged);
     super.dispose();
   }
 
@@ -139,6 +146,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     if (!_restoredOnce && !_vm.loading) {
       _scheduleTryRestore();
     }
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   // ========== ページング ==========
@@ -614,6 +625,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                               }
                             },
                             checkAnchorAvailability: (no) => _vm.getCommentByNo(no) != null,
+                            fontSize: _settings.fontSize,
                           ),
                         );
                         if (shouldMeasure) {
@@ -686,6 +698,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         }
       },
       child: CupertinoPageScaffold(
+        backgroundColor: _settings.backgroundColor,
         navigationBar: CupertinoNavigationBar(
           middle: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
