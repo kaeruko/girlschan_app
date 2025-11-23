@@ -27,6 +27,7 @@ class AnchorPreviewSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     // データ取り出し（安全に）
     final no = comment.id.toString();
+    final name = comment.name;
     final body = comment.body;
     final postedAt = comment.postedAt;
     final imgUrl = comment.imageUrl;
@@ -48,7 +49,7 @@ class AnchorPreviewSheet extends StatelessWidget {
         child: Column(
           children: [
             // --- ヘッダー ---
-            _buildHeader(context, no, postedAt),
+            _buildHeader(context, no, name, postedAt),
             
             // --- スクロール可能な本文 ---
             Expanded(
@@ -108,7 +109,7 @@ class AnchorPreviewSheet extends StatelessWidget {
   }
 
   // ヘッダー部分
-  Widget _buildHeader(BuildContext context, String no, String date) {
+  Widget _buildHeader(BuildContext context, String no, String name, String date) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: const BoxDecoration(
@@ -117,10 +118,9 @@ class AnchorPreviewSheet extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('No.$no  $date',
+          Text('No.$no  $name  $date',
               style: const TextStyle(
-                  fontWeight: FontWeight.bold, color: CupertinoColors.secondaryLabel)),
-          // バツボタン削除
+                  fontSize: 13, color: CupertinoColors.secondaryLabel)),
         ],
       ),
     );
