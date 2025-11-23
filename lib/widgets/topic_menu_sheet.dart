@@ -1,11 +1,13 @@
-import 'package:flutter/cupertino.dart';
+// widgets/topic_menu_sheet.dart (または該当ファイル)
 
+import 'package:flutter/cupertino.dart';
 
 class TopicMenuSheet extends StatelessWidget {
   final VoidCallback onJump;
   final VoidCallback onReload;
   final VoidCallback onPost;
   final VoidCallback onBrowser;
+  final VoidCallback onFilter; // ★ 追加
 
   const TopicMenuSheet({
     super.key,
@@ -13,6 +15,7 @@ class TopicMenuSheet extends StatelessWidget {
     required this.onReload,
     required this.onPost,
     required this.onBrowser,
+    required this.onFilter, // ★ 追加
   });
 
   @override
@@ -24,21 +27,22 @@ class TopicMenuSheet extends StatelessWidget {
             Navigator.pop(context);
             onPost();
           },
-          child: const Text('コメントを投稿する'),
+          child: const Text('書き込む'),
         ),
         CupertinoActionSheetAction(
           onPressed: () {
             Navigator.pop(context);
             onJump();
           },
-          child: const Text('指定のコメントへジャンプ'),
+          child: const Text('コメントへジャンプ'),
         ),
+        // ★ ここに追加
         CupertinoActionSheetAction(
           onPressed: () {
-            Navigator.pop(context);
-            onBrowser();
+            Navigator.pop(context); // メニューを閉じて
+            onFilter(); // フィルター画面を開く
           },
-          child: const Text('ブラウザで開く'),
+          child: const Text('コメントを絞り込む'),
         ),
         CupertinoActionSheetAction(
           onPressed: () {
@@ -46,6 +50,13 @@ class TopicMenuSheet extends StatelessWidget {
             onReload();
           },
           child: const Text('再読み込み'),
+        ),
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.pop(context);
+            onBrowser();
+          },
+          child: const Text('ブラウザで開く'),
         ),
       ],
       cancelButton: CupertinoActionSheetAction(
