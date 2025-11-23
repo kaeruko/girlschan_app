@@ -170,7 +170,7 @@ _vm.clearScrollFractionOnly();
       if (sc.position.extentAfter <= _loadMoreThreshold) {
         
         // ★ 追加: 前回のロードから2秒未満なら何もしない（間引き）
-        if (DateTime.now().difference(_lastFetchTime) < const Duration(seconds: 2)) {
+        if (DateTime.now().difference(_lastFetchTime) < const Duration(seconds: 5)) {
           return;
         }
 
