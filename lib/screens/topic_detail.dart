@@ -18,6 +18,14 @@ import '../widgets/comment_tile.dart';
 import '../widgets/anchor_preview_sheet.dart';
 import '../widgets/topic_menu_sheet.dart';
 
+// ★ 追加: フィルタレベルの定義
+enum CommentFilterLevel {
+  all,      // 全表示
+  positive, // プラス > マイナス
+  popular,  // プラス > マイナス × 1.5
+  legend,   // プラス > マイナス × 3.0
+}
+
 class TopicDetailScreen extends StatefulWidget {
   final int topicId;
   final String title;
@@ -25,7 +33,7 @@ class TopicDetailScreen extends StatefulWidget {
   final String posted_at;
   final int? initialJumpTo;
   final bool enableRefresh;
-  final bool saveReadPosition; // ★ 追加
+  final bool saveReadPosition;
 
   const TopicDetailScreen({
     super.key,
@@ -35,7 +43,7 @@ class TopicDetailScreen extends StatefulWidget {
     required this.posted_at,
     this.initialJumpTo,
     this.enableRefresh = true,
-    this.saveReadPosition = true, // ★ デフォルトは true
+    this.saveReadPosition = true,
   });
 
   @override
@@ -47,22 +55,43 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   late final TopicDetailController _vm;
   static const int _pageSize = 100;
   final PageController _pc = PageController();
-  final Map<int, ScrollController> _pageScroll = {};             // page -> ScrollController
-  final Map<int, VariableListMeasurer> _pageMeas = {};           // page -> measurer
+  final Map<int, ScrollController> _pageScroll = {};
+  final Map<int, VariableListMeasurer> _pageMeas = {};
   int _currentPage = 0;
 
-  // ★ 追加: 連打防止用のクールダウン変数
   DateTime _lastFetchTime = DateTime.fromMillisecondsSinceEpoch(0);
-  
-  // ★ 追加: スワイプで戻る処理が重複しないようにするフラグ
   bool _isPopping = false;
+  bool _allowPop = false;
 
-  bool _restoring = false;          // 復元中は保存/ロードを止める
-  bool _restoredOnce = false;       // 一度でも復元が成功したか
-  bool _loadingMore = false;        // 末尾ページの追加ロード中
-  int? _restoreTargetPageNo;        // 復元ターゲットのページ番号
-  bool _boostCacheDuringRestore = false; // 復元中は cacheExtent を爆上げ
-  static const double _loadMoreThreshold = 300; // 末尾付近の閾値
+  bool _restoring = false;
+  bool _restoredOnce = false;
+  bool _loadingMore = false;
+  int? _restoreTargetPageNo;
+  bool _boostCacheDuringRestore = false;
+  static const double _loadMoreThreshold = 300;
+
+  // ★ 追加: 現在のフィルター設定
+  CommentFilterLevel _currentFilter = CommentFilterLevel.all;
+
+  // ★ 追加: フィルタリングされたコメントリストを取得するゲッター
+  List<Comment> get _displayComments {
+    if (_currentFilter == CommentFilterLevel.all) {
+      return _vm.comments;
+    }
+    return _vm.comments.where((c) {
+      if (c.plus == 0) return false; // 荒らし対策（プラス0は除外）
+      switch (_currentFilter) {
+        case CommentFilterLevel.positive:
+          return c.plus > c.minus;
+        case CommentFilterLevel.popular:
+          return c.plus > (c.minus * 1.5) && c.plus >= 5;
+        case CommentFilterLevel.legend:
+          return c.plus > (c.minus * 3.0) && c.plus >= 10;
+        default:
+          return true;
+      }
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -73,14 +102,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       commentCount: widget.commentCount,
       postedAt: widget.posted_at,
       enableRefresh: widget.enableRefresh,
-      saveReadPosition: widget.saveReadPosition, // ★ 追加
+      saveReadPosition: widget.saveReadPosition,
     )..addListener(_onVmChanged);
 
-    // 初期化処理
     _vm.init().then((_) {
       if (!mounted) return;
       if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
-_vm.clearScrollFractionOnly();
+        _vm.clearScrollFractionOnly();
         _tryRestoreIfNeeded(targetNo: widget.initialJumpTo);
       } else {
         _tryRestoreIfNeeded();
@@ -90,47 +118,42 @@ _vm.clearScrollFractionOnly();
 
   @override
   void dispose() {
-    // 現在ページの位置を保存
     _saveFromPage(_currentPage);
-
-    // ページ用 ScrollController を全部 dispose
     for (final sc in _pageScroll.values) {
       sc.dispose();
     }
     _pc.dispose();
-
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
     super.dispose();
   }
 
-  // ==== VM更新 ====
   void _onVmChanged() {
     if (!mounted) return;
     setState(() {});
 
-    // ★ initialJumpTo がある場合は、initState 側の明示的な呼び出しに任せるのでここでは何もしない
     if (widget.initialJumpTo != null && widget.initialJumpTo! > 0) {
       return;
     }
 
-    // 初回データ到着後は復元を試みる
     if (!_restoredOnce && !_vm.loading) {
       _scheduleTryRestore();
     }
   }
 
-  // ========== 2) 追加: ページングのヘルパー ==========
+  // ========== ページング ==========
   int _pageCountFor(int total) => (total + _pageSize - 1) ~/ _pageSize;
 
-  int get _pageCountLive => _pageCountFor(_vm.comments.length);
+  // ★ 修正: _vm.comments ではなく _displayComments を基準にする
+  int get _pageCountLive => _pageCountFor(_displayComments.length);
+  
   bool get _hasPrev => _currentPage > 0;
   bool get _hasNext => _currentPage < _pageCountLive - 1;
 
   void _goToPage(int p) {
     final tgt = p.clamp(0, _pageCountLive > 0 ? _pageCountLive - 1 : 0);
     if (_pc.hasClients) {
-      _saveFromPage(_currentPage); // 切り替え前に位置を保存
+      _saveFromPage(_currentPage);
       _pc.animateToPage(
         tgt,
         duration: const Duration(milliseconds: 240),
@@ -161,22 +184,20 @@ _vm.clearScrollFractionOnly();
     return _pageMeas.putIfAbsent(page, () => VariableListMeasurer());
   }
 
-  // ========== 3) 追加: 末尾ページの自動ロード & 保存 ==========
   void _onPageScroll(int page) {
     if (_restoring) return;
     final sc = _scForPage(page);
     if (!sc.hasClients) return;
 
-    // 末尾ページなら差分読み込み
+    // ★ フィルタ中は追加ロードを禁止（整合性が取れないため）
+    if (_currentFilter != CommentFilterLevel.all) return;
+
     final lastPage = _pageCountFor(_vm.comments.length) - 1;
     if (page == lastPage && !_loadingMore) {
       if (sc.position.extentAfter <= _loadMoreThreshold) {
-        
-        // ★ 追加: 前回のロードから2秒未満なら何もしない（間引き）
         if (DateTime.now().difference(_lastFetchTime) < const Duration(seconds: 5)) {
           return;
         }
-
         _fetchMoreDelta();
       }
     }
@@ -184,23 +205,23 @@ _vm.clearScrollFractionOnly();
 
   Future<void> _fetchMoreDelta() async {
     if (_loadingMore) return;
-    
-    // ★ 追加: 実行開始時刻を記録
     _lastFetchTime = DateTime.now();
-    
     _loadingMore = true;
     try {
       final added = await _vm.fetchDelta();
       if (!mounted) return;
-      if (added > 0) setState(() {}); // ページ数/末尾更新
+      if (added > 0) setState(() {});
     } finally {
       _loadingMore = false;
     }
   }
 
-  // 現在ページから保存（indexInPage + fraction -> globalIndexへ変換）
+  // ========== スクロール位置の保存 ==========
   void _saveFromPage(int page) {
     if (_restoring) return;
+
+    // ★★★ 鉄の掟: 絞り込み中は位置情報を保存しない！ ★★★
+    if (_currentFilter != CommentFilterLevel.all) return;
 
     final sc = _scForPage(page);
     if (!sc.hasClients) return;
@@ -222,68 +243,57 @@ _vm.clearScrollFractionOnly();
     _vm.saveScrollByIndexAndFraction(globalIndex.toInt(), frac);
   }
 
-  // ========== 4) 追加: 復元（savedCommentNo をページにマップ） ==========
+  // ========== 復元ロジック ==========
   void _scheduleTryRestore() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryRestoreIfNeeded();
     });
   }
 
-  /// ScrollController のアタッチを待つ
   Future<void> _waitForAttach(ScrollController sc) async {
     for (int i = 0; i < 30; i++) {
-      if (sc.hasClients &&
-          sc.position.hasPixels &&
-          sc.position.hasViewportDimension) {
-        return;
-      }
+      if (sc.hasClients && sc.position.hasPixels && sc.position.hasViewportDimension) return;
       await Future.delayed(const Duration(milliseconds: 16));
     }
   }
 
-  /// PageController のアタッチを待つ
   Future<void> _waitForPageController() async {
     for (int i = 0; i < 30; i++) {
-      if (_pc.hasClients && _pc.position.hasPixels) {
-        return;
-      }
+      if (_pc.hasClients && _pc.position.hasPixels) return;
       await Future.delayed(const Duration(milliseconds: 16));
     }
   }
 
   Future<void> _tryRestoreIfNeeded({int? targetNo}) async {
-    // 1. 実行可能かチェックし、復元モードを開始
     final target = _startRestoreProcess(targetNo);
     if (target == null) return;
 
     try {
-      // 2. 必要なデータ（コメント）がメモリにあるか確認・取得
       final hasData = await _ensureDataAvailable(target);
-      if (!hasData) return; // データがなければ諦める（またはリトライ予約）
+      if (!hasData) return;
 
-      // 3. ターゲットのページ番号を特定
-      final pageIndex = _vm.indexByNo[target]! ~/ _pageSize; // nullチェックはensureDataで保証済とする
+      // ★ 修正: インデックスの特定を _displayComments 基準で行う
+      // これにより、フィルタリング中も正しいページ番号が計算される
+      final indexInList = _displayComments.indexWhere((c) => c.id == target);
+      if (indexInList == -1) {
+         // フィルタリングされて消えている場合などは復元不能なので中断
+         return; 
+      }
+      final pageIndex = indexInList ~/ _pageSize;
 
-      // 4. そのページへ横移動 (PageView)
       await _jumpToTargetPage(pageIndex);
-
-      // 5. ページ内で該当コメントまで縦スクロール (ScrollController)
-      //    ※ここは複雑なので専用メソッドに任せる
       final success = await _seekAndScrollToComment(pageIndex, target);
 
-      if (!success) {
-        // 失敗したらリトライをスケジュール
+      if (!success && _currentFilter == CommentFilterLevel.all) {
+        // 全件表示時のみ、失敗したらリトライ予約
         _scheduleTryRestore();
       }
     } finally {
-      // 6. 終了処理（フラグ解除など）
       _finishRestoreProcess(targetNo: target);
     }
   }
 
-  // 復元を開始できるか判定し、フラグを立てる
   int? _startRestoreProcess(int? targetNo) {
-    // 再入防止
     if (_restoredOnce && targetNo == null) return null;
     if (_vm.loading || _restoring) return null;
 
@@ -297,34 +307,24 @@ _vm.clearScrollFractionOnly();
     return savedNo;
   }
 
-  // 終了処理
   void _finishRestoreProcess({int? targetNo}) {
     _restoring = false;
     _boostCacheDuringRestore = false;
     _restoreTargetPageNo = null;
 
-    if (mounted) setState(() {}); // CacheExtentなどを元に戻す
-
-    // Enable measurement for the current page after restore
+    if (mounted) setState(() {});
     _measForPage(_currentPage).needsUpdate = true;
-
-    // 今回のターゲットへの復元が終わったら完了フラグを立てる
-    if (targetNo == null || targetNo == _vm.savedCommentNo) {
-      // 成功/失敗に関わらず「一度試した」とする場合
-      // (成功時のみtrueにするなら _seekAndScrollToComment の戻り値を見る)
-    }
   }
 
   Future<bool> _ensureDataAvailable(int targetNo) async {
+    // フィルタリング中はAPIフェッチを行わない（メモリにあるものだけで勝負）
+    if (_currentFilter != CommentFilterLevel.all) {
+      return _displayComments.any((c) => c.id == targetNo);
+    }
+
     await _vm.ensureContainsNo(targetNo);
     if (!mounted) return false;
-    
-    // データロード後もインデックスが見つからなければ失敗
-    if (!_vm.indexByNo.containsKey(targetNo)) {
-      _scheduleTryRestore(); // 再ロードが必要かもしれないのでスケジュール
-      return false;
-    }
-    return true;
+    return _vm.indexByNo.containsKey(targetNo);
   }
 
   Future<void> _jumpToTargetPage(int pageIndex) async {
@@ -333,14 +333,10 @@ _vm.clearScrollFractionOnly();
     if (mounted) setState(() {});
 
     await _waitForPageController();
-    
     if (_pc.hasClients && _pc.page?.round() != pageIndex) {
       _pc.jumpToPage(pageIndex);
     }
-    
-    // スクロールコントローラーがアタッチされるのを待つ
     await _waitForAttach(_scForPage(pageIndex));
-    // レイアウト安定待ち
     await Future.delayed(const Duration(milliseconds: 50));
   }
 
@@ -348,39 +344,32 @@ _vm.clearScrollFractionOnly();
     final sc = _scForPage(pageIndex);
     final meas = _measForPage(pageIndex);
     
-    // 1. まず概算位置へジャンプ（画面外だと描画されないため）
+    // ★ 修正: 概算ジャンプも _displayComments を使用
     _performApproximateJump(pageIndex, targetNo, sc, meas);
 
-    // 2. 実測ベースの厳密な位置合わせ（最大60フレーム試行）
     for (int attempt = 0; attempt < 60; attempt++) {
       if (!mounted) return false;
-
-      // UI要素（RenderObject）が見つかるかトライ
       final found = await _tryAlignVisible(targetNo, pageIndex);
       if (found) {
-        // 成功したら現在位置を保存して終了
+        // 保存はガード節で弾かれるので、ここで呼んでも安全
         _saveFromPage(pageIndex);
         _restoredOnce = true;
         return true; 
       }
-      
-      // 見つからない場合、概算位置を微調整して次フレームへ
       _adjustApproximatePosition(pageIndex, targetNo, sc, meas);
       await Future.delayed(const Duration(milliseconds: 16));
     }
-
-
-    return false; // タイムアウト
+    return false;
   }
 
-  // 概算ジャンプ処理
   void _performApproximateJump(int page, int targetNo, ScrollController sc, VariableListMeasurer meas) {
-    final all = _vm.comments;
+    // ★ 修正: 現在の表示リストを使用
+    final all = _displayComments;
     final pageItems = _itemsOfPage(page, all);
     final roughIndex = pageItems.indexWhere((item) => item.id == targetNo);
 
     if (roughIndex >= 0) {
-      meas.markRestoreTargetIndex(roughIndex); // 追従モードON
+      meas.markRestoreTargetIndex(roughIndex);
       if (sc.hasClients) {
         try {
           final guess = meas.indexToOffset(roughIndex);
@@ -390,15 +379,12 @@ _vm.clearScrollFractionOnly();
     }
   }
 
-  // 厳密な位置合わせ（Contextが見つかればスクロールしてtrueを返す）
   Future<bool> _tryAlignVisible(int targetNo, int pageIndex) async {
     final key = _vm.keyForCommentNo(targetNo);
     final ctx = key.currentContext;
 
     if (ctx == null) return false;
 
-    // コンテキストが見つかった＝描画された
-    // 1. 行頭を合わせる
     await Scrollable.ensureVisible(
       ctx,
       alignment: 0.0,
@@ -406,73 +392,154 @@ _vm.clearScrollFractionOnly();
       alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
     );
 
-    // 2. 途中まで読んでいた場合の微調整（Fraction）
-    final box = ctx.findRenderObject() as RenderBox?;
-    final h = box?.size.height ?? 0.0;
-    final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
+    if (!mounted) return false;
+    if (key.currentContext == null) return false;
 
-    if (h > 0 && frac > 0) {
-      final sc = _scForPage(pageIndex);
-      if (sc.hasClients) {
-        final offset = (sc.offset + h * frac).clamp(0.0, sc.position.maxScrollExtent);
-        sc.jumpTo(offset);
+    // 全表示時のみ、保存されていたFraction（途中位置）を反映する
+    // フィルタリング時は行頭合わせで十分
+    if (_currentFilter == CommentFilterLevel.all) {
+      final validCtx = key.currentContext;
+      if (validCtx == null) return false;
+
+      // ignore: use_build_context_synchronously
+      final box = validCtx.findRenderObject() as RenderBox?;
+      final h = box?.size.height ?? 0.0;
+      final frac = _vm.savedLocalFraction.clamp(0.0, 0.9999);
+      if (h > 0 && frac > 0) {
+        final sc = _scForPage(pageIndex);
+        if (sc.hasClients) {
+          final offset = (sc.offset + h * frac).clamp(0.0, sc.position.maxScrollExtent);
+          sc.jumpTo(offset);
+        }
       }
     }
 
-    // 後始末
     _vm.clearScrollFractionOnly();
-    _measForPage(pageIndex).markRestoreTargetIndex(null); // 追従OFF
+    _measForPage(pageIndex).markRestoreTargetIndex(null);
     return true;
   }
 
-  // 見つからなかった場合の微調整（コンテキストが無いときに呼ばれる）
   void _adjustApproximatePosition(int page, int targetNo, ScrollController sc, VariableListMeasurer meas) {
-     // 実装は概算ジャンプと同じロジックで「最新の計測データ」を使って再ジャンプするだけ
-     // ここでは _performApproximateJump を呼ぶだけでも良いが、
-     // インデックス検索コストを避けるなら index を引数に回す工夫も可
      _performApproximateJump(page, targetNo, sc, meas);
   }
 
+  // ========== UIアクション ==========
 
-  // ==== UI ====
-  bool _allowPop = false;
-
-
-
+  // ★ 追加: 検索ダイアログ
   void _showSearchDialog() async {
-    // 現在読み込まれているコメントリストを渡して検索画面を開く
     final int? selectedNo = await showCupertinoModalPopup<int>(
       context: context,
       builder: (ctx) => TopicSearchModal(allComments: _vm.comments),
     );
 
-    // 戻り値（コメントNo）があれば、そこへジャンプする
     if (!mounted) return;
     if (selectedNo != null && selectedNo > 0) {
       _tryRestoreIfNeeded(targetNo: selectedNo);
     }
   }
 
+  // ★ 追加: フィルターメニュー
+  void _showFilterSheet() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('いいね数で絞り込み'),
+        message: const Text('表示をフィルタリングします'),
+        actions: [
+          CupertinoActionSheetAction(
+            isDefaultAction: _currentFilter == CommentFilterLevel.all,
+            onPressed: () {
+              Navigator.pop(context);
+              _onFilterChanged(CommentFilterLevel.all);
+            },
+            child: const Text('なし'),
+          ),
+          CupertinoActionSheetAction(
+            isDefaultAction: _currentFilter == CommentFilterLevel.positive,
+            onPressed: () {
+              Navigator.pop(context);
+              _onFilterChanged(CommentFilterLevel.positive);
+            },
+            child: const Text('普通🍙'),
+          ),
+          CupertinoActionSheetAction(
+            isDefaultAction: _currentFilter == CommentFilterLevel.popular,
+            onPressed: () {
+              Navigator.pop(context);
+              _onFilterChanged(CommentFilterLevel.popular);
+            },
+            child: const Text('大盛り🍛'),
+          ),
+          CupertinoActionSheetAction(
+            isDefaultAction: _currentFilter == CommentFilterLevel.legend,
+            onPressed: () {
+              Navigator.pop(context);
+              _onFilterChanged(CommentFilterLevel.legend);
+            },
+            child: const Text('特盛り🍲'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
+  // ★ 追加: フィルター変更時の追跡ジャンプ処理
+  void _onFilterChanged(CommentFilterLevel newFilter) {
+    // 1. 切り替え前に、今見えているコメントのNoを取得（追跡用）
+    int? targetNo;
+    
+    // 現在のリスト（切り替え前）
+    final currentList = _displayComments; 
+    final pageItems = _itemsOfPage(_currentPage, currentList);
+    
+    if (pageItems.isNotEmpty) {
+      targetNo = pageItems.first.id;
+    }
+
+    // 2. フィルター切り替え & ページリセット
+    setState(() {
+      _currentFilter = newFilter;
+      _currentPage = 0;
+    });
+    
+    if (_pc.hasClients) {
+      _pc.jumpToPage(0);
+    }
+
+    // 3. 切り替え後のリストで、さっきのNoへジャンプを試みる
+    if (targetNo != null && targetNo > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // ★ 既存のジャンプ機能を使うことで、
+        // 「全表示」に戻った時は続きへ、「絞り込み」時も該当があればそこへ飛ぶ
+        _tryRestoreIfNeeded(targetNo: targetNo);
+      });
+    }
+
+    // トースト
+    final count = _displayComments.length;
+    final msg = _currentFilter == CommentFilterLevel.all 
+        ? '全件表示に戻しました' 
+        : '$count件に絞り込みました';
+    PlatformHelper.showSnackBar(context, msg);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final items = _vm.comments;
+    // ★ 修正: _displayComments を使用
+    final items = _displayComments;
     final pageCount = _pageCountFor(items.length);
 
-    // ★ 修正版: ScrollUpdateNotification で「座標」を監視する
     final pageView = NotificationListener<ScrollNotification>(
       onNotification: (notification) {
-        // 1. PageView自身のスクロール通知かチェック (depth == 0)
-        //    これがないと、中のコメントリストの縦スクロールに反応してしまいます
         if (notification.depth == 0 && notification is ScrollUpdateNotification) {
-          
-          // 2. 現在のスクロール位置が「-70px」を超えているかチェック
-          //    (0ページ目で左に引っ張ると、pixelsはマイナスになります)
           if (notification.metrics.pixels < -70 && !_isPopping) {
-            
-            // 3. ユーザーが指で操作している場合のみ (自動スクロールでの誤爆防止)
             if (notification.dragDetails != null) {
               _isPopping = true;
-              // ここでPopScopeの処理 (onPopInvoked) を経由させるために maybePop を使う
               Navigator.of(context).maybePop();
               return true;
             }
@@ -482,18 +549,16 @@ _vm.clearScrollFractionOnly();
       },
       child: PageView.builder(
         controller: _pc,
-        // ★ 重要: Android等でも「端っこで引っ張れる」ようにBouncingを強制する
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         onPageChanged: (p) {
           _saveFromPage(_currentPage);
           setState(() => _currentPage = p);
         },
-        itemCount: pageCount > 0 ? pageCount : 1, // 0件でも空ページ1つは描画
+        itemCount: pageCount > 0 ? pageCount : 1,
         itemBuilder: (ctx, page) {
           final pageItems = _itemsOfPage(page, items);
           final meas = _measForPage(page);
           meas.ensureCapacity(pageItems.length);
-
           final sc = _scForPage(page);
 
           return NotificationListener<ScrollNotification>(
@@ -508,8 +573,7 @@ _vm.clearScrollFractionOnly();
               child: CustomScrollView(
                 controller: sc,
                 cacheExtent: (_boostCacheDuringRestore && _restoreTargetPageNo == page)
-                    ? 50000.0
-                    : 1200.0,
+                    ? 50000.0 : 1200.0,
                 physics: const BouncingScrollPhysics(
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
@@ -518,8 +582,6 @@ _vm.clearScrollFractionOnly();
                     delegate: SliverChildBuilderDelegate(
                       (ctx2, i) {
                         final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, postedAt: '', body: '', plus: 0, minus: 0);
-
-
                         final bool shouldMeasure = _restoring || meas.needsUpdate;
                         Widget content = Container(
                           key: c.id > 0 ? _vm.keyForCommentNo(c.id) : null,
@@ -558,7 +620,6 @@ _vm.clearScrollFractionOnly();
                           return MeasureSize(
                             onChange: (sz) {
                               meas.onItemSize(i, sz.height, sc: sc);
-                              // Reset flag after measurement to avoid repeated calls
                               meas.needsUpdate = false;
                             },
                             child: content,
@@ -568,13 +629,8 @@ _vm.clearScrollFractionOnly();
                         }
                       },
                       childCount: pageItems.length,
-                      addAutomaticKeepAlives: false,
-                      addRepaintBoundaries: true,
-                      addSemanticIndexes: false,
                     ),
                   ),
-
-                  // 末尾ページ以外なら「次の100件へ」ショートカット
                   if (page < pageCount - 1)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -587,9 +643,8 @@ _vm.clearScrollFractionOnly();
                         ),
                       ),
                     ),
-
-                  // 最後のページでは「さらに読み込む」（手動トリガ、オプション）
-                  if (page == pageCount - 1)
+                  // ★ フィルター時は「さらに読み込む」は出さない（整合性のため）
+                  if (page == pageCount - 1 && _currentFilter == CommentFilterLevel.all)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -601,8 +656,6 @@ _vm.clearScrollFractionOnly();
                         ),
                       ),
                     ),
-
-                  // 末尾ページなら「読み込み中」プレースホルダ
                   if (page == pageCount - 1 && _loadingMore)
                     const SliverToBoxAdapter(
                       child: Padding(
@@ -610,8 +663,6 @@ _vm.clearScrollFractionOnly();
                         child: Center(child: CupertinoActivityIndicator()),
                       ),
                     ),
-                  
-                  // 下部余白
                   const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               ),
@@ -625,11 +676,8 @@ _vm.clearScrollFractionOnly();
       canPop: _allowPop,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-
-        // 戻る前に確実に保存
         _saveFromPage(_currentPage);
         await _vm.flushPendingScrollSave();
-
         if (mounted) {
           setState(() => _allowPop = true);
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -644,22 +692,31 @@ _vm.clearScrollFractionOnly();
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              // ★ フィルター適用時は状態を表示
               Text(
-                '${widget.posted_at} • コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}',
-                style: const TextStyle(fontSize: 11, color: CupertinoColors.secondaryLabel),
+                _currentFilter == CommentFilterLevel.all
+                    ? '${widget.posted_at} • コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}'
+                    : '絞り込み中: ${items.length}件を表示',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _currentFilter == CommentFilterLevel.all
+                      ? CupertinoColors.secondaryLabel
+                      : CupertinoColors.systemOrange,
+                  fontWeight: _currentFilter == CommentFilterLevel.all
+                      ? FontWeight.normal
+                      : FontWeight.bold,
+                ),
               ),
             ],
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ★ 追加: 検索ボタン
               CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: _showSearchDialog,
                 child: const Icon(CupertinoIcons.search),
               ),
-              // ★ 下書きがある場合のみ鉛筆マークを表示
               if (_vm.hasDraft)
                 CupertinoButton(
                   padding: EdgeInsets.zero,
@@ -678,75 +735,87 @@ _vm.clearScrollFractionOnly();
           bottom: false,
           child: _vm.loading
               ? Center(child: PlatformHelper.buildLoadingIndicator())
-              : Stack(
-                  children: [
-                    pageView,
-
-                    // ページ移動用の左右ボタン
-                    if (_pageCountLive > 1 && _hasPrev)
-                      Positioned(
-                        left: 8,
-                        top: 0,
-                        bottom: 0,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: CupertinoButton(
-                            padding: const EdgeInsets.all(8),
-                            onPressed: _hasPrev ? _goPrevPage : null,
-                            child: const Icon(CupertinoIcons.chevron_left, size: 22),
+              : items.isEmpty
+                  // ★ 0件時の表示
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(CupertinoIcons.slash_circle, size: 48, color: CupertinoColors.systemGrey3),
+                          const SizedBox(height: 16),
+                          Text(
+                            _currentFilter == CommentFilterLevel.all
+                                ? 'コメントがありません'
+                                : '条件に合うコメントがありません',
+                            style: const TextStyle(color: CupertinoColors.systemGrey),
                           ),
-                        ),
+                          if (_currentFilter != CommentFilterLevel.all)
+                            CupertinoButton(
+                              child: const Text('フィルターを解除'),
+                              onPressed: () => _onFilterChanged(CommentFilterLevel.all),
+                            )
+                        ],
                       ),
-
-                    if (_pageCountLive > 1 && _hasNext)
-                      Positioned(
-                        right: 8,
-                        top: 0,
-                        bottom: 0,
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: CupertinoButton(
-                            padding: const EdgeInsets.all(8),
-                            onPressed: _hasNext ? _goNextPage : null,
-                            child: const Icon(CupertinoIcons.chevron_right, size: 22),
-                          ),
-                        ),
-                      ),
-
-                    if (_pageCountLive > 1)
-                      Positioned(
-                        bottom: 8,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: CupertinoColors.systemGrey6.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              '${_currentPage + 1} / $_pageCountLive',
-                              style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                    )
+                  : Stack(
+                      children: [
+                        pageView,
+                        if (_pageCountLive > 1 && _hasPrev)
+                          Positioned(
+                            left: 8, top: 0, bottom: 0,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: CupertinoButton(
+                                padding: const EdgeInsets.all(8),
+                                onPressed: _hasPrev ? _goPrevPage : null,
+                                child: const Icon(CupertinoIcons.chevron_left, size: 22),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-
-                  // （任意）復元前だけ「続きへ」チップを表示して手動復元も用意
-                  if (_vm.savedCommentNo > 0 && !_restoredOnce)
-                    Positioned(
-                      top: 8, right: 8,
-                      child: CupertinoButton.filled(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        onPressed: _restoring ? null : _tryRestoreIfNeeded,
-                        child: Text('続き: No.${_vm.savedCommentNo}', style: const TextStyle(fontSize: 13)),
-                      ),
+                        if (_pageCountLive > 1 && _hasNext)
+                          Positioned(
+                            right: 8, top: 0, bottom: 0,
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: CupertinoButton(
+                                padding: const EdgeInsets.all(8),
+                                onPressed: _hasNext ? _goNextPage : null,
+                                child: const Icon(CupertinoIcons.chevron_right, size: 22),
+                              ),
+                            ),
+                          ),
+                        if (_pageCountLive > 1)
+                          Positioned(
+                            bottom: 8, left: 0, right: 0,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.systemGrey6.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  '${_currentPage + 1} / $_pageCountLive',
+                                  style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                                ),
+                              ),
+                            ),
+                          ),
+                        // 復元チップも全表示時のみ出す
+                        if (_vm.savedCommentNo > 0 && !_restoredOnce && _currentFilter == CommentFilterLevel.all)
+                          Positioned(
+                            top: 8, right: 8,
+                            child: CupertinoButton.filled(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              onPressed: _restoring ? null : _tryRestoreIfNeeded,
+                              child: Text('続き: No.${_vm.savedCommentNo}', style: const TextStyle(fontSize: 13)),
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
+        ),
       ),
-    ));
+    );
   }
 
   Future<void> _handleClipAction(Comment comment) async {
@@ -842,8 +911,6 @@ _vm.clearScrollFractionOnly();
     );
   }
 
-
-
   void _showMenu() {
     showCupertinoModalPopup(
       context: context,
@@ -851,6 +918,7 @@ _vm.clearScrollFractionOnly();
         onJump: _showJumpDialog,
         onReload: _vm.hardReload,
         onPost: _openPostDialog,
+        onFilter: _showFilterSheet, // ★ フィルター機能
         onBrowser: () async {
           final url = Uri.parse('https://girlschannel.net/topics/${widget.topicId}/');
           if (await canLaunchUrl(url)) {
@@ -896,8 +964,6 @@ _vm.clearScrollFractionOnly();
       ),
     );
   }
-
-
 
   void _showCommentActionSheet(BuildContext context, Comment c) {
     final no = c.id;
