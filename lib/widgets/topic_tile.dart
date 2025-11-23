@@ -277,8 +277,10 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 14,
-              fontWeight: (isBold && !isOld) ? FontWeight.w800 : FontWeight.w400,
-              color: (!isOld) ? CupertinoColors.activeBlue : null,
+              // 太字になるのは「dat落ちではなく(生きてて)」かつ「未読」のときだけ
+              fontWeight: (!isOld && isBold) ? FontWeight.w800 : FontWeight.w400,
+              // dat落ちならグレー、それ以外は青
+              color: isOld ? CupertinoColors.systemGrey : CupertinoColors.activeBlue,
             ),
           ),
           const SizedBox(height: 4),

@@ -22,20 +22,6 @@ class TopicMenuSheet extends StatelessWidget {
         CupertinoActionSheetAction(
           onPressed: () {
             Navigator.pop(context);
-            onJump();
-          },
-          child: const Text('指定のコメントへジャンプ'),
-        ),
-        CupertinoActionSheetAction(
-          onPressed: () {
-            Navigator.pop(context);
-            onReload();
-          },
-          child: const Text('再読み込み'),
-        ),
-        CupertinoActionSheetAction(
-          onPressed: () {
-            Navigator.pop(context);
             onPost();
           },
           child: const Text('コメントを投稿する'),
@@ -43,9 +29,23 @@ class TopicMenuSheet extends StatelessWidget {
         CupertinoActionSheetAction(
           onPressed: () {
             Navigator.pop(context);
+            onJump();
+          },
+          child: const Text('指定のコメントへジャンプ'),
+        ),
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.pop(context);
             onBrowser();
           },
           child: const Text('ブラウザで開く'),
+        ),
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.pop(context);
+            onReload();
+          },
+          child: const Text('再読み込み'),
         ),
       ],
       cancelButton: CupertinoActionSheetAction(

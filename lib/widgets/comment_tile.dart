@@ -48,12 +48,13 @@ class CommentTile extends StatelessWidget {
           'No.$no  $name  $postedAt${comment.isLocal ? ' （ローカル）' : ''}',
           style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
         ),
+        // 自分のコメントなら人アイコンのみ、それ以外でクリップされていればハートアイコンのみ
         if (userStatus == CommentUserStatus.myComment)
           const Padding(
             padding: EdgeInsets.only(left: 8),
             child: Icon(CupertinoIcons.person_fill, size: 14, color: CupertinoColors.activeBlue),
-          ),
-        else if (userStatus != CommentUserStatus.none)
+          )
+        else if (userStatus == CommentUserStatus.clipped)
           const Padding(
             padding: EdgeInsets.only(left: 8),
             child: Icon(CupertinoIcons.heart_fill, size: 14, color: CupertinoColors.systemPink),

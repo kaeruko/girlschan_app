@@ -168,14 +168,45 @@ class _CommentComposePageState extends State<CommentComposePage> {
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // トピックタイトルの表示
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemGrey6,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        CupertinoIcons.doc_text,
+                        size: 16,
+                        color: CupertinoColors.systemBlue,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '「${widget.title}」に投稿',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: CupertinoColors.secondaryLabel,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 CupertinoTextField(
                   controller: _ctrl,
-                  maxLines: null,       // 行数制限なし（たくさん書ける）
-                  minLines: 10,         // 最初から10行分の高さを確保（見た目を大きくする）
-                  textAlignVertical: TextAlignVertical.top, // 文字は上から開始
+                  maxLines: null,
+                  minLines: 10,
+                  textAlignVertical: TextAlignVertical.top,
                   placeholder: 'コメントを書く',
-                  autofocus: true,      // お好みでON（フリーズしなくなったのでOK）
+                  autofocus: true,
                 ),
               ],
             ),
