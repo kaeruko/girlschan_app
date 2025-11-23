@@ -88,7 +88,7 @@ class Comment {
         'no': id,
         'posted_at': postedAt,
         'body': body,
-        'name': name, // ★ 追加
+        'name': name,
         'plus': plus,
         'minus': minus,
         'image_url': imageUrl,
