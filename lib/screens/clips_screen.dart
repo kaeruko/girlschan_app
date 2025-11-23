@@ -172,22 +172,29 @@ with WidgetsBindingObserver {
         final thread = await fetchCommentThread(topicId, commentNo);
 
         if (thread != null && thread['comments'] is List && (thread['comments'] as List).isNotEmpty) {
-          final first = (thread['comments'] as List).first as Map<String, dynamic>;
+          final commentsList = thread['comments'] as List<dynamic>;
+          final first = commentsList.first as Map<String, dynamic>;
           final newPlus = first['plus'] as int? ?? clip['plus'];
           final newMinus = first['minus'] as int? ?? clip['minus'];
           final newAnchors = (first['anchors'] as List?)?.length ?? 0;
-          final newReverseAnchors = (first['reverse_anchors'] as List?)?.length ?? 0;
           
+          // ★ 新しい reverse_anchors のリストを取得
+          final newReverseAnchorsList = (first['reverse_anchors'] as List?) ?? [];
+          final newReverseAnchorsCount = newReverseAnchorsList.length;
+
           final oldPlus = clip['plus'] as int? ?? 0;
           final oldMinus = clip['minus'] as int? ?? 0;
           final oldAnchors = (clip['anchors'] as List?)?.length ?? 0;
-          final oldReverseAnchors = (clip['reverse_anchors'] as List?)?.length ?? 0;
+          
+          // ★ 古い reverse_anchors のリストを取得
+          final oldReverseAnchorsList = (clip['reverse_anchors'] as List?) ?? [];
+          final oldReverseAnchorsCount = oldReverseAnchorsList.length;
 
           // ★ _clips を直接更新
           _clips[i]['plus'] = newPlus;
           _clips[i]['minus'] = newMinus;
           _clips[i]['anchors'] = first['anchors'] ?? [];
-          _clips[i]['reverse_anchors'] = first['reverse_anchors'] ?? [];
+          _clips[i]['reverse_anchors'] = newReverseAnchorsList;
           hasUpdates = true;
 
           // ★ SharedPreferences にも保存
@@ -220,11 +227,10 @@ with WidgetsBindingObserver {
               }
               if (cacheUpdated) {
                 await CacheService.saveList(cacheKey, cachedComments);
-          
               }
             }
           } catch (e) {
-      
+            // ignore
           }
 
           // ★ 変化を検出してトースト
@@ -232,13 +238,47 @@ with WidgetsBindingObserver {
           if (newPlus > oldPlus) changes.add('プラスがつきました (+${newPlus - oldPlus})');
           if (newMinus > oldMinus) changes.add('マイナスがつきました (+${newMinus - oldMinus})');
           if (newAnchors > oldAnchors) changes.add('アンカーがつきました (+${newAnchors - oldAnchors})');
-          if (newReverseAnchors > oldReverseAnchors) changes.add('コメントがつきました (+${newReverseAnchors - oldReverseAnchors})');
+          
+          // ★★★ 返信プレビュー取得ロジック ★★★
+          if (newReverseAnchorsCount > oldReverseAnchorsCount) {
+            String msg = '返信 (+${newReverseAnchorsCount - oldReverseAnchorsCount})';
+            
+            // 差分（新しく増えたID）を探す
+            final addedIds = newReverseAnchorsList.where((id) => !oldReverseAnchorsList.contains(id)).toList();
+            
+            if (addedIds.isNotEmpty) {
+              // 増えたIDの中で一番最後のもの（最新）を取得してみる
+              final latestNewId = addedIds.last;
+              
+              // APIレスポンスの comments リストから、そのIDを持つコメントを探して本文を抽出
+              final replyComment = commentsList.firstWhere(
+                (c) => c['no'] == latestNewId,
+                orElse: () => null,
+              );
+
+              if (replyComment != null) {
+                String replyBody = replyComment['body'] as String? ?? '';
+
+                // 先頭の ">>数字" とそれに続く空白/改行を削除
+                replyBody = replyBody.replaceFirst(RegExp(r'^>>\d+\s*'), '');
+
+                // 改行をスペースに置換して、長さを丸める（トースト爆発防止）
+                replyBody = replyBody.replaceAll('\n', ' ');
+                if (replyBody.length > 20) {
+                  replyBody = '${replyBody.substring(0, 20)}...';
+                }
+                // メッセージにプレビューを追加
+                msg += '\n「$replyBody」';
+              }
+            }
+            changes.add(msg);
+          }
           
           if (changes.isNotEmpty) {
             if (mounted) {
               AppToast.show(
                 context,
-                '「$bodyPreview」に${changes.join('、')}',
+                '「$bodyPreview」に\n${changes.join('\n')}',
               );
             }
           } else {
