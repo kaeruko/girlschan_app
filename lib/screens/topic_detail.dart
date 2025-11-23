@@ -442,18 +442,22 @@ _vm.clearScrollFractionOnly();
     final items = _vm.comments;
     final pageCount = _pageCountFor(items.length);
 
-    // ★ NotificationListenerで囲んでOverscrollを検知
+    // ★ 修正版: ScrollUpdateNotification で「座標」を監視する
     final pageView = NotificationListener<ScrollNotification>(
       onNotification: (notification) {
-        // 1. 範囲外スクロール（Overscroll）が発生したかチェック
-        if (notification is OverscrollNotification) {
-          // 2. 「左端でのOverscroll (overscroll < 0)」 かつ 「現在1ページ目 (_currentPage == 0)」
-          //    かつ 「まだPop処理中でない」 場合
-          if (notification.overscroll < 0 && _currentPage == 0 && !_isPopping) {
-            // 3. ユーザーが指で操作している時だけ反応させる (dragDetails != null)
+        // 1. PageView自身のスクロール通知かチェック (depth == 0)
+        //    これがないと、中のコメントリストの縦スクロールに反応してしまいます
+        if (notification.depth == 0 && notification is ScrollUpdateNotification) {
+          
+          // 2. 現在のスクロール位置が「-70px」を超えているかチェック
+          //    (0ページ目で左に引っ張ると、pixelsはマイナスになります)
+          if (notification.metrics.pixels < -70 && !_isPopping) {
+            
+            // 3. ユーザーが指で操作している場合のみ (自動スクロールでの誤爆防止)
             if (notification.dragDetails != null) {
-              _isPopping = true; // ガードをかける
-              Navigator.of(context).pop(); // 一覧に戻る
+              _isPopping = true;
+              // ここでPopScopeの処理 (onPopInvoked) を経由させるために maybePop を使う
+              Navigator.of(context).maybePop();
               return true;
             }
           }
@@ -462,8 +466,10 @@ _vm.clearScrollFractionOnly();
       },
       child: PageView.builder(
         controller: _pc,
+        // ★ 重要: Android等でも「端っこで引っ張れる」ようにBouncingを強制する
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         onPageChanged: (p) {
-          _saveFromPage(_currentPage);      // 追加：切り替え前のページ位置を保存
+          _saveFromPage(_currentPage);
           setState(() => _currentPage = p);
         },
         itemCount: pageCount > 0 ? pageCount : 1, // 0件でも空ページ1つは描画
