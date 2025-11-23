@@ -445,6 +445,7 @@ with WidgetsBindingObserver {
                           
                           // ★ バッジ機能（件数表示）をつけるとさらにリッチになります
                           final count = _clips.where((c) => (c['labelId'] ?? 0) == id).length;
+                          final isMyCommentLabel = name == kMyCommentsLabelName;
 
                           return GestureDetector(
                             onTap: () => setState(() => _selectedLabelId = id),
@@ -453,7 +454,7 @@ with WidgetsBindingObserver {
                                   horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? CupertinoColors.activeBlue
+                                    ? (isMyCommentLabel ? CupertinoColors.systemOrange : CupertinoColors.activeBlue)
                                     : CupertinoColors.systemGrey6,
                                 borderRadius: BorderRadius.circular(16),
                               ),

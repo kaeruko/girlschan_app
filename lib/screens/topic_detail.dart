@@ -750,7 +750,9 @@ _vm.clearScrollFractionOnly();
       context: context,
       builder: (context) => CupertinoActionSheet(
         title: const Text('ラベルを選択してクリップ'),
-        actions: labels.map((label) {
+        actions: labels
+            .where((l) => l['name'] != kMyCommentsLabelName)
+            .map((label) {
           final id = label['id'] as int;
           final name = label['name'] as String;
           final displayName = id == 0 && name.isEmpty ? '未分類' : name;

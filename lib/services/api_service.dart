@@ -657,7 +657,7 @@ Future<void> updateClippedCommentStats({
 
 // ========== クリップラベル関連 ==========
 
-const String kMyCommentsLabelName = 'マイコメント';
+const String kMyCommentsLabelName = '📝マイコメント';
 
 Future<List<Map<String, dynamic>>> getClipLabels() async {
   final prefs = await SharedPreferences.getInstance();

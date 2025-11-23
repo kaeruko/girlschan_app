@@ -6,6 +6,7 @@ import 'shell/adaptive_shell.dart';
 import 'utils/platform_helper.dart';
 import 'utils/log.dart';
 import 'services/cache_service.dart';
+import 'services/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,9 @@ void main() async {
     
     // 💾 キャッシュサービス初期化（ディレクトリ情報を表示）
     await CacheService.initialize();
-        // await clearWatchedHistory();
+    
+    // 🏷️ ラベル初期化（マイコメントラベルを確保）
+    await getOrCreateMyCommentLabel();
   } catch (e, stackTrace) {
     logd('❌ AppConfig 初期化失敗: $e');
     logd('❌ スタックトレース: $stackTrace');

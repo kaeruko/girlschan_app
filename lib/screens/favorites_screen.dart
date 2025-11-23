@@ -182,27 +182,27 @@ class FavoritesScreenState extends State<FavoritesScreen>
       final id = t['id'] as int?;
       if (id == null) continue;
 
-      // dat落ちチェック: posted_at が 1ヶ月より前ならスキップ
-      final postedAtStr = (t['posted_at'] as String? ?? '').trim();
-
-      // ★ GirlsChannel専用パーサで解釈
-      final postedAt = postedAtStr.isEmpty
-          ? null
-          : parseGirlsChanPostedAt(postedAtStr);
-
-      // postedAt が null → よく分からない → 「最近」とみなして fetch 続行
-      // postedAt があって 31日より前 → dat落ち扱いでスキップ
-      if (postedAt != null) {
-        final diffDays = now.difference(postedAt).inDays;
-        if (diffDays > 31) {
-          
-          continue;
-        }
-      }
-
-      final beforeComments = (t['comments'] as int?) ?? 0;
-
       try {
+        // dat落ちチェック: posted_at が 1ヶ月より前ならスキップ
+        final postedAtStr = (t['posted_at'] as String? ?? '').trim();
+
+        // ★ GirlsChannel専用パーサで解釈
+        final postedAt = postedAtStr.isEmpty
+            ? null
+            : parseGirlsChanPostedAt(postedAtStr);
+
+        // postedAt が null → よく分からない → 「最近」とみなして fetch 続行
+        // postedAt があって 31日より前 → dat落ち扱いでスキップ
+        if (postedAt != null) {
+          final diffDays = now.difference(postedAt).inDays;
+          if (diffDays > 31) {
+            
+            continue;
+          }
+        }
+
+        final beforeComments = (t['comments'] as int?) ?? 0;
+
         // ユーザー要望: 「トースト、現在取得中のトピック名を出してほしい」
         final currentTitle = t['title'] as String? ?? 'トピック';
         if (mounted) {
@@ -256,13 +256,11 @@ class FavoritesScreenState extends State<FavoritesScreen>
           // ★ 更新がない場合も表示
           if (mounted) {
             AppToast.show(context, '「$currentTitle」は新着なし');
-          }
-          
+          }          
         }
-    } catch (e, st) {
-      
-    }
-
+      } catch (e, st) {
+        // logd('Meta update failed for topic $id', e, st);
+      }
       // ガルちゃん側へのスクレイプ負荷を抑えるためにウェイト
       await Future.delayed(const Duration(seconds: 5));
     }
@@ -271,12 +269,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
     if (mounted) {
       await _loadWatchedTopics();
     }
-
-    
   }
-
-
-
 
   @override
   Widget build(BuildContext context) {

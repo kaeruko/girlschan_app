@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import '../app/app_tabs.dart';
 import '../screens/topic_list.dart' as tl;
@@ -117,21 +118,16 @@ class _RotatingIcon extends StatefulWidget {
   State<_RotatingIcon> createState() => _RotatingIconState();
 }
 
-class _RotatingIconState extends State<_RotatingIcon>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+class _RotatingIconState extends State<_RotatingIcon> {
+  Timer? _timer;
+  double _angle = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 5),
-    );
     widget.loadingNotifier.addListener(_onLoadingChanged);
-    // 初期状態チェック
     if (widget.loadingNotifier.value) {
-      _controller.repeat();
+      _startTimer();
     }
   }
 
@@ -141,7 +137,6 @@ class _RotatingIconState extends State<_RotatingIcon>
     if (oldWidget.loadingNotifier != widget.loadingNotifier) {
       oldWidget.loadingNotifier.removeListener(_onLoadingChanged);
       widget.loadingNotifier.addListener(_onLoadingChanged);
-      // 新しいnotifierの状態を反映
       _onLoadingChanged();
     }
   }
@@ -149,32 +144,48 @@ class _RotatingIconState extends State<_RotatingIcon>
   @override
   void dispose() {
     widget.loadingNotifier.removeListener(_onLoadingChanged);
-    _controller.dispose();
+    _stopTimer();
     super.dispose();
   }
 
   void _onLoadingChanged() {
     if (widget.loadingNotifier.value) {
-      if (!_controller.isAnimating) {
-        _controller.repeat();
-      }
+      _startTimer();
     } else {
-      if (_controller.isAnimating) {
-        // 現在の回転位置から0に戻すアニメーションをして止める
-        // 単に stop() だと唐突に止まるので、forward() で 1.0 まで回し切るか、
-        // reset() するか。ここでは自然に止めるために animateTo を使う手もあるが、
-        // シンプルに reset で止める（あるいは stop して reset）。
-        // 今回は「回転し続ける」→「止まる」なので、stop() してから reset() で元の位置に戻す。
-        _controller.stop();
-        _controller.reset();
-      }
+      _stopTimer();
+      // 停止時は角度をリセット
+      setState(() {
+        _angle = 0.0;
+      });
     }
+  }
+
+  void _startTimer() {
+    if (_timer != null) return;
+    // 16msごとに約1度回転させる (1周約5.7秒)
+    _timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _angle += 0.02; // ラジアン加算
+        if (_angle > 2 * 3.1415926535) {
+          _angle -= 2 * 3.1415926535;
+        }
+      });
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
   }
 
   @override
   Widget build(BuildContext context) {
-    return RotationTransition(
-      turns: _controller,
+    return Transform.rotate(
+      angle: _angle,
       child: widget.child,
     );
   }
