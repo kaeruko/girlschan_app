@@ -437,6 +437,22 @@ _vm.clearScrollFractionOnly();
   // ==== UI ====
   bool _allowPop = false;
 
+
+
+  void _showSearchDialog() async {
+    // 現在読み込まれているコメントリストを渡して検索画面を開く
+    final int? selectedNo = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (ctx) => TopicSearchModal(allComments: _vm.comments),
+    );
+
+    // 戻り値（コメントNo）があれば、そこへジャンプする
+    if (!mounted) return;
+    if (selectedNo != null && selectedNo > 0) {
+      _tryRestoreIfNeeded(targetNo: selectedNo);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _vm.comments;
@@ -637,6 +653,12 @@ _vm.clearScrollFractionOnly();
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ★ 追加: 検索ボタン
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _showSearchDialog,
+                child: const Icon(CupertinoIcons.search),
+              ),
               // ★ 下書きがある場合のみ鉛筆マークを表示
               if (_vm.hasDraft)
                 CupertinoButton(
@@ -960,5 +982,122 @@ _vm.clearScrollFractionOnly();
         }
       }
     }
+  }
+}
+
+class TopicSearchModal extends StatefulWidget {
+  final List<Comment> allComments;
+
+  const TopicSearchModal({super.key, required this.allComments});
+
+  @override
+  State<TopicSearchModal> createState() => _TopicSearchModalState();
+}
+
+class _TopicSearchModalState extends State<TopicSearchModal> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  List<Comment> _filteredComments = [];
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // 初期状態は空にするか、全件表示するかはお好みで（今回は検索入力待ち）
+    _filteredComments = []; 
+    
+    // ダイアログが開いたらフォーカスを当てる
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (query.isEmpty) {
+      setState(() => _filteredComments = []);
+      return;
+    }
+
+    final lowerQuery = query.toLowerCase();
+    setState(() {
+      _filteredComments = widget.allComments.where((c) {
+        // 本文、もしくは投稿者名などで検索
+        return c.body.toLowerCase().contains(lowerQuery) ||
+               (c.id.toString() == lowerQuery); // No検索も対応
+      }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Text('閉じる'),
+          onPressed: () => Navigator.pop(context),
+        ),
+        middle: const Text('トピ内検索'),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // 検索バーエリア
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CupertinoSearchTextField(
+                controller: _searchCtrl,
+                focusNode: _focusNode,
+                onChanged: _onSearchChanged,
+                placeholder: 'キーワードまたはNoを入力',
+              ),
+            ),
+            // 結果リスト
+            Expanded(
+              child: _searchCtrl.text.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'ロード済みのコメントから検索します',
+                        style: TextStyle(color: CupertinoColors.systemGrey),
+                      ),
+                    )
+                  : _filteredComments.isEmpty
+                      ? const Center(
+                          child: Text('見つかりませんでした'),
+                        )
+                      : ListView.separated(
+                          itemCount: _filteredComments.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (ctx, i) {
+                            final c = _filteredComments[i];
+                            return Material( // タップ時のリップルエフェクト用
+                              color: Colors.transparent,
+                              child: ListTile(
+                                title: Text(
+                                  '${c.id}. ${c.body.replaceAll('\n', ' ')}', // 改行を除去して1行表示
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                trailing: const Icon(CupertinoIcons.forward, size: 16),
+                                onTap: () {
+                                  // 選択されたNoを返して閉じる
+                                  Navigator.pop(context, c.id);
+                                },
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
