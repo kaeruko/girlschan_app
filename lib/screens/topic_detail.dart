@@ -53,6 +53,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   // ★ 追加: 連打防止用のクールダウン変数
   DateTime _lastFetchTime = DateTime.fromMillisecondsSinceEpoch(0);
+  
+  // ★ 追加: スワイプで戻る処理が重複しないようにするフラグ
+  bool _isPopping = false;
 
   bool _restoring = false;          // 復元中は保存/ロードを止める
   bool _restoredOnce = false;       // 一度でも復元が成功したか
@@ -439,142 +442,161 @@ _vm.clearScrollFractionOnly();
     final items = _vm.comments;
     final pageCount = _pageCountFor(items.length);
 
-    final pageView = PageView.builder(
-      controller: _pc,
-      onPageChanged: (p) {
-        _saveFromPage(_currentPage);      // 追加：切り替え前のページ位置を保存
-        setState(() => _currentPage = p);
-      },
-      itemCount: pageCount > 0 ? pageCount : 1, // 0件でも空ページ1つは描画
-      itemBuilder: (ctx, page) {
-        final pageItems = _itemsOfPage(page, items);
-        final meas = _measForPage(page);
-        meas.ensureCapacity(pageItems.length);
-
-        final sc = _scForPage(page);
-
-        return NotificationListener<ScrollNotification>(
-          onNotification: (n) {
-            if (n is ScrollEndNotification) {
-              _saveFromPage(page);
+    // ★ NotificationListenerで囲んでOverscrollを検知
+    final pageView = NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        // 1. 範囲外スクロール（Overscroll）が発生したかチェック
+        if (notification is OverscrollNotification) {
+          // 2. 「左端でのOverscroll (overscroll < 0)」 かつ 「現在1ページ目 (_currentPage == 0)」
+          //    かつ 「まだPop処理中でない」 場合
+          if (notification.overscroll < 0 && _currentPage == 0 && !_isPopping) {
+            // 3. ユーザーが指で操作している時だけ反応させる (dragDetails != null)
+            if (notification.dragDetails != null) {
+              _isPopping = true; // ガードをかける
+              Navigator.of(context).pop(); // 一覧に戻る
+              return true;
             }
-            return false;
-          },
-          child: CupertinoScrollbar(
-            controller: sc,
-            child: CustomScrollView(
-              controller: sc,
-              cacheExtent: (_boostCacheDuringRestore && _restoreTargetPageNo == page)
-                  ? 50000.0
-                  : 1200.0,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              slivers: [
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx2, i) {
-                      final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, postedAt: '', body: '', plus: 0, minus: 0);
-
-
-                      final bool shouldMeasure = _restoring || meas.needsUpdate;
-                      Widget content = Container(
-                        key: c.id > 0 ? _vm.keyForCommentNo(c.id) : null,
-                        child: CommentTile(
-                          comment: c,
-                          userStatus: _vm.getUserStatus(c.id),
-                          onLongPress: () => _showCommentActionSheet(ctx2, c),
-                          onAnchorTap: (no) => _showAnchorPreview(no),
-                          onImageTap: (url) {
-                            Navigator.of(context).push(
-                              CupertinoPageRoute(
-                                fullscreenDialog: true,
-                                builder: (_) => ImageViewerPage(url: url),
-                              ),
-                            );
-                          },
-                          onVote: (isPlus) async {
-                            final no = c.id;
-                            final commentId = 'vbox$no';
-                            final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
-                            if (!mounted) return;
-                            if (success) {
-                              setState(() {
-                                if (isPlus) {
-                                  c.plus += 1;
-                                } else {
-                                  c.minus += 1;
-                                }
-                              });
-                            }
-                          },
-                          checkAnchorAvailability: (no) => _vm.getCommentByNo(no) != null,
-                        ),
-                      );
-                      if (shouldMeasure) {
-                        return MeasureSize(
-                          onChange: (sz) {
-                            meas.onItemSize(i, sz.height, sc: sc);
-                            // Reset flag after measurement to avoid repeated calls
-                            meas.needsUpdate = false;
-                          },
-                          child: content,
-                        );
-                      } else {
-                        return content;
-                      }
-                    },
-                    childCount: pageItems.length,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: true,
-                    addSemanticIndexes: false,
-                  ),
-                ),
-
-                // 末尾ページ以外なら「次の100件へ」ショートカット
-                if (page < pageCount - 1)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Center(
-                        child: CupertinoButton(
-                          onPressed: () => _goToPage(page + 1),
-                          child: const Text('次の100件へ'),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // 最後のページでは「さらに読み込む」（手動トリガ、オプション）
-                if (page == pageCount - 1)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Center(
-                        child: CupertinoButton.filled(
-                          onPressed: _loadingMore ? null : _fetchMoreDelta,
-                          child: Text(_loadingMore ? '読み込み中…' : 'さらに読み込む'),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // 末尾ページなら「読み込み中」プレースホルダ
-                if (page == pageCount - 1 && _loadingMore)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: CupertinoActivityIndicator()),
-                    ),
-                  ),
-                
-                // 下部余白
-                const SliverToBoxAdapter(child: SizedBox(height: 80)),
-              ],
-            ),
-          ),
-        );
+          }
+        }
+        return false;
       },
+      child: PageView.builder(
+        controller: _pc,
+        onPageChanged: (p) {
+          _saveFromPage(_currentPage);      // 追加：切り替え前のページ位置を保存
+          setState(() => _currentPage = p);
+        },
+        itemCount: pageCount > 0 ? pageCount : 1, // 0件でも空ページ1つは描画
+        itemBuilder: (ctx, page) {
+          final pageItems = _itemsOfPage(page, items);
+          final meas = _measForPage(page);
+          meas.ensureCapacity(pageItems.length);
+
+          final sc = _scForPage(page);
+
+          return NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n is ScrollEndNotification) {
+                _saveFromPage(page);
+              }
+              return false;
+            },
+            child: CupertinoScrollbar(
+              controller: sc,
+              child: CustomScrollView(
+                controller: sc,
+                cacheExtent: (_boostCacheDuringRestore && _restoreTargetPageNo == page)
+                    ? 50000.0
+                    : 1200.0,
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                slivers: [
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx2, i) {
+                        final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, postedAt: '', body: '', plus: 0, minus: 0);
+
+
+                        final bool shouldMeasure = _restoring || meas.needsUpdate;
+                        Widget content = Container(
+                          key: c.id > 0 ? _vm.keyForCommentNo(c.id) : null,
+                          child: CommentTile(
+                            comment: c,
+                            userStatus: _vm.getUserStatus(c.id),
+                            onLongPress: () => _showCommentActionSheet(ctx2, c),
+                            onAnchorTap: (no) => _showAnchorPreview(no),
+                            onImageTap: (url) {
+                              Navigator.of(context).push(
+                                CupertinoPageRoute(
+                                  fullscreenDialog: true,
+                                  builder: (_) => ImageViewerPage(url: url),
+                                ),
+                              );
+                            },
+                            onVote: (isPlus) async {
+                              final no = c.id;
+                              final commentId = 'vbox$no';
+                              final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
+                              if (!mounted) return;
+                              if (success) {
+                                setState(() {
+                                  if (isPlus) {
+                                    c.plus += 1;
+                                  } else {
+                                    c.minus += 1;
+                                  }
+                                });
+                              }
+                            },
+                            checkAnchorAvailability: (no) => _vm.getCommentByNo(no) != null,
+                          ),
+                        );
+                        if (shouldMeasure) {
+                          return MeasureSize(
+                            onChange: (sz) {
+                              meas.onItemSize(i, sz.height, sc: sc);
+                              // Reset flag after measurement to avoid repeated calls
+                              meas.needsUpdate = false;
+                            },
+                            child: content,
+                          );
+                        } else {
+                          return content;
+                        }
+                      },
+                      childCount: pageItems.length,
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
+                      addSemanticIndexes: false,
+                    ),
+                  ),
+
+                  // 末尾ページ以外なら「次の100件へ」ショートカット
+                  if (page < pageCount - 1)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: CupertinoButton(
+                            onPressed: () => _goToPage(page + 1),
+                            child: const Text('次の100件へ'),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // 最後のページでは「さらに読み込む」（手動トリガ、オプション）
+                  if (page == pageCount - 1)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: CupertinoButton.filled(
+                            onPressed: _loadingMore ? null : _fetchMoreDelta,
+                            child: Text(_loadingMore ? '読み込み中…' : 'さらに読み込む'),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // 末尾ページなら「読み込み中」プレースホルダ
+                  if (page == pageCount - 1 && _loadingMore)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CupertinoActivityIndicator()),
+                      ),
+                    ),
+                  
+                  // 下部余白
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
 
     return PopScope(
@@ -751,8 +773,10 @@ _vm.clearScrollFractionOnly();
       return;
     }
 
-    showCupertinoModalPopup(
+    showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (modalCtx) => AnchorPreviewSheet(
         comment: c,
         isClipped: _vm.getUserStatus(no) != CommentUserStatus.none,

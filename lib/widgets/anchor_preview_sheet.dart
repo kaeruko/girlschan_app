@@ -120,11 +120,7 @@ class AnchorPreviewSheet extends StatelessWidget {
           Text('No.$no  $date',
               style: const TextStyle(
                   fontWeight: FontWeight.bold, color: CupertinoColors.secondaryLabel)),
-          CupertinoButton(
-            padding: const EdgeInsets.all(4),
-            onPressed: () => Navigator.pop(context),
-            child: const Icon(CupertinoIcons.xmark, size: 20),
-          ),
+          // バツボタン削除
         ],
       ),
     );
