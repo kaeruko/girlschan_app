@@ -551,12 +551,14 @@ Future<void> addClippedComment({
   required int commentNo,
   required String commentBody,
   required String posted_at,
-  required String name, // ★ 追加
+  required String name,
   required int plus,
   required int minus,
   List<dynamic> anchors = const [],
   List<dynamic> reverse_anchors = const [],
-  int labelId = 0, // Default label ID
+  String? imageUrl, // ★ 追加
+  List<dynamic> urls = const [], // ★ 追加
+  int labelId = 0,
 }) async {
   final prefs = await SharedPreferences.getInstance();
   final clips = prefs.getStringList('clipped_comments') ?? [];
@@ -567,11 +569,13 @@ Future<void> addClippedComment({
     'no': commentNo,
     'body': commentBody,
     'posted_at': posted_at,
-    'name': name, // ★ 追加
+    'name': name,
     'plus': plus,
     'minus': minus,
     'anchors': anchors,
     'reverse_anchors': reverse_anchors,
+    'image_url': imageUrl, // ★ 追加
+    'urls': urls, // ★ 追加
     'clipDate': DateTime.now().toIso8601String(),
     'labelId': labelId,
   };

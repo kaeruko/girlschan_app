@@ -53,7 +53,7 @@ class CommentTile extends StatelessWidget {
             padding: EdgeInsets.only(left: 8),
             child: Icon(CupertinoIcons.person_fill, size: 14, color: CupertinoColors.activeBlue),
           ),
-        if (userStatus != CommentUserStatus.none)
+        else if (userStatus != CommentUserStatus.none)
           const Padding(
             padding: EdgeInsets.only(left: 8),
             child: Icon(CupertinoIcons.heart_fill, size: 14, color: CupertinoColors.systemPink),

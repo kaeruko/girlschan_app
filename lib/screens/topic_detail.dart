@@ -701,7 +701,8 @@ _vm.clearScrollFractionOnly();
 
   Future<void> _handleClipAction(Comment comment) async {
     final no = comment.id;
-    final isClipped = _vm.clippedNos.contains(no);
+    final status = _vm.getUserStatus(no);
+    final isClipped = status != CommentUserStatus.none;
     
     if (isClipped) {
       await _vm.toggleClip(comment);
@@ -754,7 +755,7 @@ _vm.clearScrollFractionOnly();
       context: context,
       builder: (modalCtx) => AnchorPreviewSheet(
         comment: c,
-        isClipped: _vm.clippedNos.contains(no),
+        isClipped: _vm.getUserStatus(no) != CommentUserStatus.none,
         onAnchorTap: (targetNo) => _showAnchorPreview(targetNo),
         onImageTap: (url) {
           Navigator.of(modalCtx).push(

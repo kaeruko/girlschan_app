@@ -543,6 +543,10 @@ with WidgetsBindingObserver {
     final topicId = clip['topicId'] as int;
     final name = clip['name'] as String? ?? '匿名';
     final memo = clip['memo'] as String? ?? '';
+    
+    // ★ 画像とURLの取得
+    final imageUrl = clip['image_url'] as String?;
+    final rawUrls = clip['urls'] as List<dynamic>? ?? [];
 
     return GestureDetector(
       onLongPress: () => _showClipMenu(clip),
@@ -554,12 +558,11 @@ with WidgetsBindingObserver {
               title: topicTitle,
               commentCount: 0,
               posted_at: posted_at,
-              initialJumpTo: commentNo, // ★ コメント番号を渡す
-              saveReadPosition: false,  // ★ クリップからの遷移では既読位置を保存しない
+              initialJumpTo: commentNo,
+              saveReadPosition: false,
             ),
           ),
         ).then((_) {
-          // ★ 詳細から戻ってきたら再読込
           _loadClips();
         });
       },
@@ -592,6 +595,70 @@ with WidgetsBindingObserver {
                   .textStyle
                   .copyWith(fontSize: 14),
             ),
+            
+            // ★ 画像の表示
+            if (imageUrl != null && imageUrl.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  imageUrl,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const SizedBox(
+                      height: 150,
+                      child: Center(child: CupertinoActivityIndicator()),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                ),
+              ),
+            ],
+            
+            // ★ URLプレビューの表示（簡易版）
+            if (rawUrls.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...rawUrls.map((u) {
+                final urlData = u as Map<String, dynamic>;
+                final url = urlData['url'] as String? ?? '';
+                final title = urlData['title'] as String? ?? url;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemGrey6,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          CupertinoIcons.link,
+                          size: 14,
+                          color: CupertinoColors.systemBlue,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.systemBlue,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ],
+            
             if (memo.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
@@ -623,7 +690,6 @@ with WidgetsBindingObserver {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    // Show anchor counts if present
                     if ((clip['anchors'] as List?)?.isNotEmpty == true || (clip['reverse_anchors'] as List?)?.isNotEmpty == true)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
