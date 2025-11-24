@@ -40,7 +40,7 @@ class GirlsChanApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
-      title: 'がるちゃんあぷり',
+      title: 'がるなび',
       locale: const Locale('ja', 'JP'),
       localizationsDelegates: const [
         GlobalCupertinoLocalizations.delegate,

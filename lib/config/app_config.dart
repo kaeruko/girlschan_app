@@ -24,7 +24,7 @@ class AppConfig {
       apiBase = response.trim();
     } catch (e) {
       logd('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
-      apiBase = 'http://192.168.40.171:5050/';
+      apiBase = 'https://yrnsrxjm7mjsye3pxrng44kml40vngmb.lambda-url.us-west-2.on.aws';
     }
   }
 

@@ -252,6 +252,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
           bool hasNewReply = false;
           String? replyPreview; // ポップアップ用（長め）
           String? badgePreview; // カードの赤帯用（短め）
+          int? replyCommentNo;
 
           if (newReverseAnchorsList.length > oldReverseAnchorsList.length) {
             hasNewReply = true;
@@ -259,6 +260,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
             
             if (addedIds.isNotEmpty) {
               final latestNewId = addedIds.last;
+              replyCommentNo = latestNewId;
               final replyComment = commentsList.firstWhere((c) => c['no'] == latestNewId, orElse: () => null);
               
               if (replyComment != null) {
@@ -291,7 +293,11 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
                 // 返信メッセージの作成
                 String replyMsg = '';
                 if (hasNewReply) {
-                   replyMsg = badgePreview != null ? '返信「$badgePreview」' : '新着返信あり';
+                   if (badgePreview != null) {
+                     replyMsg = '返信 >>$replyCommentNo「$badgePreview」';
+                   } else {
+                     replyMsg = replyCommentNo != null ? '返信 >>$replyCommentNo' : '新着返信あり';
+                   }
                 }
 
                 final msg = [

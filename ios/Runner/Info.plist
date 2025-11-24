@@ -14,7 +14,7 @@
 	</array>
 
 	<key>CFBundleDisplayName</key>
-	<string>がるちゃんあぷり</string>
+	<string>がるなび</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
