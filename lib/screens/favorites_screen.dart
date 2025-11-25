@@ -1,14 +1,11 @@
-import 'dart:developer';
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart'; // Scaffold削除に伴い、Icons等で必要なら残す
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
-import '../app/app_tabs.dart';
 import '../widgets/common/app_toast.dart';
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
-import '../utils/log.dart';
 import '../screens/topic_detail.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -22,13 +19,19 @@ class FavoritesScreenState extends State<FavoritesScreen>
     with WidgetsBindingObserver {
   final _controller = TopicTileController();
   final _scrollController = ScrollController();
+  
   List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
-  bool _refreshing = false;  // ★ リフレッシュスピナー用（_loading とは別）
-  bool _inFlight = false;  // ★ 重複ロード防止
-  bool _metaUpdating = false; // ★ メタ更新ジョブが走っているかどうか
+  bool _refreshing = false;
+  bool _inFlight = false;
+  bool _metaUpdating = false;
+  
+  // ★ UI進捗表示用
+  String _progressStatus = '';
 
-  /// ★ app_tab 側から叩くための公開メソッド
+  // 日付解析用正規表現（コンパイル済・最適化）
+  static final _dateRegex = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2}).*?(\d{1,2}):(\d{2})');
+
   void reloadFromOutside() {
     _loadWatchedTopics();
   }
@@ -36,28 +39,18 @@ class FavoritesScreenState extends State<FavoritesScreen>
   DateTime? parseGirlsChanPostedAt(String raw) {
     final s = raw.trim();
     if (s.isEmpty) return null;
+    if (s.contains('前')) return DateTime.now();
 
-    // 1) 「〜前」は全部「最近」とみなす（fetch対象）
-    //    → dat落ち判定には使わないので、敢えて now を返してOK
-    if (s.contains('前')) {
-      return DateTime.now();
-    }
-
-    // 2) "2025/11/18(火) 18:37" みたいな形式をパース
-    //    年/月/日(…)? 時:分 を拾う
-    final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2}).*?(\d{1,2}):(\d{2})')
-        .firstMatch(s);
+    final m = _dateRegex.firstMatch(s);
     if (m != null) {
-      final year = int.parse(m.group(1)!);
-      final month = int.parse(m.group(2)!);
-      final day = int.parse(m.group(3)!);
-      final hour = int.parse(m.group(4)!);
-      final minute = int.parse(m.group(5)!);
-      return DateTime(year, month, day, hour, minute);
+      return DateTime(
+        int.parse(m.group(1)!),
+        int.parse(m.group(2)!),
+        int.parse(m.group(3)!),
+        int.parse(m.group(4)!),
+        int.parse(m.group(5)!),
+      );
     }
-
-    // 3) それ以外はよくわからないので「最近」とみなして fetch させたいなら
-    //    null ではなく now を返しておいてもいい
     return DateTime.now();
   }
 
@@ -75,175 +68,152 @@ class FavoritesScreenState extends State<FavoritesScreen>
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // _loadWatchedTopics();
-    }
-  }
+  // ★ 戻ってきた時に自動リロードさせたい場合はコメントアウトを外す
+  // @override
+  // void didChangeAppLifecycleState(AppLifecycleState state) {
+  //   if (state == AppLifecycleState.resumed) {
+  //     _loadWatchedTopics();
+  //   }
+  // }
 
   Future<void> _loadWatchedTopics() async {
-    
-    if (_inFlight) {
-      
-      return;
-    }
+    if (_inFlight) return;
     _inFlight = true;
     try {
-      // 1. リスト取得
       final topics = await getWatchedTopics();
       
-      // 2. watchedAt (最終閲覧日時) の新しい順にソート
+      // ソート: 最終閲覧日時が新しい順
       topics.sort((a, b) {
         final timeA = DateTime.tryParse(a['watchedAt'] ?? '') ?? DateTime(0);
         final timeB = DateTime.tryParse(b['watchedAt'] ?? '') ?? DateTime(0);
-        // 降順（新しいのが上）
         return timeB.compareTo(timeA);
       });
 
-      if (!mounted) {
-        
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _watchedTopics = topics;
         _loading = false;
       });
-      
-    } catch (e, st) {
-      
-      // エラー処理
+    } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
     } finally {
       _inFlight = false;
-      
     }
   }
 
   Future<void> _refreshWatched() async {
-    if (_refreshing || _inFlight) return;  // ガード
+    if (_refreshing) return;
     setState(() => _refreshing = true);
 
-    // まずローカルの履歴を読み直して UI を最新にする
     await _loadWatchedTopics();
-
     if (mounted) setState(() => _refreshing = false);
 
-    // メタ情報更新は UI とは独立して裏側でゆっくり回す
     _startBackgroundMetaUpdate();
   }
 
   Future<void> _removeFromWatch(int topicId) async {
     await removeWatchedTopicId(topicId);
-    // ★ コメントキャッシュも消さないと、一覧で「既読（青背景）」が消えない
     await CacheService.clear('comments_$topicId');
 
-    if (!mounted) return;  // ★ mounted ガード
+    if (!mounted) return;
     setState(() {
       _watchedTopics.removeWhere((t) => t['id'] == topicId);
     });
-    await _controller.refreshAll();
+    // コントローラー側のキャッシュもクリア（もしあれば）
+    // await _controller.refreshAll(); // 全リフレッシュは重いので不要かも
   }
 
   Future<void> _onDetailReturned() async {
-    
     await _loadWatchedTopics();
-    // ★ 詳細から戻ったらキャッシュ状態（既読・下書きなど）を更新
     await _controller.refreshAll();
-    
   }
 
   void _startBackgroundMetaUpdate() {
-    if (_metaUpdating) {
-      
-      return;
-    }
+    if (_metaUpdating) return;
 
     _metaUpdating = true;
-    historyUpdatingNotifier.value = true; // ★ 回転開始
+    // historyUpdatingNotifier.value = true; // 必要ならコメントアウト解除
 
     _runMetaUpdateLoop().whenComplete(() {
       _metaUpdating = false;
-      historyUpdatingNotifier.value = false; // ★ 回転終了
+      // historyUpdatingNotifier.value = false;
     });
   }
 
   Future<void> _runMetaUpdateLoop() async {
-    
-
-    // スナップショットを取っておく（途中で _watchedTopics が変わっても安全に処理できる）
+    // リストのコピーを作成して安全にループ
     final topics = List<Map<String, dynamic>>.from(_watchedTopics);
+    final total = topics.length;
     final now = DateTime.now();
 
-    for (final t in topics) {
+    if (mounted) {
+      setState(() {
+        _progressStatus = '更新チェックを開始します...';
+      });
+    }
+
+    for (int i = 0; i < total; i++) {
       if (!mounted) break;
 
+      final t = topics[i];
       final id = t['id'] as int?;
       if (id == null) continue;
 
+      // ★ 進捗状況を更新
+      if (mounted) {
+        setState(() {
+          _progressStatus = 'チェック中: ${i + 1} / $total 件';
+        });
+      }
+
       try {
-        // dat落ちチェック: posted_at が 1ヶ月より前ならスキップ
+        // dat落ちチェック
         final postedAtStr = (t['posted_at'] as String? ?? '').trim();
-
-        // ★ GirlsChannel専用パーサで解釈
-        final postedAt = postedAtStr.isEmpty
-            ? null
-            : parseGirlsChanPostedAt(postedAtStr);
-
-        // postedAt が null → よく分からない → 「最近」とみなして fetch 続行
-        // postedAt があって 31日より前 → dat落ち扱いでスキップ
+        final postedAt = parseGirlsChanPostedAt(postedAtStr);
         if (postedAt != null) {
-          final diffDays = now.difference(postedAt).inDays;
-          if (diffDays > 31) {
-            
-            continue;
-          }
+          if (now.difference(postedAt).inDays > 31) continue;
         }
 
         final beforeComments = (t['comments'] as int?) ?? 0;
-
-        // ユーザー要望: 「トースト、現在取得中のトピック名を出してほしい」
-        final currentTitle = t['title'] as String? ?? 'トピック';
-        if (mounted) {
-          AppToast.show(context, '「$currentTitle」をチェック中...');
-        }
-
         
         final meta = await fetchTopicMeta(id);
-        
         final hasNew = await updateWatchedTopicFromMeta(meta);
-        
 
         if (hasNew && mounted) {
           final afterComments = (meta['total'] as int?) ?? beforeComments;
           final title = (meta['title'] as String?) ?? 'トピック';
-          final topicId = id;
           final postedAtStr = meta['posted_at'] as String? ?? '';
 
-          // ★ setStateを使わず、リストの中身だけ直接書き換える
-          final index = _watchedTopics.indexWhere((wt) => wt['id'] == topicId);
+          // リストデータを更新
+          final index = _watchedTopics.indexWhere((wt) => wt['id'] == id);
           if (index >= 0) {
-            _watchedTopics[index]['comments'] = afterComments;
-            _watchedTopics[index]['title'] = title;
-            _watchedTopics[index]['posted_at'] = postedAtStr;
+            setState(() {
+              // 1. 古いデータをコピーして新しい Map を作る（新品の箱を用意）
+              final newTopicData = Map<String, dynamic>.from(_watchedTopics[index]);
+              
+              // 2. 新しい Map のデータを書き換える
+              newTopicData['comments'] = afterComments;
+              newTopicData['title'] = title;
+              newTopicData['posted_at'] = postedAtStr;
+
+              // 3. リストの中身を、新しい Map にそっくり入れ替える
+              _watchedTopics[index] = newTopicData;
+            });
           }
 
-          // ★ 該当のタイルだけピンポイント更新
-          await _controller.refreshTopic(topicId);
+          // タイル表示を更新
+          await _controller.refreshTopic(id);
 
-          
-
-          if (!mounted) return;
+          // ★ 新着があった場合のみトースト通知（これは有益なので残す）
           AppToast.show(
             context,
             '「$title」に新着 ($beforeComments → $afterComments)',
             onTap: () {
-              
               Navigator.of(context).push(
                 CupertinoPageRoute(
                   builder: (_) => TopicDetailScreen(
-                    topicId: topicId,
+                    topicId: id,
                     title: title,
                     commentCount: afterComments,
                     posted_at: postedAtStr,
@@ -252,85 +222,115 @@ class FavoritesScreenState extends State<FavoritesScreen>
               );
             },
           );
-        } else {
-          // ★ 更新がない場合も表示
-          if (mounted) {
-            AppToast.show(context, '「$currentTitle」は新着なし');
-          }          
         }
-      } catch (e, st) {
-        // logd('Meta update failed for topic $id', e, st);
+      } catch (e) {
+        // ignore
       }
-      // ガルちゃん側へのスクレイプ負荷を抑えるためにウェイト
+      
+      // サーバー負荷対策ウェイト
       await Future.delayed(const Duration(seconds: 5));
     }
 
-    // 全件終わったら、更新されたコメント数・thumb・posted_at を反映するためもう一度読み直す
+    // ★ 完了処理
     if (mounted) {
-      await _loadWatchedTopics();
+      setState(() {
+        _progressStatus = ''; // バーを消す
+      });
+      await _loadWatchedTopics(); // 念のため最終同期
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget body;
+    return CupertinoPageScaffold(
+      // ★ ナビゲーションバーは TabSpec 側でタイトル管理するなら不要だが、
+      // 単体で動作させるならあっても良い。今回はタブの一部として埋め込まれる前提で
+      // Scaffold の body 相当部分を作るが、Cupertino統一のため PageScaffold を使用。
+      // もしタブ側の AppBar と二重になる場合は navigationBar を削除してください。
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('履歴'),
+      ),
+      child: SafeArea(
+        bottom: false, // タブバーと被らないように
+        child: _loading
+            ? const Center(child: AppSpinner(size: 20))
+            : _watchedTopics.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(CupertinoIcons.clock, size: 64, color: CupertinoColors.systemGrey),
+                        const SizedBox(height: 16),
+                        const Text('閲覧したトピックはありません',
+                            style: TextStyle(fontSize: 16, color: CupertinoColors.systemGrey)),
+                        const SizedBox(height: 8),
+                        const Text('トピックを見るとここに履歴が残ります',
+                            style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey)),
+                        // 強制リロードボタン（デバッグ用や復帰用）
+                        CupertinoButton(
+                          child: const Text('再読み込み'),
+                          onPressed: _refreshWatched,
+                        ),
+                      ],
+                    ),
+                  )
+                : CustomScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      // ★ iOS風のリフレッシュコントロール
+                      CupertinoSliverRefreshControl(onRefresh: _refreshWatched),
+                      
+                      // ★ 進捗バー
+                      if (_progressStatus.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: Container(
+                            width: double.infinity,
+                            color: CupertinoColors.systemBlue.withOpacity(0.1),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const CupertinoActivityIndicator(radius: 8),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _progressStatus,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: CupertinoColors.systemBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
 
-    if (_loading) {
-      body = const Center(child: AppSpinner(size: 20));
-    } else if (_watchedTopics.isEmpty) {
-      body = Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(CupertinoIcons.bookmark, size: 64, color: CupertinoColors.systemGrey),
-            const SizedBox(height: 16),
-            Text('履歴に登録されたトピックはありません',
-                style: TextStyle(fontSize: 16, color: CupertinoColors.systemGrey)),
-            const SizedBox(height: 8),
-            Text('トピック詳細の📘をタップして登録',
-                style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey)),
-          ],
-        ),
-      );
-    } else {
-      body = Column(
-        children: [
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refreshWatched,
-              child: CupertinoScrollbar(
-                controller: _scrollController,
-                child: ListView.builder(
-                  controller: _scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            final topic = _watchedTopics[i];
+                            return TopicTile(
+                              // これでコメント数が増えた瞬間に「別物」として強制的に再描画される
+                              key: ValueKey('${topic['id']}_${topic['comments']}'), 
+                              topic: topic,
+                              controller: _controller,
+                              showThumb: false,
+                              onRemove: (id) async {
+                                await _removeFromWatch(id);
+                              },
+                              onAfterPop: _onDetailReturned,
+                            );
+                          },
+                          childCount: _watchedTopics.length,
+                        ),
+                      ),
+                      
+                      // 下部余白（タブバーに隠れないように）
+                      const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                    ],
                   ),
-                  itemCount: _watchedTopics.length,
-                  itemBuilder: (context, i) {
-                    final topic = _watchedTopics[i];
-                    return TopicTile(
-                      key: ValueKey(topic['id']), // ★ keyを追加
-                      topic: topic,
-                      controller: _controller,
-                      showThumb: false,
-                      onRemove: (id) async {
-                        await _removeFromWatch(id);
-                      },
-                      onAfterPop: _onDetailReturned,
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // ★ どのパスでも必ず Scaffold を返す
-    return Scaffold(
-      body: body,
+      ),
     );
   }
 }
-

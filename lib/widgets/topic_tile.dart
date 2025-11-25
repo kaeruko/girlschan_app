@@ -1,8 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-
-
-
 import '../services/cache_service.dart';
 import '../screens/topic_detail.dart';
 import '../utils/log.dart';
@@ -101,16 +98,11 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
 
     int saved = 0;
     DateTime? modifiedTime;
-    int? cachedCount;
 
     if (hasCached) {
       final prefs = await CacheService.getPrefs();
       saved = prefs.getInt('scroll_$id') ?? 0;
       modifiedTime = await CacheService.getModifiedTime('comments_$id');
-      
-      // リスト長を取得（コメント数バッジ用）
-      final cachedList = await CacheService.loadList('comments_$id');
-      cachedCount = cachedList.length;
     }
 
     // ★ 3. 下書きの存在確認
@@ -124,10 +116,6 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       _savedCommentNo = saved;
       _cacheModifiedTime = modifiedTime;
       _hasDraft = hasDraft; // ★ 下書き状態を更新
-      
-      if (cachedCount != null && cachedCount > 0) {
-        widget.topic['comments'] = cachedCount;
-      }
     });
   }
 
