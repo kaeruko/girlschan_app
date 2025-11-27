@@ -19,7 +19,7 @@ import '../widgets/anchor_preview_sheet.dart';
 import '../widgets/topic_menu_sheet.dart';
 import '../services/settings_service.dart';
 
-// ★ 追加: フィルタレベルの定義
+// フィルタレベルの定義
 enum CommentFilterLevel {
   all,      // 全表示
   positive, // プラス > マイナス
@@ -71,13 +71,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   bool _boostCacheDuringRestore = false;
   static const double _loadMoreThreshold = 300;
 
-  // ★ 追加: 現在のフィルター設定
+  // 現在のフィルター設定
   CommentFilterLevel _currentFilter = CommentFilterLevel.all;
 
-  // ★ 追加: 設定サービス
+  // 設定サービス
   final _settings = SettingsService();
 
-  // ★ 追加: フィルタリングされたコメントリストを取得するゲッター
+  // フィルタリングされたコメントリストを取得するゲッター
   List<Comment> get _displayComments {
     if (_currentFilter == CommentFilterLevel.all) {
       return _vm.comments;
@@ -155,7 +155,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // ========== ページング ==========
   int _pageCountFor(int total) => (total + _pageSize - 1) ~/ _pageSize;
 
-  // ★ 修正: _vm.comments ではなく _displayComments を基準にする
+  // _vm.comments ではなく _displayComments を基準にする
   int get _pageCountLive => _pageCountFor(_displayComments.length);
   
   bool get _hasPrev => _currentPage > 0;
@@ -200,7 +200,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final sc = _scForPage(page);
     if (!sc.hasClients) return;
 
-    // ★ フィルタ中は追加ロードを禁止（整合性が取れないため）
+    // フィルタ中は追加ロードを禁止（整合性が取れないため）
     if (_currentFilter != CommentFilterLevel.all) return;
 
     final lastPage = _pageCountFor(_vm.comments.length) - 1;
@@ -231,7 +231,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   void _saveFromPage(int page) {
     if (_restoring) return;
 
-    // ★★★ 鉄の掟: 絞り込み中は位置情報を保存しない！ ★★★
+    // 鉄の掟: 絞り込み中は位置情報を保存しない！
     if (_currentFilter != CommentFilterLevel.all) return;
 
     final sc = _scForPage(page);
@@ -283,11 +283,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       final hasData = await _ensureDataAvailable(target);
       if (!hasData) return;
 
-      // ★ 修正: インデックスの特定を _displayComments 基準で行う
-      // これにより、フィルタリング中も正しいページ番号が計算される
+      // インデックスの特定を _displayComments 基準で行う
       final indexInList = _displayComments.indexWhere((c) => c.id == target);
       if (indexInList == -1) {
-         // フィルタリングされて消えている場合などは復元不能なので中断
          return; 
       }
       final pageIndex = indexInList ~/ _pageSize;
@@ -296,7 +294,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       final success = await _seekAndScrollToComment(pageIndex, target);
 
       if (!success && _currentFilter == CommentFilterLevel.all) {
-        // 全件表示時のみ、失敗したらリトライ予約
         _scheduleTryRestore();
       }
     } finally {
@@ -328,7 +325,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   Future<bool> _ensureDataAvailable(int targetNo) async {
-    // フィルタリング中はAPIフェッチを行わない（メモリにあるものだけで勝負）
+    // フィルタリング中はAPIフェッチを行わない
     if (_currentFilter != CommentFilterLevel.all) {
       return _displayComments.any((c) => c.id == targetNo);
     }
@@ -355,14 +352,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final sc = _scForPage(pageIndex);
     final meas = _measForPage(pageIndex);
     
-    // ★ 修正: 概算ジャンプも _displayComments を使用
+    // 概算ジャンプも _displayComments を使用
     _performApproximateJump(pageIndex, targetNo, sc, meas);
 
     for (int attempt = 0; attempt < 60; attempt++) {
       if (!mounted) return false;
       final found = await _tryAlignVisible(targetNo, pageIndex);
       if (found) {
-        // 保存はガード節で弾かれるので、ここで呼んでも安全
         _saveFromPage(pageIndex);
         _restoredOnce = true;
         return true; 
@@ -374,7 +370,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   void _performApproximateJump(int page, int targetNo, ScrollController sc, VariableListMeasurer meas) {
-    // ★ 修正: 現在の表示リストを使用
+    // 現在の表示リストを使用
     final all = _displayComments;
     final pageItems = _itemsOfPage(page, all);
     final roughIndex = pageItems.indexWhere((item) => item.id == targetNo);
@@ -407,7 +403,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     if (key.currentContext == null) return false;
 
     // 全表示時のみ、保存されていたFraction（途中位置）を反映する
-    // フィルタリング時は行頭合わせで十分
     if (_currentFilter == CommentFilterLevel.all) {
       final validCtx = key.currentContext;
       if (validCtx == null) return false;
@@ -436,7 +431,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
   // ========== UIアクション ==========
 
-  // ★ 追加: 検索ダイアログ
   void _showSearchDialog() async {
     final int? selectedNo = await showCupertinoModalPopup<int>(
       context: context,
@@ -449,7 +443,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
   }
 
-  // ★ 追加: フィルターメニュー
   void _showFilterSheet() {
     showCupertinoModalPopup(
       context: context,
@@ -499,12 +492,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-  // ★ 追加: フィルター変更時の追跡ジャンプ処理
   void _onFilterChanged(CommentFilterLevel newFilter) {
-    // 1. 切り替え前に、今見えているコメントのNoを取得（追跡用）
     int? targetNo;
     
-    // 現在のリスト（切り替え前）
     final currentList = _displayComments; 
     final pageItems = _itemsOfPage(_currentPage, currentList);
     
@@ -512,7 +502,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       targetNo = pageItems.first.id;
     }
 
-    // 2. フィルター切り替え & ページリセット
     setState(() {
       _currentFilter = newFilter;
       _currentPage = 0;
@@ -522,16 +511,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       _pc.jumpToPage(0);
     }
 
-    // 3. 切り替え後のリストで、さっきのNoへジャンプを試みる
     if (targetNo != null && targetNo > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // ★ 既存のジャンプ機能を使うことで、
-        // 「全表示」に戻った時は続きへ、「絞り込み」時も該当があればそこへ飛ぶ
         _tryRestoreIfNeeded(targetNo: targetNo);
       });
     }
 
-    // トースト
     final count = _displayComments.length;
     final msg = _currentFilter == CommentFilterLevel.all 
         ? '全件表示に戻しました' 
@@ -539,9 +524,42 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     PlatformHelper.showSnackBar(context, msg);
   }
 
+  // ★★★ 追加: 返信一覧を表示するシート ★★★
+  void _showRepliesList(List<int> replyIds) {
+    final replies = replyIds
+        .map((id) => _vm.getCommentByNo(id))
+        .whereType<Comment>()
+        .toList();
+
+    if (replies.isEmpty) {
+      PlatformHelper.showSnackBar(context, '返信コメントが見つかりません');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ReplyListSheet(
+        replies: replies,
+        onAnchorTap: (no) => _showAnchorPreview(no),
+        onImageTap: (url) {
+          Navigator.of(ctx).push(
+            CupertinoPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => ImageViewerPage(url: url),
+            ),
+          );
+        },
+        settings: _settings,
+        // ★ ここで再帰呼び出しを可能にする（自分自身を呼ぶ）
+        onRepliesTap: (ids) => _showRepliesList(ids), 
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ★ 修正: _displayComments を使用
     final items = _displayComments;
     final pageCount = _pageCountFor(items.length);
 
@@ -609,6 +627,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                                 ),
                               );
                             },
+                            // ★ 返信ボタンが押された時の処理
+                            onRepliesTap: (ids) => _showRepliesList(ids), 
+
                             onVote: (isPlus) async {
                               final no = c.id;
                               final commentId = 'vbox$no';
@@ -655,7 +676,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                         ),
                       ),
                     ),
-                  // ★ フィルター時は「さらに読み込む」は出さない（整合性のため）
                   if (page == pageCount - 1 && _currentFilter == CommentFilterLevel.all)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -749,7 +769,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           child: _vm.loading
               ? Center(child: PlatformHelper.buildLoadingIndicator())
               : items.isEmpty
-                  // ★ 0件時の表示
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -814,7 +833,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                               ),
                             ),
                           ),
-                        // 復元チップも全表示時のみ出す
                         if (_vm.savedCommentNo > 0 && !_restoredOnce && _currentFilter == CommentFilterLevel.all)
                           Positioned(
                             top: 8, right: 8,
@@ -931,7 +949,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         onJump: _showJumpDialog,
         onReload: _vm.hardReload,
         onPost: _openPostDialog,
-        onFilter: _showFilterSheet, // ★ フィルター機能
+        onFilter: _showFilterSheet,
         onBrowser: () async {
           final url = Uri.parse('https://girlschannel.net/topics/${widget.topicId}/');
           if (await canLaunchUrl(url)) {
@@ -1026,19 +1044,14 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
 
     if (!mounted) return;
-
-    // ★ 戻ってきたら下書き状態を更新（保存したかもしれないし、削除したかもしれない）
     await _vm.checkDraft();
 
     if (result != null) {
-      // 投稿されたのでコメント一覧を再読込
       await _vm.fetchDelta();
       
-      // テキストが返ってきた場合は、その本文を持つコメントを探してクリップする
       if (result is String && result.isNotEmpty) {
         final postedText = result;
         Comment? target;
-        // 最新のコメントから探す
         for (final c in _vm.comments.reversed) {
           if (c.body.trim() == postedText.trim()) {
             target = c;
@@ -1047,8 +1060,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         }
 
         if (target != null) {
-          // クリップ実行（自分のコメントラベルで）
-          // ★ Controller内のキャッシュを使用
           final labelId = _vm.myCommentLabelId ?? 0;
           await _vm.toggleClip(target, labelId: labelId);
           if (mounted) {
@@ -1081,10 +1092,8 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
   @override
   void initState() {
     super.initState();
-    // 初期状態は空にするか、全件表示するかはお好みで（今回は検索入力待ち）
     _filteredComments = []; 
     
-    // ダイアログが開いたらフォーカスを当てる
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
@@ -1106,9 +1115,8 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
     final lowerQuery = query.toLowerCase();
     setState(() {
       _filteredComments = widget.allComments.where((c) {
-        // 本文、もしくは投稿者名などで検索
         return c.body.toLowerCase().contains(lowerQuery) ||
-               (c.id.toString() == lowerQuery); // No検索も対応
+               (c.id.toString() == lowerQuery);
       }).toList();
     });
   }
@@ -1127,7 +1135,6 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
       child: SafeArea(
         child: Column(
           children: [
-            // 検索バーエリア
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: CupertinoSearchTextField(
@@ -1137,7 +1144,6 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
                 placeholder: 'キーワードまたはNoを入力',
               ),
             ),
-            // 結果リスト
             Expanded(
               child: _searchCtrl.text.isEmpty
                   ? const Center(
@@ -1155,18 +1161,17 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (ctx, i) {
                             final c = _filteredComments[i];
-                            return Material( // タップ時のリップルエフェクト用
+                            return Material( 
                               color: Colors.transparent,
                               child: ListTile(
                                 title: Text(
-                                  '${c.id}. ${c.body.replaceAll('\n', ' ')}', // 改行を除去して1行表示
+                                  '${c.id}. ${c.body.replaceAll('\n', ' ')}',
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontSize: 14),
                                 ),
                                 trailing: const Icon(CupertinoIcons.forward, size: 16),
                                 onTap: () {
-                                  // 選択されたNoを返して閉じる
                                   Navigator.pop(context, c.id);
                                 },
                               ),
@@ -1177,6 +1182,84 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ★★★ 返信一覧を表示するシート ★★★
+class ReplyListSheet extends StatelessWidget {
+  final List<Comment> replies;
+  final Function(int) onAnchorTap;
+  final Function(String) onImageTap;
+  final SettingsService settings;
+  // ★ 追加: 再帰呼び出し用のコールバック
+  final Function(List<int>)? onRepliesTap;
+
+  const ReplyListSheet({
+    super.key,
+    required this.replies,
+    required this.onAnchorTap,
+    required this.onImageTap,
+    required this.settings,
+    this.onRepliesTap, // ★ 追加
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.9,
+      minChildSize: 0.4,
+      builder: (_, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: settings.backgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // ヘッダー
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: CupertinoColors.separator)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('${replies.length}件の返信', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(CupertinoIcons.xmark_circle_fill, color: CupertinoColors.systemGrey),
+                    ),
+                  ],
+                ),
+              ),
+              // リスト
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  itemCount: replies.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final c = replies[index];
+                    return CommentTile(
+                      comment: c,
+                      userStatus: CommentUserStatus.none, 
+                      onAnchorTap: onAnchorTap,
+                      onImageTap: onImageTap,
+                      checkAnchorAvailability: (no) => true,
+                      fontSize: settings.fontSize,
+                      onRepliesTap: onRepliesTap, 
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          
+        );
+      },
     );
   }
 }

@@ -11,6 +11,7 @@ class CommentTile extends StatelessWidget {
   final VoidCallback? onLongPress;
   final Function(int no)? onAnchorTap;
   final Function(String url)? onImageTap;
+  final Function(List<int> replyIds)? onRepliesTap; // ★ 追加: 返信ボタン用コールバック
   final Function(bool isPlus)? onVote;
   final bool Function(int no)? checkAnchorAvailability;
   final double fontSize;
@@ -23,6 +24,7 @@ class CommentTile extends StatelessWidget {
     this.onLongPress,
     this.onAnchorTap,
     this.onImageTap,
+    this.onRepliesTap, // ★ 追加
     this.onVote,
     this.checkAnchorAvailability,
     this.fontSize = 15.0,
@@ -47,23 +49,23 @@ class CommentTile extends StatelessWidget {
         Row(
           children: [
             Text(
-          'No.$no  $name  $postedAt${comment.isLocal ? ' （ローカル）' : ''}',
-          style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
+              'No.$no  $name  $postedAt${comment.isLocal ? ' （ローカル）' : ''}',
+              style: const TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
+            ),
+            // 自分のコメントなら人アイコンのみ、それ以外でクリップされていればハートアイコンのみ
+            if (userStatus == CommentUserStatus.myComment)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(CupertinoIcons.person_fill, size: 14, color: CupertinoColors.activeBlue),
+              )
+            else if (userStatus == CommentUserStatus.clipped)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(CupertinoIcons.heart_fill, size: 14, color: CupertinoColors.systemPink),
+              ),
+          ],
         ),
-        // 自分のコメントなら人アイコンのみ、それ以外でクリップされていればハートアイコンのみ
-        if (userStatus == CommentUserStatus.myComment)
-          const Padding(
-            padding: EdgeInsets.only(left: 8),
-            child: Icon(CupertinoIcons.person_fill, size: 14, color: CupertinoColors.activeBlue),
-          )
-        else if (userStatus == CommentUserStatus.clipped)
-          const Padding(
-            padding: EdgeInsets.only(left: 8),
-            child: Icon(CupertinoIcons.heart_fill, size: 14, color: CupertinoColors.systemPink),
-          ),
-      ],
-    ),
-    const SizedBox(height: 8),
+        const SizedBox(height: 8),
         if (anchors.isNotEmpty)
           AnchorChips(
             anchors: anchors,
@@ -71,13 +73,9 @@ class CommentTile extends StatelessWidget {
             isReverse: false,
             checkExists: checkAnchorAvailability,
           ),
-        if (reverseAnchors.isNotEmpty)
-          AnchorChips(
-            anchors: reverseAnchors,
-            onTap: (no) => onAnchorTap?.call(no),
-            isReverse: true,
-            checkExists: checkAnchorAvailability,
-          ),
+        
+        // ★ 変更: reverseAnchors (チップ表示) は削除し、下のボタンへ移動
+        
         Text(body, style: TextStyle(fontSize: fontSize)),
         if (urls.isNotEmpty) UrlPreviewList(urls: urls),
         if (imageUrl != null) ...[
@@ -110,31 +108,71 @@ class CommentTile extends StatelessWidget {
         const SizedBox(height: 6),
         VoteBarGraph(plus: plus, minus: minus),
         const SizedBox(height: 8),
+        
+        // アクション行 (投票ボタンと返信ボタン)
         Row(
-          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                if (comment.isLocal) return;
-                onVote?.call(true);
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text('＋$plus', style: const TextStyle(color: CupertinoColors.systemRed)),
-              ),
+            // 投票ボタン
+            Row(
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minSize: 0,
+                  onPressed: () {
+                    if (comment.isLocal) return;
+                    onVote?.call(true);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    child: Text('＋$plus', style: const TextStyle(color: CupertinoColors.systemRed)),
+                  ),
+                ),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minSize: 0,
+                  onPressed: () {
+                    if (comment.isLocal) return;
+                    onVote?.call(false);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
+                  ),
+                ),
+              ],
             ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                if (comment.isLocal) return;
-                onVote?.call(false);
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text('−$minus', style: const TextStyle(color: CupertinoColors.secondaryLabel)),
+            
+            const Spacer(),
+
+            // ★ 追加: 返信ボタン
+            if (reverseAnchors.isNotEmpty)
+              GestureDetector(
+                onTap: () => onRepliesTap?.call(reverseAnchors),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.activeBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(CupertinoIcons.reply, size: 14, color: CupertinoColors.activeBlue),
+                      const SizedBox(width: 4),
+                      Text(
+                        '返信 ${reverseAnchors.length}件',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: CupertinoColors.activeBlue,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(CupertinoIcons.chevron_right, size: 12, color: CupertinoColors.activeBlue),
+                    ],
+                  ),
+                ),
               ),
-            ),
           ],
         ),
       ],
