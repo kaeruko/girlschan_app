@@ -555,11 +555,20 @@ class TopicDetailController extends ChangeNotifier {
     return list;
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     flushPendingScrollSave(); // デバウンス中の未確定分を即コミット
     _saveDebounce?.cancel();
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
   }
 
   Future<void> _touchWatchedTopic({
