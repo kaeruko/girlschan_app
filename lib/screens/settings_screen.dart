@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../services/settings_service.dart';
+import '../widgets/common/app_toast.dart';
+import '../services/data_backup_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -11,6 +13,7 @@ class SettingsScreen extends StatefulWidget {
 
 class SettingsScreenState extends State<SettingsScreen> {
   final _settings = SettingsService();
+  final _backupService = DataBackupService();
 
   // プリセットカラー
   final List<Color> _colors = const [
@@ -45,6 +48,8 @@ class SettingsScreenState extends State<SettingsScreen> {
     final currentFontSize = _settings.fontSize;
     final currentBgColor = _settings.backgroundColor;
     final isDark = currentBgColor.computeLuminance() < 0.5;
+    final bgColor = _settings.getBackgroundColor(context);
+    final textColor = _settings.getTextColor(context);
 
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
@@ -56,6 +61,21 @@ class SettingsScreenState extends State<SettingsScreen> {
           children: [
             const SizedBox(height: 20),
             
+            CupertinoListSection.insetGrouped(
+              header: const Text('データ管理'),
+              children: [
+                CupertinoListTile(
+                  title: Text('クリップをエクスポート', style: TextStyle(color: textColor)),
+                  leading: const Icon(CupertinoIcons.share_up, color: CupertinoColors.systemBlue),
+                  onTap: () => _showExportMenu(),
+                ),
+                CupertinoListTile(
+                  title: Text('クリップをインポート', style: TextStyle(color: textColor)),
+                  leading: const Icon(CupertinoIcons.arrow_down_doc, color: CupertinoColors.systemGreen),
+                  onTap: () => _showImportMenu(),
+                ),
+              ],
+            ),
             // --- 文字サイズ設定 ---
             CupertinoListSection.insetGrouped(
               header: const Text('文字サイズ'),
@@ -182,4 +202,117 @@ class SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  void _showExportMenu() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (modalContext) => CupertinoActionSheet(
+        title: const Text('クリップのバックアップ'),
+        message: const Text('保存方法を選択してください'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(modalContext);
+              await _backupService.shareExportFile();
+            },
+            child: const Text('ファイルに保存 / 共有'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(modalContext);
+              await _backupService.copyToClipboard();
+              if (mounted) AppToast.show(context, 'クリップボードにコピーしました');
+            },
+            child: const Text('クリップボードにコピー'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(modalContext),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
+  void _showImportMenu() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (modalContext) => CupertinoActionSheet(
+        title: const Text('クリップの復元'),
+        message: const Text('既存のクリップに追加されます（重複はスキップ）'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(modalContext);
+              try {
+                final count = await _backupService.pickAndImportFile();
+                if (mounted) {
+                  AppToast.show(context, '$count件のクリップを復元しました');
+                  // 必要なら clipsScreenStateKey.currentState?.reloadFromOutside(); で更新
+                }
+              } catch (e) {
+                if (mounted) AppToast.show(context, 'エラー: ファイルを読み込めませんでした');
+              }
+            },
+            child: const Text('ファイルから読み込む'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(modalContext);
+              _showJsonInputDialog();
+            },
+            child: const Text('テキストを貼り付けて読み込む'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(modalContext),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
+  void _showJsonInputDialog() {
+    final controller = TextEditingController();
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('JSONテキストを入力'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: 'ここにJSONをペースト',
+            maxLines: 5,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('キャンセル'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () async {
+              final text = controller.text.trim();
+              Navigator.pop(ctx);
+              if (text.isEmpty) return;
+              
+              try {
+                final count = await _backupService.importFromJson(text);
+                if (mounted) AppToast.show(context, '$count件のクリップを復元しました');
+              } catch (e) {
+                if (mounted) AppToast.show(context, '形式が正しくありません');
+              }
+            },
+            child: const Text('読み込む'),
+          ),
+        ],
+      ),
+    );
+  }
+
 }

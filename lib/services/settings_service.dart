@@ -38,4 +38,12 @@ class SettingsService extends ChangeNotifier {
     // ignore: deprecated_member_use
     await prefs.setInt(_kBgColorKey, color.value);
   }
+
+  Color getBackgroundColor(BuildContext context) {
+    return backgroundColor;
+  }
+
+  Color getTextColor(BuildContext context) {
+    return backgroundColor.computeLuminance() < 0.5 ? Colors.white : Colors.black;
+  }
 }

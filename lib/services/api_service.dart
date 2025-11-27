@@ -654,7 +654,6 @@ Future<void> updateClippedCommentStats({
   }
 }
 
-
 // ========== クリップラベル関連 ==========
 
 const String kMyCommentsLabelName = '📝マイコメント';
@@ -763,4 +762,19 @@ Future<void> deleteClipLabel(int id) async {
   if (clipsUpdated) {
     await prefs.setStringList('clipped_comments', newClips);
   }
+}
+
+Future<void> importClipDirectly(Map<String, dynamic> clipData) async {
+  final prefs = await SharedPreferences.getInstance();
+  
+  // 1. 現在の保存リスト（文字列のリスト）を取得
+  final List<String> clips = prefs.getStringList('clipped_comments') ?? [];
+  
+  // 2. インポートデータを JSON 文字列に変換
+  // ※ ここで clipData に 'memo' が入っていれば、そのまま保存される
+  final String jsonString = jsonEncode(clipData);
+  
+  // 3. リストに追加して保存
+  clips.add(jsonString);
+  await prefs.setStringList('clipped_comments', clips);
 }
