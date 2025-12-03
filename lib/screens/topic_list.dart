@@ -74,8 +74,9 @@ class TopicListScreenState extends State<TopicListScreen>
     logd('🔄 [_updateTopicInList] Start processing index=$index, id=$topicId', name: 'TopicList');
 
     try {
-      final metaKey = 'topic_meta_$topicId';
-      final meta = await CacheService.loadMap(metaKey);
+      // final metaKey = 'topic_meta_$topicId';
+      // final meta = await CacheService.loadMap(metaKey);
+      final meta = await getTopicMetaFromDb(topicId);
       
       if (!mounted) {
         

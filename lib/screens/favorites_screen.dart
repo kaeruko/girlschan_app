@@ -114,7 +114,8 @@ class FavoritesScreenState extends State<FavoritesScreen>
 
   Future<void> _removeFromWatch(int topicId) async {
     await removeWatchedTopicId(topicId);
-    await CacheService.clear('comments_$topicId');
+    // await CacheService.clear('comments_$topicId');
+    await deleteTopicComments(topicId);
 
     if (!mounted) return;
     setState(() {

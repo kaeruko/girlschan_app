@@ -24,6 +24,11 @@ dependencies:
   share_plus: ^7.2.1
   file_picker: ^8.0.0
 
+  # DB
+  drift: ^2.0.0
+  sqlite3_flutter_libs: ^0.5.0
+  path: ^1.8.0
+
   # デスクトップ専用（iOSでは呼ばない＝安全）
   window_manager: ^0.5.1
   webview_flutter: ^4.13.0
@@ -43,6 +48,8 @@ dev_dependencies:
   # どちらか一方に揃える。両OSで通る方へ
   network_image_mock: ^2.1.1   # ← もしmacOSで不具合なら ^2.1.0 に落とす
   dart_code_linter: ^3.2.0
+  drift_dev: ^2.0.0
+  build_runner: ^2.0.0
 
 flutter:
   # Materialを使わないなら `uses-material-design` は不要

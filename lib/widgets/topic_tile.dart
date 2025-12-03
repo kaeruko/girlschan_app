@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/cache_service.dart';
+import '../services/api_service.dart';
 import '../screens/topic_detail.dart';
 import '../utils/log.dart';
 import 'topic_tile_controller.dart';
@@ -74,7 +75,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   Future<void> refreshCacheState() async {
     final id = widget.topic['id'] as int;
     try {
-      final meta = await CacheService.loadMap('topic_meta_$id');
+      // final meta = await CacheService.loadMap('topic_meta_$id');
+      final meta = await getTopicMetaFromDb(id);
       if (meta != null) {
         if (mounted) {
           setState(() {
@@ -94,7 +96,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     }
 
     // 2. コメントキャッシュ（既読状態）の確認（既存の処理）
-    final hasCached = await CacheService.exists('comments_$id');
+    // final hasCached = await CacheService.exists('comments_$id');
+    final hasCached = await hasCachedCommentsInDb(id);
 
     int saved = 0;
     DateTime? modifiedTime;
@@ -102,7 +105,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     if (hasCached) {
       final prefs = await CacheService.getPrefs();
       saved = prefs.getInt('scroll_$id') ?? 0;
-      modifiedTime = await CacheService.getModifiedTime('comments_$id');
+      // modifiedTime = await CacheService.getModifiedTime('comments_$id');
+      modifiedTime = await getTopicFetchedAt(id);
     }
 
     // ★ 3. 下書きの存在確認

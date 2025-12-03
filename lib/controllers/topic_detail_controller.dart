@@ -249,8 +249,9 @@ class TopicDetailController extends ChangeNotifier {
     _isWatched = true;
 
     // キャッシュ
-    final cacheKey = 'comments_$topicId';
-    final cached = await CacheService.loadList(cacheKey);
+    // final cacheKey = 'comments_$topicId';
+    // final cached = await CacheService.loadList(cacheKey);
+    final cached = await getCommentsFromDb(topicId);
     if (cached.isNotEmpty) {
       final locals = await _loadLocalComments();
     _allComments = [
@@ -280,7 +281,7 @@ class TopicDetailController extends ChangeNotifier {
       _totalComments = total;
       _hasMore = list.length == commentsPerPage;
 
-      await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
+      // await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
 
       final locals = await _loadLocalComments();
       _allComments = [..._allComments, ...locals];
@@ -380,7 +381,7 @@ class TopicDetailController extends ChangeNotifier {
       }
       
       // ★ 追加: キャッシュ保存
-      await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
+      // await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
       _freezeSaving();
 
       _loadingMore = false;
@@ -443,7 +444,7 @@ class TopicDetailController extends ChangeNotifier {
       }
 
       // 6. 新しいデータをキャッシュ保存
-      await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
+      // await CacheService.saveList('comments_$topicId', _allComments.map((c) => c.toJson()).toList());
       
       // 7. 履歴も更新
       await updateWatchedTopicsComments([
@@ -577,45 +578,7 @@ class TopicDetailController extends ChangeNotifier {
     required int comments,
     required String postedAt,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-
-    final nowIso = DateTime.now().toIso8601String();
-
-    // 既存エントリを探す
-    final idx = jsonList.indexWhere((s) {
-      final m = jsonDecode(s) as Map<String, dynamic>;
-      return m['id'] == id;
-    });
-
-    if (idx >= 0) {
-      // 既に watched に登録済み → 上書き
-      final watched = jsonDecode(jsonList[idx]) as Map<String, dynamic>;
-      watched['title'] = title;
-      
-      // ★ comments が 0 の場合は、既存の値を維持する（上書きしない）
-      if (comments > 0) {
-        watched['comments'] = comments;
-      } else {
-        // 既存の値があればそれをキープ、なければ 0 のまま
-      }
-
-      watched['posted_at'] = postedAt;
-      watched['watchedAt'] = nowIso; // ★ 最終閲覧時刻を更新
-      jsonList[idx] = jsonEncode(watched);
-    } else {
-      // 初登録
-      final watched = <String, dynamic>{
-        'id': id,
-        'title': title,
-        'comments': comments,
-        'posted_at': postedAt,
-        'watchedAt': nowIso,
-      };
-      jsonList.add(jsonEncode(watched));
-    }
-
-    await prefs.setStringList('watched_topics_full', jsonList);
+    await addWatchedTopic(id: id, title: title, comments: comments, posted_at: postedAt);
   }
 
   bool get _isOld {

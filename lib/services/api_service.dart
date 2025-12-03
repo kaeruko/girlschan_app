@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:drift/drift.dart' as drift;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../utils/log.dart';
-import 'cache_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../database/database.dart';
+// import 'cache_service.dart'; // Keep for list caching in UI if needed, but we try to move away
 
 final apiBase = AppConfig.apiBase;
+final db = AppDatabase(); // Singleton
 
 // ========== ヘルパー関数（HTTP共通処理） ==========
 
@@ -61,44 +64,24 @@ Future<bool> rateComment(int topicId, String commentId, int value) async {
     
     final url = 'https://girlschannel.net/topics/post_value?value=$value&topic_id=$topicId&comment_id=$commentId';
     logd('⭐ [rateComment] Request URL: $url');
-    logd('⭐ [rateComment] Parameters: topicId=$topicId, commentId=$commentId, value=$value');
     
     final response = await http.get(
       Uri.parse(url),
       headers: {
         'accept': 'application/json, text/plain, */*',
-        'accept-language': 'ja,en-US;q=0.9,en;q=0.8',
-        'dnt': '1',
-        'priority': 'u=1, i',
-        'referer': 'https://girlschannel.net/topics/$topicId/',
-        'sec-ch-ua': '"Chromium";v="141", "Not?A_Brand";v="8"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Android"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-origin',
-        'user-agent': 'Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 CrKey/1.54.248666',
+        'user-agent': 'Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
       },
     );
     
-    logd('⭐ [rateComment] Response status: ${response.statusCode}');
-    logd('⭐ [rateComment] Response body: ${response.body}');
-    
     if (response.statusCode == 200) {
-      if (response.body.isEmpty) {
-        logd('⭐ [rateComment] ✅ Success (empty body)');
-        return true;
-      }
+      if (response.body.isEmpty) return true;
       try {
         final data = jsonDecode(response.body);
-        logd('⭐ [rateComment] Parsed JSON: $data');
         return data['result'] == true;
       } catch (e) {
-        logd('⭐ [rateComment] ⚠️ JSON parse error: $e');
         return true;
       }
     }
-    logd('⭐ [rateComment] ❌ Failed with status ${response.statusCode}');
     return false;
   } catch (e) {
     logd('⭐ [rateComment] ❌ Error: $e');
@@ -116,12 +99,6 @@ Future<Map<String, dynamic>> searchTopics({
   String? dateFilter,
 }) async {
   try {
-    // logd('');
-    // logd('============================================');
-    // logd('🔍 [searchTopics] API呼び出し開始');
-    // logd('============================================');
-    // logd('');
-    
     final uri = Uri.parse('$apiBase/search').replace(
       queryParameters: {
         'q': query,
@@ -131,17 +108,7 @@ Future<Map<String, dynamic>> searchTopics({
       },
     );
     
-    // logd('🔍 [searchTopics] API URL: $uri');
-    // logd('� [searchTopics] Parameters:');
-    // logd('   - query: $query');
-    // logd('   - page: $page');
-    // logd('   - count: $count');
-    if (dateFilter != null) logd('   - dateFilter: $dateFilter');
-    // logd('🔍 [searchTopics] API Base: $apiBase');
-    
     final data = await _fetchMap(uri);
-    
-    // logd('🔍 [searchTopics] ✅ Success');
     return data;
   } catch (e) {
     logd('🔍 [searchTopics] ❌ Error: $e');
@@ -168,8 +135,6 @@ Future<Map<String, dynamic>> fetchTopicMeta(int topicId) async {
       )
       .timeout(const Duration(seconds: 30));
 
-  logd('📡 [fetchTopicMeta] Response: ${resp.body}', name: 'API');
-
   if (resp.statusCode != 200) {
     throw Exception('fetchTopicMeta failed: ${resp.statusCode}');
   }
@@ -188,97 +153,73 @@ Future<Map<String, dynamic>> fetchTopicMeta(int topicId) async {
 Future<bool> updateWatchedTopicFromMeta(Map<String, dynamic> meta) async {
   final topicId = meta['id'] as int;
   final newTotal = (meta['total'] as int?) ?? 0;
-  final newThumb = meta['thumb'];
-  final newPostedAt = meta['posted_at'];
-  final newFetchedAt = meta['fetched_at'];
+  final newThumb = meta['thumb'] as String?;
+  final newPostedAt = meta['posted_at'] as String?;
 
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-
-  bool updated = false;
-  bool hasNewComments = false;
-
-  for (int i = 0; i < jsonList.length; i++) {
-    final watched = jsonDecode(jsonList[i]) as Map<String, dynamic>;
-    if (watched['id'] != topicId) continue;
-
-    final oldTotal = (watched['comments'] as int?) ?? 0;
+  // DBの履歴を更新
+  final topic = await (db.select(db.topics)..where((t) => t.id.equals(topicId))).getSingleOrNull();
+  
+  if (topic != null && topic.lastViewedAt != null) {
+    final oldTotal = topic.commentCount;
     if (newTotal > oldTotal) {
-      hasNewComments = true;
+      // 更新あり
+      await (db.update(db.topics)..where((t) => t.id.equals(topicId))).write(
+        TopicsCompanion(
+          commentCount: drift.Value(newTotal),
+          postedAt: newPostedAt != null ? drift.Value(newPostedAt) : drift.Value.absent(),
+          thumbnail: newThumb != null ? drift.Value(newThumb) : drift.Value.absent(),
+          fetchedAt: drift.Value(DateTime.now()),
+        )
+      );
+      return true;
     }
-
-    // コメント数
-    watched['comments'] = newTotal;
-
-    // 投稿日・サムネはあれば上書き
-    if (newPostedAt is String && newPostedAt.isNotEmpty) {
-      watched['posted_at'] = newPostedAt;
-    }
-    if (newFetchedAt is String && newFetchedAt.isNotEmpty) {
-      watched['fetched_at'] = newFetchedAt;
-    }
-    if (newThumb is String && newThumb.isNotEmpty) {
-      watched['thumb'] = newThumb;
-    }
-
-    jsonList[i] = jsonEncode(watched);
-    updated = true;
-    break;
   }
-
-  if (updated) {
-    await prefs.setStringList('watched_topics_full', jsonList);
-  }
-
-  return hasNewComments;
+  return false;
 }
 
 
 // キャッシュ対応のトピック取得
 Future<List<dynamic>> fetchNewTopicsWithCache() async {
   try {
-    logd('');
-    logd('============================================');
-    logd('📰 [fetchNewTopicsWithCache] API呼び出し開始');
-    logd('============================================');
-    logd('');
-    
     final uri = '$apiBase/topics/new';
-    logd('📰 [fetchNewTopicsWithCache] API URL: $uri');
-    
     final data = await _fetchList(Uri.parse(uri));
     
-    // ⚠️ キャッシュへの保存はUI側（TopicListScreen）で一本化
-    // logd('📰 [fetchNewTopicsWithCache] (キャッシュ保存は UI 側で処理)');
+    // DBに保存
+    await _upsertTopicsFromApi(data);
+    
     return data;
   } catch (e) {
-    // logd('📰 [fetchNewTopicsWithCache] ❌ Error: $e');
-    rethrow; // ← UI側で cacheKey を使ってキャッシュから拾う
+    rethrow;
   }
 }
 
 /// キャッシュ対応の人気トピック取得
 Future<List<dynamic>> fetchPopularTopicsWithCache() async {
   try {
-    // logd('');
-    // logd('============================================');
-    // logd('⭐ [fetchPopularTopicsWithCache] API呼び出し開始');
-    // logd('============================================');
-    // logd('');
-    
     final uri = '$apiBase/topics/popular';
-    // logd('⭐ [fetchPopularTopicsWithCache] API URL: $uri');
-    
     final data = await _fetchList(Uri.parse(uri));
     
-    // logd('⭐ [fetchPopularTopicsWithCache] ✅ Success - Fetched ${data.length} topics');
-    // ⚠️ キャッシュへの保存はUI側（TopicListScreen）で一本化
-    // logd('⭐ [fetchPopularTopicsWithCache] (キャッシュ保存は UI 側で処理)');
+    // DBに保存
+    await _upsertTopicsFromApi(data);
+    
     return data;
   } catch (e) {
-    // logd('⭐ [fetchPopularTopicsWithCache] ❌ Error: $e');
-    rethrow; // ← UI側で cacheKey を使ってキャッシュから拾う
+    rethrow;
   }
+}
+
+Future<void> _upsertTopicsFromApi(List<dynamic> list) async {
+  final entries = list.map((json) {
+    return TopicsCompanion.insert(
+      id: json['id'],
+      title: json['title'],
+      commentCount: drift.Value(json['comments'] ?? 0),
+      postedAt: drift.Value(json['posted_at']),
+      thumbnail: drift.Value(json['thumb']),
+      fetchedAt: drift.Value(DateTime.now()),
+    );
+  }).toList();
+  await db.upsertTopics(entries);
 }
 
 // キャッシュ対応のコメント取得（ページング対応）
@@ -289,12 +230,6 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
   bool old = false,
 }) async {
   try {
-    // logd('');
-    // logd('============================================');
-    // logd('💬 [fetchCommentsWithPagination] API呼び出し開始');
-    // logd('============================================');
-    // logd('');
-    
     final queryParams = {
       'offset': offset.toString(),
       'limit': limit.toString(),
@@ -306,40 +241,51 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     final uri = Uri.parse('$apiBase/topic/$topicId').replace(
       queryParameters: queryParams,
     );
-    // logd('💬 [fetchCommentsWithPagination] API URL: $uri');
-    // logd('💬 [fetchCommentsWithPagination] Parameters: topicId=$topicId, offset=$offset, limit=$limit');
     
     final data = await _fetchMap(uri);
     
-    // logd('💬 [fetchCommentsWithPagination] Parsing JSON...');
     final comments = data['comments'] as List<dynamic>? ?? [];
     final total = data['total'] as int? ?? comments.length;
-    
-    // ★追加: Python側から返ってくる新しいフィールドを取得
     final posted_at = data['posted_at'] as String? ?? '';
-    final thumb = data['thumb'] as String?; // nullの場合もあるので nullable
+    final thumb = data['thumb'] as String?;
 
-    // logd('💬 [fetchCommentsWithPagination] ✅ Fetched ${comments.length} comments (total: $total)');
-    // logd('💬 [fetchCommentsWithPagination] Offset: $offset, Limit: $limit');
-    
-    // ★修正: totalだけでなく、サムネや日時もメタキャッシュに保存しておく
-    await CacheService.saveMap('topic_meta_$topicId', {
-      'total': total,
-      'posted_at': posted_at,
-      'thumb': thumb,
-    });
-    // logd('💬 [fetchCommentsWithPagination] 💾 Cached meta for topic $topicId');
+    // DBにコメント保存
+    final commentEntries = comments.map((c) {
+      return CommentsCompanion.insert(
+        topicId: topicId,
+        number: c['no'],
+        body: c['body'],
+        name: drift.Value(c['name']),
+        postedAt: drift.Value(c['posted_at']),
+        plus: drift.Value(c['plus'] ?? 0),
+        minus: drift.Value(c['minus'] ?? 0),
+        imageUrl: drift.Value(c['image_url']),
+        anchors: drift.Value(List<int>.from(c['anchors'] ?? [])),
+        reverseAnchors: drift.Value(List<int>.from(c['reverse_anchors'] ?? [])),
+      );
+    }).toList();
+    await db.upsertComments(commentEntries);
+
+    // DBのトピックメタ情報を更新
+    // タイトルが不明な場合は更新のみ試みる
+    await (db.update(db.topics)..where((t) => t.id.equals(topicId))).write(
+      TopicsCompanion(
+        commentCount: drift.Value(total),
+        postedAt: posted_at.isNotEmpty ? drift.Value(posted_at) : drift.Value.absent(),
+        thumbnail: thumb != null ? drift.Value(thumb) : drift.Value.absent(),
+        fetchedAt: drift.Value(DateTime.now()),
+      )
+    );
     
     return {
       'comments': comments,
       'total': total,
       'posted_at': posted_at,
-      'thumb': thumb, // ★戻り値に追加
+      'thumb': thumb,
       'offset': offset,
       'limit': limit,
     };
   } catch (e) {
-    // logd('💬 [fetchCommentsWithPagination] ❌ Error: $e');
     rethrow;
   }
 }
@@ -347,64 +293,31 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
 /// 指定されたコメントのスレッド（アンカー先・元など）を取得
 Future<Map<String, dynamic>> fetchCommentThread(int topicId, int commentId) async {
   try {
-    // logd('');
-    // logd('============================================');
-    // logd('🧵 [fetchCommentThread] API呼び出し開始');
-    // logd('============================================');
-    // logd('');
-
     final uri = Uri.parse('$apiBase/comment/$topicId/$commentId');
-    // logd('🧵 [fetchCommentThread] API URL: $uri');
-
     final data = await _fetchMap(uri);
-
-    // logd('🧵 [fetchCommentThread] ✅ Success - Fetched ${data['count']} comments');
     return data;
   } catch (e) {
-    // logd('🧵 [fetchCommentThread] ❌ Error: $e');
     rethrow;
   }
 }
+
 // ========== 履歴関連（トピック履歴） ==========
 
 Future<List<Map<String, dynamic>>> getWatchedTopics() async {
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-
-  final topics = jsonList
-      .map((e) => jsonDecode(e) as Map<String, dynamic>)
-      .toList();
-
-  for (final t in topics) {
-    // logd('📂 [getWatchedTopics] id=${t['id']} title=${t['title']} posted_at=${t['posted_at']} fetched_at=${t['fetched_at']}');
-  }
-
-  // watchedAt があれば、クリップと同じように新しい順にソート
-  topics.sort((a, b) {
-    DateTime parseDate(String? s) {
-      if (s == null || s.isEmpty) {
-        return DateTime.fromMillisecondsSinceEpoch(0);
-      }
-      try {
-        return DateTime.parse(s);
-      } catch (_) {
-        return DateTime.fromMillisecondsSinceEpoch(0);
-      }
-    }
-
-    return parseDate(b['watchedAt'] as String?)
-        .compareTo(parseDate(a['watchedAt'] as String?));
-  });
-
-  return topics;
+  final history = await db.getHistory();
+  return history.map((t) => {
+    'id': t.id,
+    'title': t.title,
+    'comments': t.commentCount,
+    'posted_at': t.postedAt,
+    'thumb': t.thumbnail,
+    'watchedAt': t.lastViewedAt?.toIso8601String(),
+  }).toList();
 }
 
 Future<List<int>> getWatchedTopicIds() async {
-  final topics = await getWatchedTopics();
-  return topics
-      .map((topic) => topic['id'])
-      .whereType<int>()
-      .toList();
+  final history = await db.getHistory();
+  return history.map((t) => t.id).toList();
 }
 
 Future<void> addWatchedTopic({
@@ -413,136 +326,78 @@ Future<void> addWatchedTopic({
   required int comments,
   required String posted_at,
 }) async {
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-
-  final isDuplicate = jsonList.any((e) {
-    final topic = jsonDecode(e) as Map<String, dynamic>;
-    return topic['id'] == id;
-  });
-
-  if (!isDuplicate) {
-    final topic = {
-      'id': id,
-      'title': title,
-      'comments': comments,
-      'posted_at': posted_at,
-      'watchedAt': DateTime.now().toIso8601String(),
-    };
-    jsonList.add(jsonEncode(topic));
-    await prefs.setStringList('watched_topics_full', jsonList);
-  }
+  // トピックを保存（または更新）
+  await db.upsertTopics([TopicsCompanion.insert(
+    id: id,
+    title: title,
+    commentCount: drift.Value(comments),
+    postedAt: drift.Value(posted_at),
+    fetchedAt: drift.Value(DateTime.now()),
+  )]);
+  
+  // 閲覧済みにマーク
+  await db.markTopicAsViewed(id);
 }
 
 Future<void> removeWatchedTopicId(int id) async {
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-
-  jsonList.removeWhere((e) {
-    final topic = jsonDecode(e) as Map<String, dynamic>;
-    return topic['id'] == id;
-  });
-
-  await prefs.setStringList('watched_topics_full', jsonList);
-
-  // 旧 watched_topics も整理したいならついでに消す
-  final legacy = prefs.getStringList('watched_topics') ?? [];
-  if (legacy.isNotEmpty) {
-    final filtered = legacy.where((s) => int.tryParse(s) != id).toList();
-    await prefs.setStringList('watched_topics', filtered);
-  }
+  // 履歴フラグを下ろす（データはキャッシュとして残す）
+  await (db.update(db.topics)..where((t) => t.id.equals(id))).write(
+    const TopicsCompanion(lastViewedAt: drift.Value(null)),
+  );
 }
 
 /// APIから取得したトピックリストで、watchedTopicsのコメント数を更新
 Future<void> updateWatchedTopicsComments(
   List<Map<String, dynamic>> fetchedTopics,
 ) async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-    
-    if (jsonList.isEmpty) {
-      return;
-    }
-    
-    final fetchedMap = {
-      for (final topic in fetchedTopics) 
-        (topic['id'] as int): topic
-    };
-    
-    bool updated = false;
-    for (int i = 0; i < jsonList.length; i++) {
-      final watched = jsonDecode(jsonList[i]) as Map<String, dynamic>;
-      final topicId = watched['id'] as int;
-      
-      if (fetchedMap.containsKey(topicId)) {
-        final fetchedComments = fetchedMap[topicId]!['comments'] as int?;
-        
-        if (fetchedComments != null ) {          
-          watched['comments'] = fetchedComments;
-          jsonList[i] = jsonEncode(watched);
-          updated = true;
-        }
-      }
-    }
-    
-    if (updated) {
-      await prefs.setStringList('watched_topics_full', jsonList);
-    }
-  } catch (e) {
-    // エラー処理
-  }
+  // DBの一括更新
+  await _upsertTopicsFromApi(fetchedTopics);
 }
 
 /// トピックを閲覧したとして、watchedAt（最終閲覧日時）を現在時刻に更新する
 Future<void> touchWatchedTopic(int topicId) async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = prefs.getStringList('watched_topics_full') ?? [];
-    
-    bool updated = false;
-    
-    // リストを走査して該当IDを探す
-    for (int i = 0; i < jsonList.length; i++) {
-      final Map<String, dynamic> topic = jsonDecode(jsonList[i]);
-      
-      if (topic['id'] == topicId) {
-        // 日時を現在時刻に更新
-        topic['watchedAt'] = DateTime.now().toIso8601String();
-        
-        // リストを更新
-        jsonList[i] = jsonEncode(topic);
-        updated = true;
-        break; // IDはユニークなので見つかったら終了
-      }
-    }
-    
-    if (updated) {
-      // 更新があった場合のみ保存
-      await prefs.setStringList('watched_topics_full', jsonList);
-      // logd('👆 [touchWatchedTopic] Updated timestamp for ID: $topicId');
-    }
-  } catch (e) {
-    // logd('❌ [touchWatchedTopic] Error: $e');
-  }
+  await db.markTopicAsViewed(topicId);
 }
 
 /// 履歴全体を削除
 Future<void> clearWatchedHistory() async {
-  final prefs = await SharedPreferences.getInstance();
-  final hadFull = prefs.containsKey('watched_topics_full');
-  final hadIds = prefs.containsKey('watched_topics');
-  await prefs.remove('watched_topics_full');
-  await prefs.remove('watched_topics'); // 旧形式も一緒に消す
-  logd('🧹 [clearWatchedHistory] full=$hadFull, ids=$hadIds → cleared', name: 'ClearHistory');
+  await db.topics.update().write(
+    const TopicsCompanion(lastViewedAt: drift.Value(null)),
+  );
 }
 
 // ========== クリップ関連（コメント保存） ==========
 
 Future<List<Map<String, dynamic>>> getClippedComments() async {
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('clipped_comments') ?? [];
-  return jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  // クリップされたコメントと、そのトピック情報を結合して取得
+  final query = db.select(db.comments).join([
+    drift.innerJoin(db.topics, db.topics.id.equalsExp(db.comments.topicId))
+  ]);
+  query.where(db.comments.isClipped.equals(true));
+  query.orderBy([drift.OrderingTerm.desc(db.comments.clippedAt)]);
+  
+  final result = await query.get();
+  
+  return result.map((row) {
+    final comment = row.readTable(db.comments);
+    final topic = row.readTable(db.topics);
+    return {
+      'topicId': topic.id,
+      'topicTitle': topic.title,
+      'no': comment.number,
+      'body': comment.body,
+      'posted_at': comment.postedAt,
+      'name': comment.name,
+      'plus': comment.plus,
+      'minus': comment.minus,
+      'anchors': comment.anchors,
+      'reverse_anchors': comment.reverseAnchors,
+      'image_url': comment.imageUrl,
+      'clipDate': comment.clippedAt?.toIso8601String(),
+      'labelId': comment.labelId,
+      'memo': comment.clipMemo,
+    };
+  }).toList();
 }
 
 Future<void> addClippedComment({
@@ -556,72 +411,62 @@ Future<void> addClippedComment({
   required int minus,
   List<dynamic> anchors = const [],
   List<dynamic> reverse_anchors = const [],
-  String? imageUrl, // ★ 追加
-  List<dynamic> urls = const [], // ★ 追加
+  String? imageUrl,
+  List<dynamic> urls = const [], // DBには未対応だが引数は維持
   int labelId = 0,
 }) async {
-  final prefs = await SharedPreferences.getInstance();
-  final clips = prefs.getStringList('clipped_comments') ?? [];
-  
-  final clip = {
-    'topicId': topicId,
-    'topicTitle': topicTitle,
-    'no': commentNo,
-    'body': commentBody,
-    'posted_at': posted_at,
-    'name': name,
-    'plus': plus,
-    'minus': minus,
-    'anchors': anchors,
-    'reverse_anchors': reverse_anchors,
-    'image_url': imageUrl, // ★ 追加
-    'urls': urls, // ★ 追加
-    'clipDate': DateTime.now().toIso8601String(),
-    'labelId': labelId,
-  };
-  
-  // 重複チェック（同じトピックの同じコメント）
-  final isDuplicate = clips.any((e) {
-    final existing = jsonDecode(e) as Map<String, dynamic>;
-    return existing['topicId'] == topicId && existing['no'] == commentNo;
-  });
-  
-  if (!isDuplicate) {
-    clips.add(jsonEncode(clip));
-    await prefs.setStringList('clipped_comments', clips);
+  // トピックが存在しない場合は作成
+  final topicExists = await (db.select(db.topics)..where((t) => t.id.equals(topicId))).getSingleOrNull();
+  if (topicExists == null) {
+    await db.upsertTopics([TopicsCompanion.insert(
+      id: topicId,
+      title: topicTitle,
+      postedAt: drift.Value(posted_at),
+      fetchedAt: drift.Value(DateTime.now()),
+    )]);
   }
+
+  // コメントをUpsertしつつクリップ状態にする
+  // 既存のコメントがある場合は、クリップ情報を更新
+  await db.batch((batch) {
+    batch.insert(
+      db.comments,
+      CommentsCompanion.insert(
+        topicId: topicId,
+        number: commentNo,
+        body: commentBody,
+        name: drift.Value(name),
+        postedAt: drift.Value(posted_at),
+        plus: drift.Value(plus),
+        minus: drift.Value(minus),
+        imageUrl: drift.Value(imageUrl),
+        anchors: drift.Value(List<int>.from(anchors)),
+        reverseAnchors: drift.Value(List<int>.from(reverse_anchors)),
+        isClipped: const drift.Value(true),
+        clippedAt: drift.Value(DateTime.now()),
+        labelId: drift.Value(labelId),
+      ),
+      onConflict: drift.DoUpdate((old) => CommentsCompanion.custom(
+        isClipped: const drift.Value(true),
+        clippedAt: drift.Value(DateTime.now()),
+        labelId: drift.Value(labelId),
+        // 本文なども最新化
+        body: drift.Value(commentBody),
+        plus: drift.Value(plus),
+        minus: drift.Value(minus),
+      )),
+    );
+  });
 }
 
 Future<void> removeClippedComment(int topicId, int commentNo) async {
-  final prefs = await SharedPreferences.getInstance();
-  final clips = prefs.getStringList('clipped_comments') ?? [];
-  
-  clips.removeWhere((e) {
-    final clip = jsonDecode(e) as Map<String, dynamic>;
-    return clip['topicId'] == topicId && clip['no'] == commentNo;
-  });
-  
-  await prefs.setStringList('clipped_comments', clips);
+  await db.toggleClip(topicId, commentNo, false);
 }
 
 Future<void> updateClippedCommentMemo(int topicId, int commentNo, String memo) async {
-  final prefs = await SharedPreferences.getInstance();
-  final clips = prefs.getStringList('clipped_comments') ?? [];
-  
-  bool updated = false;
-  for (int i = 0; i < clips.length; i++) {
-    final clip = jsonDecode(clips[i]) as Map<String, dynamic>;
-    if (clip['topicId'] == topicId && clip['no'] == commentNo) {
-      clip['memo'] = memo;
-      clips[i] = jsonEncode(clip);
-      updated = true;
-      break;
-    }
-  }
-  
-  if (updated) {
-    await prefs.setStringList('clipped_comments', clips);
-  }
+  await (db.update(db.comments)..where((c) => c.topicId.equals(topicId) & c.number.equals(commentNo))).write(
+    CommentsCompanion(clipMemo: drift.Value(memo)),
+  );
 }
 
 Future<void> updateClippedCommentStats({
@@ -632,26 +477,14 @@ Future<void> updateClippedCommentStats({
   required List<dynamic> anchors,
   required List<dynamic> reverse_anchors,
 }) async {
-  final prefs = await SharedPreferences.getInstance();
-  final clips = prefs.getStringList('clipped_comments') ?? [];
-  
-  bool updated = false;
-  for (int i = 0; i < clips.length; i++) {
-    final clip = jsonDecode(clips[i]) as Map<String, dynamic>;
-    if (clip['topicId'] == topicId && clip['no'] == commentNo) {
-      clip['plus'] = plus;
-      clip['minus'] = minus;
-      clip['anchors'] = anchors;
-      clip['reverse_anchors'] = reverse_anchors;
-      clips[i] = jsonEncode(clip);
-      updated = true;
-      break;
-    }
-  }
-  
-  if (updated) {
-    await prefs.setStringList('clipped_comments', clips);
-  }
+  await (db.update(db.comments)..where((c) => c.topicId.equals(topicId) & c.number.equals(commentNo))).write(
+    CommentsCompanion(
+      plus: drift.Value(plus),
+      minus: drift.Value(minus),
+      anchors: drift.Value(List<int>.from(anchors)),
+      reverseAnchors: drift.Value(List<int>.from(reverse_anchors)),
+    ),
+  );
 }
 
 // ========== クリップラベル関連 ==========
@@ -659,16 +492,18 @@ Future<void> updateClippedCommentStats({
 const String kMyCommentsLabelName = '📝マイコメント';
 
 Future<List<Map<String, dynamic>>> getClipLabels() async {
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('clip_labels') ?? [];
-  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  
-  // デフォルトラベルがなければ追加（表示用、保存はしない）
-  if (!labels.any((l) => l['id'] == 0)) {
-    labels.insert(0, {'id': 0, 'name': '', 'createdAt': DateTime.now().toIso8601String()});
+  final labels = await db.select(db.clipLabels).get();
+  final list = labels.map((l) => {
+    'id': l.id,
+    'name': l.name,
+    'createdAt': l.createdAt.toIso8601String(),
+  }).toList();
+
+  // デフォルトラベル(ID:0)はDBに含まれない場合があるので、なければ追加
+  if (!list.any((l) => l['id'] == 0)) {
+    list.insert(0, {'id': 0, 'name': '', 'createdAt': DateTime.now().toIso8601String()});
   }
-  
-  return labels;
+  return list;
 }
 
 Future<int> getOrCreateMyCommentLabel() async {
@@ -696,85 +531,92 @@ Future<bool> isMyCommentLabel(int labelId) async {
 }
 
 Future<void> addClipLabel(String name) async {
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('clip_labels') ?? [];
-  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  
-  // ID生成 (max ID + 1)
-  int maxId = 0;
-  for (final l in labels) {
-    final id = l['id'] as int;
-    if (id > maxId) maxId = id;
-  }
-  final newId = maxId + 1;
-  
-  final newLabel = {
-    'id': newId,
-    'name': name,
-    'createdAt': DateTime.now().toIso8601String(),
-  };
-  
-  labels.add(newLabel);
-  await prefs.setStringList('clip_labels', labels.map((e) => jsonEncode(e)).toList());
+  await db.into(db.clipLabels).insert(ClipLabelsCompanion.insert(name: name));
 }
 
 Future<void> updateClipLabel(int id, String name) async {
-  if (id == 0) return; // デフォルトラベルは編集不可
-  
-  final prefs = await SharedPreferences.getInstance();
-  final jsonList = prefs.getStringList('clip_labels') ?? [];
-  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  
-  final index = labels.indexWhere((l) => l['id'] == id);
-  if (index != -1) {
-    labels[index]['name'] = name;
-    await prefs.setStringList('clip_labels', labels.map((e) => jsonEncode(e)).toList());
-  }
+  if (id == 0) return;
+  await (db.update(db.clipLabels)..where((l) => l.id.equals(id))).write(
+    ClipLabelsCompanion(name: drift.Value(name)),
+  );
 }
 
 Future<void> deleteClipLabel(int id) async {
-  if (id == 0) return; // デフォルトラベルは削除不可
-  
-  final prefs = await SharedPreferences.getInstance();
+  if (id == 0) return;
   
   // 1. ラベル削除
-  final jsonList = prefs.getStringList('clip_labels') ?? [];
-  final labels = jsonList.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-  labels.removeWhere((l) => l['id'] == id);
-  await prefs.setStringList('clip_labels', labels.map((e) => jsonEncode(e)).toList());
+  await (db.delete(db.clipLabels)..where((l) => l.id.equals(id))).go();
   
   // 2. 削除されたラベルのクリップをデフォルト(0)に移動
-  final clipsJson = prefs.getStringList('clipped_comments') ?? [];
-  bool clipsUpdated = false;
-  final newClips = <String>[];
-  
-  for (final c in clipsJson) {
-    final clip = jsonDecode(c) as Map<String, dynamic>;
-    if (clip['labelId'] == id) {
-      clip['labelId'] = 0;
-      newClips.add(jsonEncode(clip));
-      clipsUpdated = true;
-    } else {
-      newClips.add(c);
-    }
-  }
-  
-  if (clipsUpdated) {
-    await prefs.setStringList('clipped_comments', newClips);
-  }
+  await (db.update(db.comments)..where((c) => c.labelId.equals(id))).write(
+    const CommentsCompanion(labelId: drift.Value(0)),
+  );
 }
 
 Future<void> importClipDirectly(Map<String, dynamic> clipData) async {
-  final prefs = await SharedPreferences.getInstance();
+  // インポート機能：Mapから復元
+  final topicId = clipData['topicId'] as int;
+  final commentNo = clipData['no'] as int;
   
-  // 1. 現在の保存リスト（文字列のリスト）を取得
-  final List<String> clips = prefs.getStringList('clipped_comments') ?? [];
+  await addClippedComment(
+    topicId: topicId,
+    topicTitle: clipData['topicTitle'] ?? '',
+    commentNo: commentNo,
+    commentBody: clipData['body'] ?? '',
+    posted_at: clipData['posted_at'] ?? '',
+    name: clipData['name'] ?? '',
+    plus: clipData['plus'] ?? 0,
+    minus: clipData['minus'] ?? 0,
+    anchors: clipData['anchors'] ?? [],
+    reverse_anchors: clipData['reverse_anchors'] ?? [],
+    imageUrl: clipData['image_url'],
+    labelId: clipData['labelId'] ?? 0,
+  );
   
-  // 2. インポートデータを JSON 文字列に変換
-  // ※ ここで clipData に 'memo' が入っていれば、そのまま保存される
-  final String jsonString = jsonEncode(clipData);
+  if (clipData['memo'] != null) {
+    await updateClippedCommentMemo(topicId, commentNo, clipData['memo']);
+  }
+}
+
+// ========== 追加: UI用ヘルパー ==========
+
+/// トピックのメタ情報をDBから取得（キャッシュ代わり）
+Future<Map<String, dynamic>?> getTopicMetaFromDb(int topicId) async {
+  final topic = await (db.select(db.topics)..where((t) => t.id.equals(topicId))).getSingleOrNull();
+  if (topic == null) return null;
   
-  // 3. リストに追加して保存
-  clips.add(jsonString);
-  await prefs.setStringList('clipped_comments', clips);
+  return {
+    'total': topic.commentCount,
+    'posted_at': topic.postedAt,
+    'thumb': topic.thumbnail,
+  };
+}
+
+Future<bool> hasCachedCommentsInDb(int topicId) async {
+  final count = await (db.select(db.comments)..where((c) => c.topicId.equals(topicId))).limit(1).get().then((l) => l.length);
+  return count > 0;
+}
+
+Future<DateTime?> getTopicFetchedAt(int topicId) async {
+  final topic = await (db.select(db.topics)..where((t) => t.id.equals(topicId))).getSingleOrNull();
+  return topic?.fetchedAt;
+}
+
+Future<List<Map<String, dynamic>>> getCommentsFromDb(int topicId) async {
+  final comments = await db.getCommentsForTopic(topicId);
+  return comments.map((c) => {
+    'no': c.number,
+    'body': c.body,
+    'name': c.name,
+    'posted_at': c.postedAt,
+    'plus': c.plus,
+    'minus': c.minus,
+    'image_url': c.imageUrl,
+    'anchors': c.anchors,
+    'reverse_anchors': c.reverseAnchors,
+  }).toList();
+}
+
+Future<void> deleteTopicComments(int topicId) async {
+  await (db.delete(db.comments)..where((c) => c.topicId.equals(topicId))).go();
 }
