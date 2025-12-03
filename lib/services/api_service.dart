@@ -493,7 +493,7 @@ const String kMyCommentsLabelName = '📝マイコメント';
 
 Future<List<Map<String, dynamic>>> getClipLabels() async {
   final labels = await db.select(db.clipLabels).get();
-  final list = labels.map((l) => {
+  final list = labels.map<Map<String, dynamic>>((l) => {
     'id': l.id,
     'name': l.name,
     'createdAt': l.createdAt.toIso8601String(),
@@ -510,7 +510,7 @@ Future<int> getOrCreateMyCommentLabel() async {
   final labels = await getClipLabels();
   final existing = labels.firstWhere(
     (l) => l['name'] == kMyCommentsLabelName,
-    orElse: () => {},
+    orElse: () => <String, dynamic>{},
   );
 
   if (existing.isNotEmpty) {

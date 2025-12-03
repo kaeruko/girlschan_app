@@ -5,8 +5,7 @@ import '../utils/log.dart';
 class AppConfig {
   static late String apiBase;
 
-  static const String googleDriveFileId = '1dxoVmKCEHnIRinUC2gK-YC3ZinRE9GnA';
-
+  static const String googleDriveFileId = '1XYsfmC3A0qtVbGgEmCvtmQvL0Qm405x1';
   // 既存のgetterは使わず、fetch内で確実にキャッシュバスターを付ける
   static String get googleDriveDownloadUrl =>
       'https://drive.google.com/uc?export=download&id=$googleDriveFileId';
@@ -24,7 +23,7 @@ class AppConfig {
       apiBase = response.trim();
     } catch (e) {
       logd('エラー: Google Drive から apiBase の読み込みに失敗しました: $e');
-      apiBase = 'https://yrnsrxjm7mjsye3pxrng44kml40vngmb.lambda-url.us-west-2.on.aws';
+      apiBase = '';
     }
   }
 
