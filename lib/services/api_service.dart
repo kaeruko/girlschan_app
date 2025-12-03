@@ -211,7 +211,7 @@ Future<List<dynamic>> fetchPopularTopicsWithCache() async {
 Future<void> _upsertTopicsFromApi(List<dynamic> list) async {
   final entries = list.map((json) {
     return TopicsCompanion.insert(
-      id: json['id'],
+      id: drift.Value(json['id']),
       title: json['title'],
       commentCount: drift.Value(json['comments'] ?? 0),
       postedAt: drift.Value(json['posted_at']),
@@ -328,7 +328,7 @@ Future<void> addWatchedTopic({
 }) async {
   // トピックを保存（または更新）
   await db.upsertTopics([TopicsCompanion.insert(
-    id: id,
+    id: drift.Value(id),
     title: title,
     commentCount: drift.Value(comments),
     postedAt: drift.Value(posted_at),
@@ -419,7 +419,7 @@ Future<void> addClippedComment({
   final topicExists = await (db.select(db.topics)..where((t) => t.id.equals(topicId))).getSingleOrNull();
   if (topicExists == null) {
     await db.upsertTopics([TopicsCompanion.insert(
-      id: topicId,
+      id: drift.Value(topicId),
       title: topicTitle,
       postedAt: drift.Value(posted_at),
       fetchedAt: drift.Value(DateTime.now()),
@@ -447,13 +447,13 @@ Future<void> addClippedComment({
         labelId: drift.Value(labelId),
       ),
       onConflict: drift.DoUpdate((old) => CommentsCompanion.custom(
-        isClipped: const drift.Value(true),
-        clippedAt: drift.Value(DateTime.now()),
-        labelId: drift.Value(labelId),
+        isClipped: const drift.Constant(true),
+        clippedAt: drift.Constant(DateTime.now()),
+        labelId: drift.Constant(labelId),
         // 本文なども最新化
-        body: drift.Value(commentBody),
-        plus: drift.Value(plus),
-        minus: drift.Value(minus),
+        body: drift.Constant(commentBody),
+        plus: drift.Constant(plus),
+        minus: drift.Constant(minus),
       )),
     );
   });
@@ -593,7 +593,7 @@ Future<Map<String, dynamic>?> getTopicMetaFromDb(int topicId) async {
 }
 
 Future<bool> hasCachedCommentsInDb(int topicId) async {
-  final count = await (db.select(db.comments)..where((c) => c.topicId.equals(topicId))).limit(1).get().then((l) => l.length);
+  final count = await (db.select(db.comments)..where((c) => c.topicId.equals(topicId))..limit(1)).get().then((l) => l.length);
   return count > 0;
 }
 

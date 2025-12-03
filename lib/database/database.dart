@@ -152,8 +152,8 @@ class AppDatabase extends _$AppDatabase {
             body: Constant(row.body.value),
             plus: Constant(row.plus.value),
             minus: Constant(row.minus.value),
-            anchors: Constant(row.anchors.value),
-            reverseAnchors: Constant(row.reverseAnchors.value),
+            anchors: Constant(const IntListConverter().toSql(row.anchors.value)),
+            reverseAnchors: Constant(const IntListConverter().toSql(row.reverseAnchors.value)),
             // isClipped, clipMemo 等は更新しないことで維持する
           )),
         );
