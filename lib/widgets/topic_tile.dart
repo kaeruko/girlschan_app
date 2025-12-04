@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart'; // ★これを追加
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/cache_service.dart';
 import '../services/api_service.dart';

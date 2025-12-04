@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart'; // ★これを追加
 import '../models/comment.dart';
 import 'vote_bar_graph.dart';
 import 'url_preview_list.dart';

@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart' show WidgetsFlutterBinding, Size;
+import 'package:flutter/widgets.dart' show WidgetsFlutterBinding, Size, Offset; // ★Offsetを追加
 import 'package:window_manager/window_manager.dart';
 
 import 'dart:async';
