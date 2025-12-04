@@ -131,12 +131,6 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   Widget build(BuildContext context) {
     final id = widget.topic['id'] as int;
     final title = widget.topic['title'] as String? ?? 'タイトル不明';
-    
-    // デバッグ: タイトルが空の場合にログ出力
-    if (title.isEmpty || title == 'タイトル不明') {
-      logd('⚠️ [TopicTile] Empty or unknown title: ID=$id, title="$title", topic=${widget.topic}', name: 'TopicTile');
-    }
-    
     final comments = widget.topic['comments'] is int
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
@@ -148,17 +142,18 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final displayData = _calculateDisplayData(comments, posted_at);
     final bgColor = _calculateBackgroundColor(displayData.isOld);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: bgColor,
-        border: _hasCachedComments
-            ? const Border(left: BorderSide(color: CupertinoColors.systemBlue, width: 4))
-            : null,
-      ),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+    return Material(
+      color: bgColor,
+      child: InkWell(
         onTap: () => _handleTap(context, id, title, comments, posted_at),
-        child: Padding(
+        hoverColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+        mouseCursor: SystemMouseCursors.click,
+        child: Container(
+          decoration: BoxDecoration(
+            border: _hasCachedComments
+                ? const Border(left: BorderSide(color: CupertinoColors.systemBlue, width: 4))
+                : null,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,

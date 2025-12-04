@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
 import '../widgets/history_sidebar.dart';
@@ -51,7 +52,11 @@ class _MacShellState extends State<MacShell> {
 
   void _onTabChanged(int newIndex) {
     setState(() => _index = newIndex);
-    final tabId = _effectiveTabs[newIndex].id;
+    _refreshCurrentTab();
+  }
+
+  void _refreshCurrentTab() {
+    final tabId = _effectiveTabs[_index].id;
 
     // ★ 履歴タブのリロード（型安全）
     if (tabId == 'tab_favorites') {
@@ -63,7 +68,7 @@ class _MacShellState extends State<MacShell> {
     }
     // ★ 新着・人気タブのリフレッシュ（TopicListScreenState）
     if (tabId == 'tab_new' || tabId == 'tab_popular') {
-      final key = _effectiveTabs[newIndex].stateKey;
+      final key = _effectiveTabs[_index].stateKey;
       if (key is GlobalKey<tl.TopicListScreenState>) {
         key.currentState?.refreshTiles();
       }
@@ -72,74 +77,95 @@ class _MacShellState extends State<MacShell> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: null,
-      child: Column(
-        children: [
-          // ネイティブ信号下のスペーサ
-          SizedBox(height: _captionHeight),
-          // 上バー：タブ切替のみ（更新ボタンは置かない）
-          _buildTopTabBar(),
-          // 本体：左＝履歴サイドバー、右＝タブ内容
-          Expanded(
-            child: Row(
-              children: [
-                // 左サイド（キャッシュ履歴）
-                SizedBox(
-                  width: 260,
-                  child: HistorySidebar(
-                    onSelectTopic: (id, title, count, posted_at) {
-                      // 現在タブの Navigator に詳細を push
-                      final nav = _tabNavKeys[_index].currentState;
-                      if (nav != null) {
-                        nav.push(CupertinoPageRoute(
-                          builder: (_) => TopicDetailScreen(
-                            topicId: id,
-                            title: title,
-                            commentCount: count ?? 0,
-                            posted_at: posted_at, 
-                          ),
-                        ));
-                      }
-                    },
-                  ),
+    return CallbackShortcuts(
+      bindings: {
+        // Cmd + R (または F5) でリロード
+        const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
+          _refreshCurrentTab();
+        },
+        const SingleActivator(LogicalKeyboardKey.f5): () {
+          _refreshCurrentTab();
+        },
+        // Esc で戻る（詳細画面を開いている時など）
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          final nav = _tabNavKeys[_index].currentState;
+          if (nav != null && nav.canPop()) {
+            nav.pop();
+          }
+        },
+      },
+      child: Focus(
+        autofocus: true, // キーイベントを受け取るために必要
+        child: CupertinoPageScaffold(
+          navigationBar: null,
+          child: Column(
+            children: [
+              // ネイティブ信号下のスペーサ
+              SizedBox(height: _captionHeight),
+              // 上バー：タブ切替のみ（更新ボタンは置かない）
+              _buildTopTabBar(),
+              // 本体：左＝履歴サイドバー、右＝タブ内容
+              Expanded(
+                child: Row(
+                  children: [
+                    // 左サイド（キャッシュ履歴）
+                    SizedBox(
+                      width: 260,
+                      child: HistorySidebar(
+                        onSelectTopic: (id, title, count, posted_at) {
+                          // 現在タブの Navigator に詳細を push
+                          final nav = _tabNavKeys[_index].currentState;
+                          if (nav != null) {
+                            nav.push(CupertinoPageRoute(
+                              builder: (_) => TopicDetailScreen(
+                                topicId: id,
+                                title: title,
+                                commentCount: count ?? 0,
+                                posted_at: posted_at, 
+                              ),
+                            ));
+                          }
+                        },
+                      ),
+                    ),
+                    Container(width: 1, color: CupertinoColors.separator),
+                    // 右ペイン（タブの中身）
+                    Expanded(
+                      child: IndexedStack(
+                        index: _index,
+                        children: [
+                          for (int i = 0; i < _effectiveTabs.length; i++)
+                            Navigator(
+                              key: _tabNavKeys[i],
+                              onGenerateRoute: (settings) {
+                                if (settings.name == '/') {
+                                  final spec = _effectiveTabs[i];
+                                  Widget screen;
+                                  // ★ GlobalKey を各スクリーンに渡す
+                                  if (spec.id == 'tab_clips') {
+                                    screen = ClipsScreen(key: _clipsKey);
+                                  } else if (spec.id == 'tab_favorites') {
+                                    screen = FavoritesScreen(key: _favoritesKey);
+                                  } else {
+                                    screen = spec.builder(context);
+                                  }
+                                  return CupertinoPageRoute(
+                                    builder: (_) => screen,
+                                    settings: settings,
+                                  );
+                                }
+                                return null;
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                Container(width: 1, color: CupertinoColors.separator),
-                // 右ペイン（タブの中身）
-                Expanded(
-                  child: IndexedStack(
-                    index: _index,
-                    children: [
-                      for (int i = 0; i < _effectiveTabs.length; i++)
-                        Navigator(
-                          key: _tabNavKeys[i],
-                          onGenerateRoute: (settings) {
-                            if (settings.name == '/') {
-                              final spec = _effectiveTabs[i];
-                              Widget screen;
-                              // ★ GlobalKey を各スクリーンに渡す
-                              if (spec.id == 'tab_clips') {
-                                screen = ClipsScreen(key: _clipsKey);
-                              } else if (spec.id == 'tab_favorites') {
-                                screen = FavoritesScreen(key: _favoritesKey);
-                              } else {
-                                screen = spec.builder(context);
-                              }
-                              return CupertinoPageRoute(
-                                builder: (_) => screen,
-                                settings: settings,
-                              );
-                            }
-                            return null;
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

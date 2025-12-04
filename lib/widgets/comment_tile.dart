@@ -178,15 +178,20 @@ class CommentTile extends StatelessWidget {
       ],
     );
 
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
+    return Material(
+      color: CupertinoColors.systemBackground, // 明示的に背景色を指定しないと透ける場合がある
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        hoverColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+        mouseCursor: SystemMouseCursors.click,
+        child: Container(
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: innerWidget,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: innerWidget,
       ),
     );
   }

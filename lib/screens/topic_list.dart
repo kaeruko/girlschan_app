@@ -245,7 +245,8 @@ class TopicListScreenState extends State<TopicListScreen>
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: fetchFromServer,
-                    child: CupertinoScrollbar(
+                    child: Scrollbar(
+                      thumbVisibility: true, // ★ Macでは常にバーを表示
                       controller: _scrollController,
                       child: ListView.builder(
                         controller: _scrollController,
