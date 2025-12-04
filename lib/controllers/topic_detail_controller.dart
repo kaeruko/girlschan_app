@@ -70,9 +70,9 @@ class TopicDetailController extends ChangeNotifier {
   });
 
   final int topicId;
-  final String title;
-  final int commentCount;
-  final String postedAt;
+  String title;
+  int commentCount;
+  String postedAt;
 
   final bool enableRefresh;
   final bool saveReadPosition; // ★ 追加
@@ -215,6 +215,23 @@ class TopicDetailController extends ChangeNotifier {
       _hasDraft = exists;
       notifyListeners();
     }
+  }
+
+  Future<void> updateMetadata({
+    required String title,
+    required int comments,
+    required String postedAt,
+  }) async {
+    this.title = title;
+    this.commentCount = comments;
+    this.postedAt = postedAt;
+    
+    await _touchWatchedTopic(
+      id: topicId,
+      title: title,
+      comments: comments,
+      postedAt: postedAt,
+    );
   }
 
   // ==== init ====

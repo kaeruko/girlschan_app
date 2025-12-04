@@ -14,12 +14,32 @@ class SelectionController extends ChangeNotifier {
 
   // トピックを選択する
   void selectTopic(int id, {String title = '', int comments = 0, String postedAt = ''}) {
+    print('🔍 [SelectionController] selectTopic called: id=$id, title="$title", comments=$comments, postedAt="$postedAt"');
+    bool shouldNotify = false;
+
+    // IDが変わった場合
     if (_selectedTopicId != id) {
       _selectedTopicId = id;
+      shouldNotify = true;
+    }
+
+    // ★ ここが修正点: IDが同じでも、タイトル等の情報が増えていれば更新する
+    if (title.isNotEmpty && _title != title) {
       _title = title;
+      shouldNotify = true;
+    }
+    if (comments > 0 && _commentCount != comments) {
       _commentCount = comments;
+      shouldNotify = true;
+    }
+    if (postedAt.isNotEmpty && _postedAt != postedAt) {
       _postedAt = postedAt;
-      notifyListeners(); // 画面を更新！
+      shouldNotify = true;
+    }
+
+    if (shouldNotify) {
+      print('✅ [SelectionController] Updated: _title="$_title", _commentCount=$_commentCount, _postedAt="$_postedAt"');
+      notifyListeners(); // 変更があった場合のみ画面更新
     }
   }
 
@@ -27,6 +47,9 @@ class SelectionController extends ChangeNotifier {
   void clearSelection() {
     if (_selectedTopicId != null) {
       _selectedTopicId = null;
+      _title = ''; // クリア時は情報もリセット
+      _commentCount = 0;
+      _postedAt = '';
       notifyListeners();
     }
   }

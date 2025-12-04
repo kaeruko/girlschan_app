@@ -322,6 +322,12 @@ Future<List<int>> getWatchedTopicIds() async {
   return history.map((t) => t.id).toList();
 }
 
+import 'history_notifier.dart';
+
+// ... (existing imports)
+
+// ...
+
 Future<void> addWatchedTopic({
   required int id,
   required String title,
@@ -344,6 +350,9 @@ Future<void> addWatchedTopic({
     commentCount: comments,
     postedAt: posted_at,
   );
+
+  // 履歴更新を通知
+  historyUpdateNotifier.value++;
 }
 
 Future<void> removeWatchedTopicId(int id) async {

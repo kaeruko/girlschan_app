@@ -15,10 +15,21 @@ class _HistorySidebarState extends State<HistorySidebar> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
 
+import '../services/history_notifier.dart';
+
+// ...
+
   @override
   void initState() {
     super.initState();
     _load();
+    historyUpdateNotifier.addListener(_load);
+  }
+
+  @override
+  void dispose() {
+    historyUpdateNotifier.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {

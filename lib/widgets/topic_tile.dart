@@ -334,6 +334,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   ) async {
     // ★追加: 親から挙動が指定されていればそちらを優先実行
     if (widget.onTopicTap != null) {
+      print('🔍 [TopicTile] onTopicTap called: id=$id, title="$title", comments=$comments, posted_at="$posted_at"');
       widget.onTopicTap!(id, title, comments, posted_at);
       return;
     }

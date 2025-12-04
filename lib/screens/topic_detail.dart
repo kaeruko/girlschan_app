@@ -98,6 +98,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   @override
+  void didUpdateWidget(TopicDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.topicId == widget.topicId) {
+      if (oldWidget.title != widget.title ||
+          oldWidget.commentCount != widget.commentCount ||
+          oldWidget.posted_at != widget.posted_at) {
+        _vm.updateMetadata(
+          title: widget.title,
+          comments: widget.commentCount,
+          postedAt: widget.posted_at,
+        );
+      }
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     _vm = TopicDetailController(

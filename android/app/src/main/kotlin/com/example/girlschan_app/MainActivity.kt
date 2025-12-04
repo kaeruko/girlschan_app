@@ -1,4 +1,4 @@
-package com.example.girlschan_app
+package jp.cloxs.girlschan_app
 
 import io.flutter.embedding.android.FlutterActivity
 
