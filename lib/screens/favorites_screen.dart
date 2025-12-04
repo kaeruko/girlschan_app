@@ -8,6 +8,7 @@ import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
 import '../screens/topic_detail.dart';
 import '../utils/log.dart';
+import '../services/history_notifier.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -60,10 +61,12 @@ class FavoritesScreenState extends State<FavoritesScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadWatchedTopics();
+    historyUpdateNotifier.addListener(_loadWatchedTopics);
   }
 
   @override
   void dispose() {
+    historyUpdateNotifier.removeListener(_loadWatchedTopics);
     _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

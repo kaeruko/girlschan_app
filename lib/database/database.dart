@@ -110,10 +110,10 @@ class AppDatabase extends _$AppDatabase {
           topics,
           row,
           onConflict: DoUpdate((old) => TopicsCompanion.custom(
-            title: Constant(row.title.value),
-            commentCount: Constant(row.commentCount.value),
-            postedAt: Constant(row.postedAt.value),
-            thumbnail: Constant(row.thumbnail.value),
+            title: row.title.present ? Constant(row.title.value) : old.title,
+            commentCount: row.commentCount.present ? Constant(row.commentCount.value) : old.commentCount,
+            postedAt: row.postedAt.present ? Constant(row.postedAt.value) : old.postedAt,
+            thumbnail: row.thumbnail.present ? Constant(row.thumbnail.value) : old.thumbnail,
             fetchedAt: Constant(DateTime.now()), // 取得日時を更新
             // lastViewedAt は更新しない（履歴を保持）
           )),

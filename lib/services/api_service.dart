@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../utils/log.dart';
 import '../database/database.dart';
+import 'history_notifier.dart';
 // import 'cache_service.dart'; // Keep for list caching in UI if needed, but we try to move away
 
 final apiBase = AppConfig.apiBase;
@@ -210,14 +211,25 @@ Future<List<dynamic>> fetchPopularTopicsWithCache() async {
 
 Future<void> _upsertTopicsFromApi(List<dynamic> list) async {
   final entries = list.map((json) {
-    return TopicsCompanion.insert(
-      id: drift.Value(json['id']),
-      title: json['title'] ?? '',
-      commentCount: drift.Value(json['comments'] ?? 0),
-      postedAt: drift.Value(json['posted_at']),
-      thumbnail: drift.Value(json['thumb']),
-      fetchedAt: drift.Value(DateTime.now()),
-    );
+    final hasTitle = json['title'] != null;
+    if (hasTitle) {
+      return TopicsCompanion.insert(
+        id: drift.Value(json['id']),
+        title: json['title'],
+        commentCount: drift.Value(json['comments'] ?? 0),
+        postedAt: drift.Value(json['posted_at']),
+        thumbnail: drift.Value(json['thumb']),
+        fetchedAt: drift.Value(DateTime.now()),
+      );
+    } else {
+      return TopicsCompanion.custom(
+        id: drift.Value(json['id']),
+        commentCount: drift.Value(json['comments'] ?? 0),
+        postedAt: json['posted_at'] != null ? drift.Value(json['posted_at']) : const drift.Value.absent(),
+        thumbnail: json['thumb'] != null ? drift.Value(json['thumb']) : const drift.Value.absent(),
+        fetchedAt: drift.Value(DateTime.now()),
+      );
+    }
   }).toList();
   await db.upsertTopics(entries);
 }
@@ -322,18 +334,14 @@ Future<List<int>> getWatchedTopicIds() async {
   return history.map((t) => t.id).toList();
 }
 
-import 'history_notifier.dart';
-
-// ... (existing imports)
-
-// ...
-
 Future<void> addWatchedTopic({
   required int id,
   required String title,
   required int comments,
   required String posted_at,
 }) async {
+  logd('📝 [addWatchedTopic] id=$id, title="$title", comments=$comments, posted_at="$posted_at"');
+  
   // トピックを保存（または更新）
   await db.upsertTopics([TopicsCompanion.insert(
     id: drift.Value(id),
@@ -353,6 +361,7 @@ Future<void> addWatchedTopic({
 
   // 履歴更新を通知
   historyUpdateNotifier.value++;
+  logd('✅ [addWatchedTopic] Saved and notified. historyUpdateNotifier.value=${historyUpdateNotifier.value}');
 }
 
 Future<void> removeWatchedTopicId(int id) async {

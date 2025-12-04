@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
+import '../services/history_notifier.dart';
 import '../utils/log.dart';
 
 class HistorySidebar extends StatefulWidget {
@@ -14,10 +15,6 @@ class HistorySidebar extends StatefulWidget {
 class _HistorySidebarState extends State<HistorySidebar> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
-
-import '../services/history_notifier.dart';
-
-// ...
 
   @override
   void initState() {
@@ -35,6 +32,10 @@ import '../services/history_notifier.dart';
   Future<void> _load() async {
     try {
       final topics = await getWatchedTopics();
+      logd('📚 [HistorySidebar] Loaded ${topics.length} topics');
+      for (var t in topics.take(3)) {
+        logd('  - id=${t['id']}, title="${t['title']}", comments=${t['comments']}');
+      }
       if (!mounted) return;
       setState(() {
         _items = topics;

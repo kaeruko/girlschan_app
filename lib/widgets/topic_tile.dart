@@ -135,7 +135,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   @override
   Widget build(BuildContext context) {
     final id = widget.topic['id'] as int;
-    final title = widget.topic['title'] as String? ?? 'タイトル不明';
+    var title = widget.topic['title'] as String? ?? '';
+    if (title.isEmpty) title = 'タイトル不明';
     final comments = widget.topic['comments'] is int
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
