@@ -7,6 +7,7 @@ import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
 import '../screens/topic_detail.dart';
+import '../utils/log.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -113,6 +114,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
   }
 
   Future<void> _removeFromWatch(int topicId) async {
+    logd('🗑️ [FavoritesScreen] _removeFromWatch called: ID=$topicId', name: 'FavoritesScreen');
     await removeWatchedTopicId(topicId);
     // await CacheService.clear('comments_$topicId');
     await deleteTopicComments(topicId);
@@ -318,6 +320,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
                               controller: _controller,
                               showThumb: false,
                               onRemove: (id) async {
+                                logd('🗑️ [FavoritesScreen] onRemove callback invoked: ID=$id', name: 'FavoritesScreen');
                                 await _removeFromWatch(id);
                               },
                               onAfterPop: _onDetailReturned,

@@ -213,11 +213,20 @@ class TopicListScreenState extends State<TopicListScreen>
   }
 
   Future<void> _removeCommentsCache(int topicId) async {
+    logd('🗑️ [TopicList] _removeCommentsCache called: ID=$topicId', name: 'TopicList');
     // ★ watched_topics_full からも削除（履歴に残らないようにする）
     await removeWatchedTopicId(topicId);
-    // コメントキャッシュも消去
-    await CacheService.clear('comments_$topicId');
+    await deleteTopicComments(topicId);
+    
+    // ★ リストからも削除（画面から消す）
+    if (mounted) {
+      setState(() {
+        _topics.removeWhere((t) => t['id'] == topicId);
+      });
+    }
+    
     await _controller.refreshAll();
+    logd('🗑️ [TopicList] Topic removed from list', name: 'TopicList');
   }
 
   @override

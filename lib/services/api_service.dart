@@ -212,7 +212,7 @@ Future<void> _upsertTopicsFromApi(List<dynamic> list) async {
   final entries = list.map((json) {
     return TopicsCompanion.insert(
       id: drift.Value(json['id']),
-      title: json['title'],
+      title: json['title'] ?? '',
       commentCount: drift.Value(json['comments'] ?? 0),
       postedAt: drift.Value(json['posted_at']),
       thumbnail: drift.Value(json['thumb']),

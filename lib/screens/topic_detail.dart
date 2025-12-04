@@ -861,7 +861,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
 
     final labels = await getClipLabels();
-    if (labels.length <= 1) {
+    
+    // マイコメント以外のラベル（ユーザーが選択可能なラベル）を抽出
+    final selectableLabels = labels.where((l) => l['name'] != kMyCommentsLabelName).toList();
+    
+    // 選択可能なラベルが1つ以下（未分類のみ）の場合は選択画面を出さない
+    if (selectableLabels.length <= 1) {
       await _vm.toggleClip(comment, labelId: 0);
       if (mounted) setState(() {});
       return;
@@ -872,9 +877,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       context: context,
       builder: (context) => CupertinoActionSheet(
         title: const Text('ラベルを選択してクリップ'),
-        actions: labels
-            .where((l) => l['name'] != kMyCommentsLabelName)
-            .map((label) {
+        actions: selectableLabels.map((label) {
           final id = label['id'] as int;
           final name = label['name'] as String;
           final displayName = id == 0 && name.isEmpty ? '未分類' : name;

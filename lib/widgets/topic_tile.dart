@@ -80,6 +80,10 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       if (meta != null) {
         if (mounted) {
           setState(() {
+            // メタデータにコメント数があれば上書き
+            if (meta['total'] != null) {
+              widget.topic['comments'] = meta['total'];
+            }
             // メタデータに日時があれば上書き
             if (meta['posted_at'] != null && meta['posted_at'].toString().isNotEmpty) {
               widget.topic['posted_at'] = meta['posted_at'];
@@ -127,6 +131,12 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   Widget build(BuildContext context) {
     final id = widget.topic['id'] as int;
     final title = widget.topic['title'] as String? ?? 'タイトル不明';
+    
+    // デバッグ: タイトルが空の場合にログ出力
+    if (title.isEmpty || title == 'タイトル不明') {
+      logd('⚠️ [TopicTile] Empty or unknown title: ID=$id, title="$title", topic=${widget.topic}', name: 'TopicTile');
+    }
+    
     final comments = widget.topic['comments'] is int
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
@@ -294,9 +304,21 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       padding: EdgeInsets.zero,
       minimumSize: const Size(28, 28),
       onPressed: () async {
-        await widget.onRemove!(id);
-        if (mounted) await refreshCacheState();
+        logd('🗑️ [TopicTile] Remove button pressed: ID=$id');
+        logd('🗑️ [TopicTile] onRemove callback exists: ${widget.onRemove != null}');
+        if (widget.onRemove != null) {
+          logd('🗑️ [TopicTile] Calling onRemove callback...');
+          await widget.onRemove!(id);
+          logd('🗑️ [TopicTile] onRemove callback completed');
+        }
+        if (mounted) {
+          logd('🗑️ [TopicTile] Calling refreshCacheState...');
+          await refreshCacheState();
+          logd('🗑️ [TopicTile] refreshCacheState completed');
+        }
+        logd('🗑️ [TopicTile] Calling controller.refreshAll...');
         await widget.controller.refreshAll();
+        logd('🗑️ [TopicTile] controller.refreshAll completed');
       },
       child: const Icon(CupertinoIcons.xmark, size: 20),
     );
