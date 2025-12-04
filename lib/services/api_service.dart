@@ -248,6 +248,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     final total = data['total'] as int? ?? comments.length;
     final posted_at = data['posted_at'] as String? ?? '';
     final thumb = data['thumb'] as String?;
+    final title = data['title'] as String? ?? ''; // ★タイトルを取得
 
     // DBにコメント保存
     final commentEntries = comments.map((c) {
@@ -266,10 +267,10 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     }).toList();
     await db.upsertComments(commentEntries);
 
-    // DBのトピックメタ情報を更新
-    // タイトルが不明な場合は更新のみ試みる
+    // DBのトピックメタ情報を更新（★タイトルも保存）
     await (db.update(db.topics)..where((t) => t.id.equals(topicId))).write(
       TopicsCompanion(
+        title: title.isNotEmpty ? drift.Value(title) : drift.Value.absent(), // ★追加
         commentCount: drift.Value(total),
         postedAt: posted_at.isNotEmpty ? drift.Value(posted_at) : drift.Value.absent(),
         thumbnail: thumb != null ? drift.Value(thumb) : drift.Value.absent(),
@@ -282,6 +283,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
       'total': total,
       'posted_at': posted_at,
       'thumb': thumb,
+      'title': title, // ★追加
       'offset': offset,
       'limit': limit,
     };
@@ -335,8 +337,13 @@ Future<void> addWatchedTopic({
     fetchedAt: drift.Value(DateTime.now()),
   )]);
   
-  // 閲覧済みにマーク
-  await db.markTopicAsViewed(id);
+  // 閲覧済みにマーク（タイトルなども一緒に保存）
+  await db.markTopicAsViewed(
+    id,
+    title: title,
+    commentCount: comments,
+    postedAt: posted_at,
+  );
 }
 
 Future<void> removeWatchedTopicId(int id) async {

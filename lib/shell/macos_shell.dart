@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart'; // AnimatedBuilder, Scaffold etc
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
@@ -8,6 +9,7 @@ import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/search_screen.dart';
+import '../controllers/selection_controller.dart'; // ★追加
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -20,10 +22,15 @@ class MacShell extends StatefulWidget {
 class _MacShellState extends State<MacShell> {
   int _index = 0;
   late final List<TabSpec> _effectiveTabs;
+  // NavigatorKeys は 3ペイン化で不要になる可能性があるが、
+  // 検索画面や設定画面など、ドリルダウンが必要なタブのために残す
   late final List<GlobalKey<NavigatorState>> _tabNavKeys;
   late final GlobalKey<ClipsScreenState> _clipsKey;
   late final GlobalKey<FavoritesScreenState> _favoritesKey;
   double _captionHeight = 28.0;
+
+  // ★ 選択状態を管理
+  final _selectionController = SelectionController();
 
   @override
   void initState() {
@@ -88,76 +95,92 @@ class _MacShellState extends State<MacShell> {
         },
         // Esc で戻る（詳細画面を開いている時など）
         const SingleActivator(LogicalKeyboardKey.escape): () {
+          // 3ペインの場合、Escで選択解除などが考えられるが、
+          // とりあえず既存のNavigatorがあればpopする
           final nav = _tabNavKeys[_index].currentState;
           if (nav != null && nav.canPop()) {
             nav.pop();
+          } else {
+            // 選択解除
+            _selectionController.clearSelection();
           }
         },
       },
       child: Focus(
         autofocus: true, // キーイベントを受け取るために必要
-        child: CupertinoPageScaffold(
-          navigationBar: null,
-          child: Column(
+        child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
+          body: Column(
             children: [
               // ネイティブ信号下のスペーサ
               SizedBox(height: _captionHeight),
               // 上バー：タブ切替のみ（更新ボタンは置かない）
               _buildTopTabBar(),
-              // 本体：左＝履歴サイドバー、右＝タブ内容
+              // 本体：3ペイン構成
               Expanded(
                 child: Row(
                   children: [
-                    // 左サイド（キャッシュ履歴）
+                    // 【左】サイドバー（履歴など）
                     SizedBox(
-                      width: 260,
+                      width: 250,
                       child: HistorySidebar(
                         onSelectTopic: (id, title, count, posted_at) {
-                          // 現在タブの Navigator に詳細を push
-                          final nav = _tabNavKeys[_index].currentState;
-                          if (nav != null) {
-                            nav.push(CupertinoPageRoute(
-                              builder: (_) => TopicDetailScreen(
-                                topicId: id,
-                                title: title,
-                                commentCount: count ?? 0,
-                                posted_at: posted_at, 
-                              ),
-                            ));
-                          }
+                          // 選択状態を更新
+                          _selectionController.selectTopic(
+                            id,
+                            title: title,
+                            comments: count ?? 0,
+                            postedAt: posted_at,
+                          );
                         },
                       ),
                     ),
-                    Container(width: 1, color: CupertinoColors.separator),
-                    // 右ペイン（タブの中身）
-                    Expanded(
+                    
+                    // 縦の区切り線
+                    const VerticalDivider(width: 1),
+
+                    // 【中】トピック一覧（タブの中身）
+                    SizedBox(
+                      width: 350,
                       child: IndexedStack(
                         index: _index,
                         children: [
                           for (int i = 0; i < _effectiveTabs.length; i++)
-                            Navigator(
-                              key: _tabNavKeys[i],
-                              onGenerateRoute: (settings) {
-                                if (settings.name == '/') {
-                                  final spec = _effectiveTabs[i];
-                                  Widget screen;
-                                  // ★ GlobalKey を各スクリーンに渡す
-                                  if (spec.id == 'tab_clips') {
-                                    screen = ClipsScreen(key: _clipsKey);
-                                  } else if (spec.id == 'tab_favorites') {
-                                    screen = FavoritesScreen(key: _favoritesKey);
-                                  } else {
-                                    screen = spec.builder(context);
-                                  }
-                                  return CupertinoPageRoute(
-                                    builder: (_) => screen,
-                                    settings: settings,
-                                  );
-                                }
-                                return null;
-                              },
-                            ),
+                            _buildCenterPaneContent(i),
                         ],
+                      ),
+                    ),
+
+                    // 縦の区切り線
+                    const VerticalDivider(width: 1),
+
+                    // 【右】詳細エリア（選択状態に応じて中身が変わる）
+                    Expanded(
+                      child: AnimatedBuilder(
+                        animation: _selectionController,
+                        builder: (context, _) {
+                          final selectedId = _selectionController.selectedTopicId;
+                          
+                          if (selectedId == null) {
+                            // 何も選ばれていない時
+                            return const Center(
+                              child: Text(
+                                "トピックを選択してください",
+                                style: TextStyle(color: CupertinoColors.systemGrey),
+                              ),
+                            );
+                          }
+
+                          // 選ばれていれば詳細画面を埋め込む
+                          return TopicDetailScreen(
+                            key: ValueKey(selectedId), // IDが変わったら作り直す
+                            topicId: selectedId,
+                            title: _selectionController.title,
+                            commentCount: _selectionController.commentCount,
+                            posted_at: _selectionController.postedAt,
+                            enableRefresh: true,
+                            saveReadPosition: true,
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -167,6 +190,51 @@ class _MacShellState extends State<MacShell> {
           ),
         ),
       ),
+    );
+  }
+
+  /// センターペインのコンテンツをビルド
+  Widget _buildCenterPaneContent(int index) {
+    final spec = _effectiveTabs[index];
+
+    // 新着・人気タブは TopicListScreen を直接生成してコールバックを渡す
+    if (spec.id == 'tab_new' || spec.id == 'tab_popular') {
+      return tl.TopicListScreen(
+        key: spec.stateKey,
+        sortOrder: spec.id == 'tab_new' ? 'new' : 'popular',
+        onTopicTap: (id, title, comments, postedAt) {
+          _selectionController.selectTopic(
+            id,
+            title: title,
+            comments: comments,
+            postedAt: postedAt,
+          );
+        },
+      );
+    }
+
+    // その他のタブ（履歴、クリップなど）は既存の Navigator 構成を維持
+    // ※ これらも onTopicTap 対応すれば Navigator 不要にできるが、
+    //    今回は TopicListScreen を優先
+    return Navigator(
+      key: _tabNavKeys[index],
+      onGenerateRoute: (settings) {
+        if (settings.name == '/') {
+          Widget screen;
+          if (spec.id == 'tab_clips') {
+            screen = ClipsScreen(key: _clipsKey);
+          } else if (spec.id == 'tab_favorites') {
+            screen = FavoritesScreen(key: _favoritesKey);
+          } else {
+            screen = spec.builder(context);
+          }
+          return CupertinoPageRoute(
+            builder: (_) => screen,
+            settings: settings,
+          );
+        }
+        return null;
+      },
     );
   }
 
@@ -204,16 +272,17 @@ class _MacShellState extends State<MacShell> {
                     _effectiveTabs[i].label,
                     style: TextStyle(
                       fontSize: 13,
+                      fontWeight: i == _index ? FontWeight.w600 : FontWeight.normal,
                       color: i == _index
-                          ? CupertinoColors.systemPink
-                          : CupertinoColors.label,
-                      fontWeight: i == _index ? FontWeight.w600 : FontWeight.w400,
+                          ? CupertinoColors.label
+                          : CupertinoColors.secondaryLabel,
                     ),
                   ),
                 ],
               ),
             ),
-            if (i < _effectiveTabs.length - 1) const SizedBox(width: 4),
+            if (i < _effectiveTabs.length - 1)
+              const SizedBox(width: 8),
           ],
           const Spacer(),
           // 検索アイコン追加

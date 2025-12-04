@@ -13,14 +13,20 @@ class TopicListScreen extends StatefulWidget {
   /// 'new' または 'popular' - どのトピックを表示するか
   final String sortOrder;
 
+  /// トピックタップ時のコールバック（3ペイン構成用）
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
+
   const TopicListScreen({
     super.key,
     this.sortOrder = 'popular',
+    this.onTopicTap,
   });
 
   @override
   State<TopicListScreen> createState() => TopicListScreenState();
 }
+
+
 
 class TopicListScreenState extends State<TopicListScreen>
   with WidgetsBindingObserver {
@@ -266,6 +272,7 @@ class TopicListScreenState extends State<TopicListScreen>
                             showThumb: true,                      // 一覧はサムネ表示
                             onRemove: _removeCommentsCache,        // ×でコメントキャッシュ削除
                             onAfterPop: () => _onAfterPopFromTile(idx, id),
+                            onTopicTap: widget.onTopicTap, // ★ 親から渡されたコールバックを設定
                           );
                         },
                       ),

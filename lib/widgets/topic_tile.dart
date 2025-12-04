@@ -20,6 +20,9 @@ class TopicTile extends StatefulWidget {
   /// サムネイルの表示ON/OFF（お気に入りではナシ、一覧ではアリ等）
   final bool showThumb;
 
+  /// タップ時の挙動を親から指定できるようにする
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
+
   const TopicTile({
     super.key,
     required this.topic,
@@ -27,6 +30,7 @@ class TopicTile extends StatefulWidget {
     this.onRemove,
     this.onAfterPop,
     this.showThumb = true,
+    this.onTopicTap, // ★コンストラクタに追加
   });
 
   @override
@@ -328,6 +332,12 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     int comments,
     String posted_at,
   ) async {
+    // ★追加: 親から挙動が指定されていればそちらを優先実行
+    if (widget.onTopicTap != null) {
+      widget.onTopicTap!(id, title, comments, posted_at);
+      return;
+    }
+
     logd('👆 [TopicTile] Tap detected: ID=$id', name: 'TileNav');
 
     await Navigator.of(context).push(

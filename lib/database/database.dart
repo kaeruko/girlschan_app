@@ -123,9 +123,21 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// 閲覧履歴の更新
-  Future<void> markTopicAsViewed(int topicId) async {
+  Future<void> markTopicAsViewed(
+    int topicId, {
+    String? title,
+    int? commentCount,
+    String? postedAt,
+    String? thumbnail,
+  }) async {
     await (update(topics)..where((t) => t.id.equals(topicId))).write(
-      TopicsCompanion(lastViewedAt: Value(DateTime.now())),
+      TopicsCompanion(
+        lastViewedAt: Value(DateTime.now()),
+        title: title != null ? Value(title) : Value.absent(),
+        commentCount: commentCount != null ? Value(commentCount) : Value.absent(),
+        postedAt: postedAt != null ? Value(postedAt) : Value.absent(),
+        thumbnail: thumbnail != null ? Value(thumbnail) : Value.absent(),
+      ),
     );
   }
 
