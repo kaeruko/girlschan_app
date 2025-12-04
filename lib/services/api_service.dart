@@ -167,8 +167,8 @@ Future<bool> updateWatchedTopicFromMeta(Map<String, dynamic> meta) async {
       await (db.update(db.topics)..where((t) => t.id.equals(topicId))).write(
         TopicsCompanion(
           commentCount: drift.Value(newTotal),
-          postedAt: newPostedAt != null ? drift.Value(newPostedAt) : drift.Value.absent(),
-          thumbnail: newThumb != null ? drift.Value(newThumb) : drift.Value.absent(),
+          postedAt: newPostedAt != null ? drift.Value(newPostedAt) : const drift.Value.absent(),
+          thumbnail: newThumb != null ? drift.Value(newThumb) : const drift.Value.absent(),
           fetchedAt: drift.Value(DateTime.now()),
         )
       );
@@ -210,28 +210,47 @@ Future<List<dynamic>> fetchPopularTopicsWithCache() async {
 }
 
 Future<void> _upsertTopicsFromApi(List<dynamic> list) async {
-  final entries = list.map((json) {
+  final insertable = <TopicsCompanion>[];
+  final updatable = <TopicsCompanion>[];
+
+  for (final json in list) {
     final hasTitle = json['title'] != null;
     if (hasTitle) {
-      return TopicsCompanion.insert(
-        id: drift.Value(json['id']),
-        title: json['title'],
-        commentCount: drift.Value(json['comments'] ?? 0),
-        postedAt: drift.Value(json['posted_at']),
-        thumbnail: drift.Value(json['thumb']),
+      insertable.add(TopicsCompanion.insert(
+        id: drift.Value(json['id'] as int),
+        title: json['title'] as String,
+        commentCount: drift.Value((json['comments'] ?? 0) as int),
+        postedAt: drift.Value(json['posted_at'] as String?),
+        thumbnail: drift.Value(json['thumb'] as String?),
         fetchedAt: drift.Value(DateTime.now()),
-      );
+      ));
     } else {
-      return TopicsCompanion.custom(
-        id: drift.Value(json['id']),
-        commentCount: drift.Value(json['comments'] ?? 0),
-        postedAt: json['posted_at'] != null ? drift.Value(json['posted_at']) : const drift.Value.absent(),
-        thumbnail: json['thumb'] != null ? drift.Value(json['thumb']) : const drift.Value.absent(),
+      updatable.add(TopicsCompanion(
+        id: drift.Value(json['id'] as int),
+        commentCount: drift.Value((json['comments'] ?? 0) as int),
+        postedAt: json['posted_at'] != null ? drift.Value(json['posted_at'] as String) : const drift.Value.absent(),
+        thumbnail: json['thumb'] != null ? drift.Value(json['thumb'] as String) : const drift.Value.absent(),
         fetchedAt: drift.Value(DateTime.now()),
-      );
+      ));
     }
-  }).toList();
-  await db.upsertTopics(entries);
+  }
+
+  if (insertable.isNotEmpty) {
+    await db.upsertTopics(insertable);
+  }
+  
+  if (updatable.isNotEmpty) {
+    await db.batch((batch) {
+      for (final row in updatable) {
+        // タイトルがない場合は更新のみ（存在しない場合は何もしない）
+        batch.update(
+          db.topics,
+          row,
+          where: (t) => t.id.equals(row.id.value),
+        );
+      }
+    });
+  }
 }
 
 // キャッシュ対応のコメント取得（ページング対応）
@@ -619,6 +638,7 @@ Future<Map<String, dynamic>?> getTopicMetaFromDb(int topicId) async {
 
 Future<bool> hasCachedCommentsInDb(int topicId) async {
   final count = await (db.select(db.comments)..where((c) => c.topicId.equals(topicId))..limit(1)).get().then((l) => l.length);
+  logd('🔍 [hasCachedCommentsInDb] topicId=$topicId count=$count');
   return count > 0;
 }
 

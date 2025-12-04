@@ -109,11 +109,11 @@ class AppDatabase extends _$AppDatabase {
         batch.insert(
           topics,
           row,
-          onConflict: DoUpdate((old) => TopicsCompanion.custom(
-            title: row.title.present ? Constant(row.title.value) : old.title,
-            commentCount: row.commentCount.present ? Constant(row.commentCount.value) : old.commentCount,
-            postedAt: row.postedAt.present ? Constant(row.postedAt.value) : old.postedAt,
-            thumbnail: row.thumbnail.present ? Constant(row.thumbnail.value) : old.thumbnail,
+          onConflict: DoUpdate((_) => TopicsCompanion.custom(
+            title: row.title.present ? Constant(row.title.value) : null,
+            commentCount: row.commentCount.present ? Constant(row.commentCount.value) : null,
+            postedAt: row.postedAt.present ? Constant(row.postedAt.value) : null,
+            thumbnail: row.thumbnail.present ? Constant(row.thumbnail.value) : null,
             fetchedAt: Constant(DateTime.now()), // 取得日時を更新
             // lastViewedAt は更新しない（履歴を保持）
           )),
