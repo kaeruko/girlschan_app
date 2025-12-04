@@ -84,32 +84,35 @@ class _MacShellState extends State<MacShell> {
 
   @override
   Widget build(BuildContext context) {
-    return CallbackShortcuts(
-      bindings: {
-        // Cmd + R (または F5) でリロード
-        const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
-          _refreshCurrentTab();
+    // ★ InkWell を反応させるため、全体を Material でラップ
+    return Material(
+      type: MaterialType.transparency, // 背景色を変えずにMaterial機能だけ提供
+      child: CallbackShortcuts(
+        bindings: {
+          // Cmd + R (または F5) でリロード
+          const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
+            _refreshCurrentTab();
+          },
+          const SingleActivator(LogicalKeyboardKey.f5): () {
+            _refreshCurrentTab();
+          },
+          // Esc で戻る（詳細画面を開いている時など）
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            // 3ペインの場合、Escで選択解除などが考えられるが、
+            // とりあえず既存のNavigatorがあればpopする
+            final nav = _tabNavKeys[_index].currentState;
+            if (nav != null && nav.canPop()) {
+              nav.pop();
+            } else {
+              // 選択解除
+              _selectionController.clearSelection();
+            }
+          },
         },
-        const SingleActivator(LogicalKeyboardKey.f5): () {
-          _refreshCurrentTab();
-        },
-        // Esc で戻る（詳細画面を開いている時など）
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          // 3ペインの場合、Escで選択解除などが考えられるが、
-          // とりあえず既存のNavigatorがあればpopする
-          final nav = _tabNavKeys[_index].currentState;
-          if (nav != null && nav.canPop()) {
-            nav.pop();
-          } else {
-            // 選択解除
-            _selectionController.clearSelection();
-          }
-        },
-      },
-      child: Focus(
-        autofocus: true, // キーイベントを受け取るために必要
-        child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
-          body: Column(
+        child: Focus(
+          autofocus: true, // キーイベントを受け取るために必要
+          child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
+            body: Column(
             children: [
               // ネイティブ信号下のスペーサ
               SizedBox(height: _captionHeight),
@@ -189,6 +192,7 @@ class _MacShellState extends State<MacShell> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
