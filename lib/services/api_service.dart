@@ -100,14 +100,16 @@ Future<Map<String, dynamic>> searchTopics({
   String? dateFilter,
 }) async {
   try {
-    final uri = Uri.parse('$apiBase/search').replace(
-      queryParameters: {
-        'q': query,
-        'page': page.toString(),
-        'count': count.toString(),
-        if (dateFilter != null) 'date_filter': dateFilter,
-      },
-    );
+    // パスパラメータ形式: /search/<q>/<date>/<page>
+    final pathSegments = <String>['search', Uri.encodeComponent(query)];
+    if (dateFilter != null && dateFilter.isNotEmpty) {
+      pathSegments.add(dateFilter);
+    }
+    if (page > 1 || (dateFilter != null && dateFilter.isNotEmpty)) {
+      pathSegments.add(page.toString());
+    }
+    
+    final uri = Uri.parse('$apiBase/${pathSegments.join('/')}');
     
     final data = await _fetchMap(uri);
     return data;
@@ -261,22 +263,31 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
   bool old = false,
 }) async {
   try {
-    final queryParams = {
-      'offset': offset.toString(),
-      'limit': limit.toString(),
-    };
+    // パスパラメータ形式: /topic/<tid>/<offset>/<limit>
+    final pathSegments = <String>['topic', topicId.toString()];
+    if (offset > 0 || limit != 500) {
+      pathSegments.add(offset.toString());
+      if (limit != 500) {
+        pathSegments.add(limit.toString());
+      }
+    }
+    
+    final queryParams = <String, String>{};
     if (old) {
       queryParams['old'] = 'true';
     }
 
-    final uri = Uri.parse('$apiBase/topic/$topicId').replace(
-      queryParameters: queryParams,
+    final uri = Uri.parse('$apiBase/${pathSegments.join('/')}').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
     );
     
     final data = await _fetchMap(uri);
     
     final comments = data['comments'] as List<dynamic>? ?? [];
     final total = data['total'] as int? ?? comments.length;
+    
+    logd('📥 [fetchComments] topicId=$topicId offset=$offset limit=$limit -> comments=${comments.length}, total=$total (raw=${data['total']})');
+
     final posted_at = data['posted_at'] as String? ?? '';
     final thumb = data['thumb'] as String?;
     final title = data['title'] as String? ?? ''; // ★タイトルを取得

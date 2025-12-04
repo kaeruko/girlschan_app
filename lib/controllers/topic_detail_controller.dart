@@ -292,7 +292,16 @@ class TopicDetailController extends ChangeNotifier {
       final page = await fetchCommentsWithPagination(topicId, offset: 0, limit: commentsPerPage, old: _isOld);
       final rawList = (page['comments'] as List<dynamic>? ?? []);
       final list = rawList.map((e) => Comment.fromJson(e as Map<String, dynamic>)).toList();
-      final total = (page['total'] as int?) ?? list.length;
+      final apiTotal = page['total'] as int?;
+      
+      // APIのtotalがnull、または取得件数と同じ（上限）で、かつ初期値の方が大きい場合は初期値を採用
+      // (APIがtotalを返さない、あるいはキャッシュヒット時の挙動対策)
+      int total = apiTotal ?? list.length;
+      if (total <= list.length && commentCount > total) {
+        total = commentCount;
+      }
+
+      logd('[fetchFirstPage] apiTotal=$apiTotal, list.len=${list.length}, initCount=$commentCount -> finalTotal=$total');
 
       _allComments = list;
       _totalComments = total;
