@@ -649,7 +649,6 @@ Future<Map<String, dynamic>?> getTopicMetaFromDb(int topicId) async {
 
 Future<bool> hasCachedCommentsInDb(int topicId) async {
   final count = await (db.select(db.comments)..where((c) => c.topicId.equals(topicId))..limit(1)).get().then((l) => l.length);
-  logd('🔍 [hasCachedCommentsInDb] topicId=$topicId count=$count');
   return count > 0;
 }
 

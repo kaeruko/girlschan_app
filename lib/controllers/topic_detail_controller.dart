@@ -155,9 +155,13 @@ class TopicDetailController extends ChangeNotifier {
       if (_allComments.isEmpty) return;
       final safe = i.clamp(0, _allComments.length - 1);
       final no = _allComments[safe].id;
+      final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
+
+      // ★追加: 過去に戻るような保存はしない（既読位置の維持）
+      if (no < _savedCommentNo) return;
+      if (no == _savedCommentNo && ff <= savedLocalFraction) return;
 
       final prefs = await SharedPreferences.getInstance();
-      final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
       await prefs.setInt('scroll_$topicId', no);
       await prefs.setDouble('scroll_frac_$topicId', ff);
 
@@ -188,9 +192,13 @@ class TopicDetailController extends ChangeNotifier {
     if (_allComments.isEmpty) return;
     final safe = i.clamp(0, _allComments.length - 1);
     final no = _allComments[safe].id;
+    final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
+
+    // ★追加: 過去に戻るような保存はしない
+    if (no < _savedCommentNo) return;
+    if (no == _savedCommentNo && ff <= savedLocalFraction) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final ff = f.isFinite ? f.clamp(0.0, 1.0) : 0.0;
     await prefs.setInt('scroll_$topicId', no);
     await prefs.setDouble('scroll_frac_$topicId', ff);
 
