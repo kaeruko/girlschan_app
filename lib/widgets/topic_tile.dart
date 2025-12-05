@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../screens/topic_detail.dart';
 import '../utils/log.dart';
 import 'topic_tile_controller.dart';
+import '../services/settings_service.dart';
 
 /// 共通トピックタイル（Material 依存ナシ）
 class TopicTile extends StatefulWidget {
@@ -42,6 +43,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   int _savedCommentNo = 0;
   DateTime? _cacheModifiedTime;
   bool _hasDraft = false; // ★ 下書き状態を管理
+  final _settings = SettingsService();
+
 
   @override
   int get topicId => widget.topic['id'] as int;
@@ -50,8 +53,14 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   void initState() {
     super.initState();
     widget.controller.register(this);
+    _settings.addListener(_onSettingsChanged);
     refreshCacheState(); // 初回
   }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
 
   @override
   void didUpdateWidget(covariant TopicTile oldWidget) {
@@ -72,7 +81,9 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
 
   @override
   void dispose() {
+    _settings.removeListener(_onSettingsChanged);
     widget.controller.unregister(this);
+
     super.dispose();
   }
 
@@ -279,12 +290,13 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 14,
               // 太字になるのは「dat落ちではなく(生きてて)」かつ「未読」のときだけ
               fontWeight: (!isOld && isBold) ? FontWeight.w800 : FontWeight.w400,
               // dat落ちならグレー、それ以外は青
               color: isOld ? CupertinoColors.systemGrey : CupertinoColors.activeBlue,
+              fontSize: _settings.fontSize,
             ),
+
           ),
           const SizedBox(height: 4),
           Text(
@@ -292,7 +304,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                 // ? 'コメント: $commentDisplay (キャッシュ: $cacheTimeDisplay)'
                 ? 'コメント: $commentDisplay'
                 : 'コメント: $commentDisplay',
-            style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+            style: TextStyle(fontSize: _settings.fontSize - 2, color: CupertinoColors.systemGrey),
+
           ),
         ],
       ),
