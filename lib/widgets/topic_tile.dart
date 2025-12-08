@@ -118,6 +118,9 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     // 2. コメントキャッシュ（既読状態）の確認（既存の処理）
     // final hasCached = await CacheService.exists('comments_$id');
     final hasCached = await hasCachedCommentsInDb(id);
+    
+    // ★ デバッグログ追加 (Step 30)
+    // logd('🔍 [TopicTile] refreshCacheState id=$id, hasCached=$hasCached');
 
     int saved = 0;
     DateTime? modifiedTime;
@@ -141,6 +144,12 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       _cacheModifiedTime = modifiedTime;
       _hasDraft = hasDraft; // ★ 下書き状態を更新
     });
+    
+    // ★ デバッグログ (確定後)
+    // if (!hasCached) {
+    //    logd('⚠️ [TopicTile] Cache missing for ID=$id. _hasCachedComments=false');
+    // }
+    
   }
 
   @override

@@ -224,12 +224,14 @@ class TopicListScreenState extends State<TopicListScreen>
     await removeWatchedTopicId(topicId);
     await deleteTopicComments(topicId);
     
-    // ★ リストからも削除（画面から消す）
+    // ★ リストからは削除しない（履歴のみ消す）
+    /*
     if (mounted) {
       setState(() {
         _topics.removeWhere((t) => t['id'] == topicId);
       });
     }
+    */
     
     await _controller.refreshAll();
     logd('🗑️ [TopicList] Topic removed from list', name: 'TopicList');
