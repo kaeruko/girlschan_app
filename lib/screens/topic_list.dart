@@ -1,6 +1,8 @@
 import 'dart:developer';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
@@ -39,6 +41,10 @@ class TopicListScreenState extends State<TopicListScreen>
   bool _loading = true;
   bool _fetching = false; // ⭐ 多重実行防止フラグ
 
+  // 広告関連
+  BannerAd? _bannerAd;
+  bool _isAdLoaded = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +53,7 @@ class TopicListScreenState extends State<TopicListScreen>
     cacheKey = widget.sortOrder == 'new' ? 'topics_new' : 'topics_popular';
     // logd('🔧 [initState] sortOrder=${widget.sortOrder}, cacheKey=$cacheKey', name: 'TopicList');
     _loadFromCache();
+    _loadBannerAd();
   }
 
   Future<void> _onAfterPopFromTile(int idx, int id) async {
@@ -59,6 +66,7 @@ class TopicListScreenState extends State<TopicListScreen>
 
   @override
   void dispose() {
+    _bannerAd?.dispose();
     _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -237,6 +245,33 @@ class TopicListScreenState extends State<TopicListScreen>
     logd('🗑️ [TopicList] Topic removed from list', name: 'TopicList');
   }
 
+  void _loadBannerAd() {
+    // デスクトップなどは広告非対応のためスキップ
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+
+    _bannerAd = BannerAd(
+      adUnitId: 'ca-app-pub-1701253412237513/7949216085',
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) {
+            ad.dispose();
+            return;
+          }
+          setState(() {
+            _isAdLoaded = true;
+          });
+          logd('✅ [TopicList] 広告読み込み成功');
+        },
+        onAdFailedToLoad: (ad, error) {
+          logd('❌ [TopicList] 広告読み込み失敗: $error');
+          ad.dispose();
+        },
+      ),
+    )..load();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -281,6 +316,13 @@ class TopicListScreenState extends State<TopicListScreen>
                     ),
                   ),
                 ),
+                // 広告バナー表示
+                if (_isAdLoaded && _bannerAd != null)
+                  SizedBox(
+                    width: _bannerAd!.size.width.toDouble(),
+                    height: _bannerAd!.size.height.toDouble(),
+                    child: AdWidget(ad: _bannerAd!),
+                  ),
               ],
             ),
     );

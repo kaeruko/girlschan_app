@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'config/app_config.dart';
 import 'app/app_tabs.dart';
 import 'shell/adaptive_shell.dart';
@@ -28,6 +29,14 @@ void main() async {
     logd('❌ AppConfig 初期化失敗: $e');
     logd('❌ スタックトレース: $stackTrace');
     AppConfig.apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
+  }
+
+  // 📱 モバイル広告SDK初期化（デスクトップでは自動的にスキップされる）
+  try {
+    await MobileAds.instance.initialize();
+    logd('✅ 広告SDK初期化完了');
+  } catch (e) {
+    logd('⚠️ 広告SDK初期化スキップ: $e');
   }
 
   runApp(const GirlsChanApp());

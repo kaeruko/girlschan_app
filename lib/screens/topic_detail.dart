@@ -1,7 +1,9 @@
 // --- UI専用: TopicDetailScreen ---
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/log.dart';
 
@@ -77,6 +79,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   // 設定サービス
   final _settings = SettingsService();
 
+  // 広告関連
+  BannerAd? _bannerAd;
+  bool _isAdLoaded = false;
+
   // フィルタリングされたコメントリストを取得するゲッター
   List<Comment> get _displayComments {
     if (_currentFilter == CommentFilterLevel.all) {
@@ -136,10 +142,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         _tryRestoreIfNeeded();
       }
     });
+
+    _loadBannerAd();
   }
 
   @override
   void dispose() {
+    _bannerAd?.dispose();
     _saveFromPage(_currentPage);
     for (final sc in _pageScroll.values) {
       sc.dispose();
@@ -574,6 +583,33 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
+  void _loadBannerAd() {
+    // デスクトップなどは広告非対応のためスキップ
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+
+    _bannerAd = BannerAd(
+      adUnitId: 'ca-app-pub-1701253412237513/7949216085',
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) {
+            ad.dispose();
+            return;
+          }
+          setState(() {
+            _isAdLoaded = true;
+          });
+          logd('✅ [TopicDetail] 広告読み込み成功');
+        },
+        onAdFailedToLoad: (ad, error) {
+          logd('❌ [TopicDetail] 広告読み込み失敗: $error');
+          ad.dispose();
+        },
+      ),
+    )..load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _displayComments;
@@ -782,84 +818,97 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         ),
         child: SafeArea(
           bottom: false,
-          child: _vm.loading
-              ? Center(child: PlatformHelper.buildLoadingIndicator())
-              : items.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(CupertinoIcons.slash_circle, size: 48, color: CupertinoColors.systemGrey3),
-                          const SizedBox(height: 16),
-                          Text(
-                            _currentFilter == CommentFilterLevel.all
-                                ? 'コメントがありません'
-                                : '条件に合うコメントがありません',
-                            style: const TextStyle(color: CupertinoColors.systemGrey),
-                          ),
-                          if (_currentFilter != CommentFilterLevel.all)
-                            CupertinoButton(
-                              child: const Text('フィルターを解除'),
-                              onPressed: () => _onFilterChanged(CommentFilterLevel.all),
-                            )
-                        ],
-                      ),
-                    )
-                  : Stack(
-                      children: [
-                        pageView,
-                        if (_pageCountLive > 1 && _hasPrev)
-                          Positioned(
-                            left: 8, top: 0, bottom: 0,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: CupertinoButton(
-                                padding: const EdgeInsets.all(8),
-                                onPressed: _hasPrev ? _goPrevPage : null,
-                                child: const Icon(CupertinoIcons.chevron_left, size: 22),
-                              ),
-                            ),
-                          ),
-                        if (_pageCountLive > 1 && _hasNext)
-                          Positioned(
-                            right: 8, top: 0, bottom: 0,
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: CupertinoButton(
-                                padding: const EdgeInsets.all(8),
-                                onPressed: _hasNext ? _goNextPage : null,
-                                child: const Icon(CupertinoIcons.chevron_right, size: 22),
-                              ),
-                            ),
-                          ),
-                        if (_pageCountLive > 1)
-                          Positioned(
-                            bottom: 8, left: 0, right: 0,
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: CupertinoColors.systemGrey6.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(16),
+          child: Column(
+            children: [
+              Expanded(
+                child: _vm.loading
+                    ? Center(child: PlatformHelper.buildLoadingIndicator())
+                    : items.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(CupertinoIcons.slash_circle, size: 48, color: CupertinoColors.systemGrey3),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _currentFilter == CommentFilterLevel.all
+                                      ? 'コメントがありません'
+                                      : '条件に合うコメントがありません',
+                                  style: const TextStyle(color: CupertinoColors.systemGrey),
                                 ),
-                                child: Text(
-                                  '${_currentPage + 1} / $_pageCountLive',
-                                  style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                                if (_currentFilter != CommentFilterLevel.all)
+                                  CupertinoButton(
+                                    child: const Text('フィルターを解除'),
+                                    onPressed: () => _onFilterChanged(CommentFilterLevel.all),
+                                  )
+                              ],
+                            ),
+                          )
+                        : Stack(
+                            children: [
+                              pageView,
+                              if (_pageCountLive > 1 && _hasPrev)
+                                Positioned(
+                                  left: 8, top: 0, bottom: 0,
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: CupertinoButton(
+                                      padding: const EdgeInsets.all(8),
+                                      onPressed: _hasPrev ? _goPrevPage : null,
+                                      child: const Icon(CupertinoIcons.chevron_left, size: 22),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
+                              if (_pageCountLive > 1 && _hasNext)
+                                Positioned(
+                                  right: 8, top: 0, bottom: 0,
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: CupertinoButton(
+                                      padding: const EdgeInsets.all(8),
+                                      onPressed: _hasNext ? _goNextPage : null,
+                                      child: const Icon(CupertinoIcons.chevron_right, size: 22),
+                                    ),
+                                  ),
+                                ),
+                              if (_pageCountLive > 1)
+                                Positioned(
+                                  bottom: 8, left: 0, right: 0,
+                                  child: Center(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: CupertinoColors.systemGrey6.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Text(
+                                        '${_currentPage + 1} / $_pageCountLive',
+                                        style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (_vm.savedCommentNo > 0 && !_restoredOnce && _currentFilter == CommentFilterLevel.all)
+                                Positioned(
+                                  top: 8, right: 8,
+                                  child: CupertinoButton.filled(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    onPressed: _restoring ? null : _tryRestoreIfNeeded,
+                                    child: Text('続き: No.${_vm.savedCommentNo}', style: const TextStyle(fontSize: 13)),
+                                  ),
+                                ),
+                            ],
                           ),
-                        if (_vm.savedCommentNo > 0 && !_restoredOnce && _currentFilter == CommentFilterLevel.all)
-                          Positioned(
-                            top: 8, right: 8,
-                            child: CupertinoButton.filled(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              onPressed: _restoring ? null : _tryRestoreIfNeeded,
-                              child: Text('続き: No.${_vm.savedCommentNo}', style: const TextStyle(fontSize: 13)),
-                            ),
-                          ),
-                      ],
-                    ),
+              ),
+              // 広告バナー表示
+              if (_isAdLoaded && _bannerAd != null)
+                SizedBox(
+                  width: _bannerAd!.size.width.toDouble(),
+                  height: _bannerAd!.size.height.toDouble(),
+                  child: AdWidget(ad: _bannerAd!),
+                ),
+            ],
+          ),
         ),
       ),
     );
