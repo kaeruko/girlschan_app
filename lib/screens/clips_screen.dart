@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../services/settings_service.dart';
 import '../screens/topic_detail.dart';
 import '../widgets/common/app_spinner.dart';
 import '../widgets/common/app_toast.dart'; // トーストは重要な通知のみに使用
@@ -35,6 +36,9 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _labels = [];
   int _selectedLabelId = 0;
 
+  // 設定サービス
+  final _settings = SettingsService();
+
   // 日付解析用正規表現（コンパイル済）
   static final _dateRegex = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2}).*?(\d{1,2}):(\d{2})');
 
@@ -46,12 +50,14 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _settings.addListener(_onSettingsChanged);
     _loadClips();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _settings.removeListener(_onSettingsChanged);
     _scrollController.dispose();
     super.dispose();
   }
@@ -59,6 +65,10 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _loadClips();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   // ★ アプリ内通知（オーバーレイ）を表示するメソッド
@@ -714,7 +724,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
             const SizedBox(height: 6),
             Text(
               commentBody,
-              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: 14),
+              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontSize: _settings.fontSize),
             ),
             
             if (imageUrl != null && imageUrl.isNotEmpty) ...[

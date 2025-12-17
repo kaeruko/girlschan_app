@@ -180,7 +180,7 @@ class CommentTile extends StatelessWidget {
     );
 
     return Material(
-      color: CupertinoColors.systemBackground, // 明示的に背景色を指定しないと透ける場合がある
+      color: Colors.transparent, // 親の背景色を透過させる
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
