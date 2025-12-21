@@ -76,7 +76,7 @@ class Comment {
       plus: json['plus'] ?? 0,
       minus: json['minus'] ?? 0,
       imageUrl: json['image_url'],
-      originalImageUrl: json['original_image_url'],
+      originalImageUrl: json['original_image_url'] ?? json['originalImageUrl'],
       anchors: List<int>.from(json['anchors'] ?? []),
       reverseAnchors: List<int>.from(json['reverse_anchors'] ?? []),
       urls: (json['urls'] as List<dynamic>?)

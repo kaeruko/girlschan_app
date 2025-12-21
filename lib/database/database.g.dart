@@ -3,7 +3,7 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
-class $TopicsTable extends Topics with TableInfo<$TopicsTable, Topic> {
+class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -59,7 +59,7 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, Topic> {
   String get actualTableName => $name;
   static const String $name = 'topics';
   @override
-  VerificationContext validateIntegrity(Insertable<Topic> instance,
+  VerificationContext validateIntegrity(Insertable<TopicEntry> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -102,9 +102,9 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, Topic> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Topic map(Map<String, dynamic> data, {String? tablePrefix}) {
+  TopicEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Topic(
+    return TopicEntry(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       title: attachedDatabase.typeMapping
@@ -128,7 +128,7 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, Topic> {
   }
 }
 
-class Topic extends DataClass implements Insertable<Topic> {
+class TopicEntry extends DataClass implements Insertable<TopicEntry> {
   final int id;
   final String title;
   final int commentCount;
@@ -140,7 +140,7 @@ class Topic extends DataClass implements Insertable<Topic> {
 
   /// データ取得日時（キャッシュ有効期限判定用）
   final DateTime? fetchedAt;
-  const Topic(
+  const TopicEntry(
       {required this.id,
       required this.title,
       required this.commentCount,
@@ -189,10 +189,10 @@ class Topic extends DataClass implements Insertable<Topic> {
     );
   }
 
-  factory Topic.fromJson(Map<String, dynamic> json,
+  factory TopicEntry.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Topic(
+    return TopicEntry(
       id: serializer.fromJson<int>(json['id']),
       title: serializer.fromJson<String>(json['title']),
       commentCount: serializer.fromJson<int>(json['commentCount']),
@@ -216,7 +216,7 @@ class Topic extends DataClass implements Insertable<Topic> {
     };
   }
 
-  Topic copyWith(
+  TopicEntry copyWith(
           {int? id,
           String? title,
           int? commentCount,
@@ -224,7 +224,7 @@ class Topic extends DataClass implements Insertable<Topic> {
           Value<String?> thumbnail = const Value.absent(),
           Value<DateTime?> lastViewedAt = const Value.absent(),
           Value<DateTime?> fetchedAt = const Value.absent()}) =>
-      Topic(
+      TopicEntry(
         id: id ?? this.id,
         title: title ?? this.title,
         commentCount: commentCount ?? this.commentCount,
@@ -234,8 +234,8 @@ class Topic extends DataClass implements Insertable<Topic> {
             lastViewedAt.present ? lastViewedAt.value : this.lastViewedAt,
         fetchedAt: fetchedAt.present ? fetchedAt.value : this.fetchedAt,
       );
-  Topic copyWithCompanion(TopicsCompanion data) {
-    return Topic(
+  TopicEntry copyWithCompanion(TopicsCompanion data) {
+    return TopicEntry(
       id: data.id.present ? data.id.value : this.id,
       title: data.title.present ? data.title.value : this.title,
       commentCount: data.commentCount.present
@@ -252,7 +252,7 @@ class Topic extends DataClass implements Insertable<Topic> {
 
   @override
   String toString() {
-    return (StringBuffer('Topic(')
+    return (StringBuffer('TopicEntry(')
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('commentCount: $commentCount, ')
@@ -270,7 +270,7 @@ class Topic extends DataClass implements Insertable<Topic> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Topic &&
+      (other is TopicEntry &&
           other.id == this.id &&
           other.title == this.title &&
           other.commentCount == this.commentCount &&
@@ -280,7 +280,7 @@ class Topic extends DataClass implements Insertable<Topic> {
           other.fetchedAt == this.fetchedAt);
 }
 
-class TopicsCompanion extends UpdateCompanion<Topic> {
+class TopicsCompanion extends UpdateCompanion<TopicEntry> {
   final Value<int> id;
   final Value<String> title;
   final Value<int> commentCount;
@@ -306,7 +306,7 @@ class TopicsCompanion extends UpdateCompanion<Topic> {
     this.lastViewedAt = const Value.absent(),
     this.fetchedAt = const Value.absent(),
   }) : title = Value(title);
-  static Insertable<Topic> custom({
+  static Insertable<TopicEntry> custom({
     Expression<int>? id,
     Expression<String>? title,
     Expression<int>? commentCount,
@@ -387,7 +387,8 @@ class TopicsCompanion extends UpdateCompanion<Topic> {
   }
 }
 
-class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
+class $CommentsTable extends Comments
+    with TableInfo<$CommentsTable, CommentEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -441,6 +442,12 @@ class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
   @override
   late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
       'image_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _originalImageUrlMeta =
+      const VerificationMeta('originalImageUrl');
+  @override
+  late final GeneratedColumn<String> originalImageUrl = GeneratedColumn<String>(
+      'original_image_url', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   late final GeneratedColumnWithTypeConverter<List<int>, String> anchors =
@@ -497,6 +504,7 @@ class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
         plus,
         minus,
         imageUrl,
+        originalImageUrl,
         anchors,
         reverseAnchors,
         isClipped,
@@ -510,7 +518,7 @@ class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
   String get actualTableName => $name;
   static const String $name = 'comments';
   @override
-  VerificationContext validateIntegrity(Insertable<Comment> instance,
+  VerificationContext validateIntegrity(Insertable<CommentEntry> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -552,6 +560,12 @@ class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
       context.handle(_imageUrlMeta,
           imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta));
     }
+    if (data.containsKey('original_image_url')) {
+      context.handle(
+          _originalImageUrlMeta,
+          originalImageUrl.isAcceptableOrUnknown(
+              data['original_image_url']!, _originalImageUrlMeta));
+    }
     if (data.containsKey('is_clipped')) {
       context.handle(_isClippedMeta,
           isClipped.isAcceptableOrUnknown(data['is_clipped']!, _isClippedMeta));
@@ -574,9 +588,9 @@ class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
   @override
   Set<GeneratedColumn> get $primaryKey => {topicId, number};
   @override
-  Comment map(Map<String, dynamic> data, {String? tablePrefix}) {
+  CommentEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Comment(
+    return CommentEntry(
       topicId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}topic_id'])!,
       number: attachedDatabase.typeMapping
@@ -593,6 +607,8 @@ class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
           .read(DriftSqlType.int, data['${effectivePrefix}minus'])!,
       imageUrl: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}image_url']),
+      originalImageUrl: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}original_image_url']),
       anchors: $CommentsTable.$converteranchors.fromSql(attachedDatabase
           .typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}anchors'])!),
@@ -621,7 +637,7 @@ class $CommentsTable extends Comments with TableInfo<$CommentsTable, Comment> {
       const IntListConverter();
 }
 
-class Comment extends DataClass implements Insertable<Comment> {
+class CommentEntry extends DataClass implements Insertable<CommentEntry> {
   final int topicId;
   final int number;
   final String body;
@@ -630,6 +646,7 @@ class Comment extends DataClass implements Insertable<Comment> {
   final int plus;
   final int minus;
   final String? imageUrl;
+  final String? originalImageUrl;
   final List<int> anchors;
   final List<int> reverseAnchors;
 
@@ -644,7 +661,7 @@ class Comment extends DataClass implements Insertable<Comment> {
 
   /// ラベルID
   final int labelId;
-  const Comment(
+  const CommentEntry(
       {required this.topicId,
       required this.number,
       required this.body,
@@ -653,6 +670,7 @@ class Comment extends DataClass implements Insertable<Comment> {
       required this.plus,
       required this.minus,
       this.imageUrl,
+      this.originalImageUrl,
       required this.anchors,
       required this.reverseAnchors,
       required this.isClipped,
@@ -675,6 +693,9 @@ class Comment extends DataClass implements Insertable<Comment> {
     map['minus'] = Variable<int>(minus);
     if (!nullToAbsent || imageUrl != null) {
       map['image_url'] = Variable<String>(imageUrl);
+    }
+    if (!nullToAbsent || originalImageUrl != null) {
+      map['original_image_url'] = Variable<String>(originalImageUrl);
     }
     {
       map['anchors'] =
@@ -709,6 +730,9 @@ class Comment extends DataClass implements Insertable<Comment> {
       imageUrl: imageUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(imageUrl),
+      originalImageUrl: originalImageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originalImageUrl),
       anchors: Value(anchors),
       reverseAnchors: Value(reverseAnchors),
       isClipped: Value(isClipped),
@@ -722,10 +746,10 @@ class Comment extends DataClass implements Insertable<Comment> {
     );
   }
 
-  factory Comment.fromJson(Map<String, dynamic> json,
+  factory CommentEntry.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Comment(
+    return CommentEntry(
       topicId: serializer.fromJson<int>(json['topicId']),
       number: serializer.fromJson<int>(json['number']),
       body: serializer.fromJson<String>(json['body']),
@@ -734,6 +758,7 @@ class Comment extends DataClass implements Insertable<Comment> {
       plus: serializer.fromJson<int>(json['plus']),
       minus: serializer.fromJson<int>(json['minus']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
+      originalImageUrl: serializer.fromJson<String?>(json['originalImageUrl']),
       anchors: serializer.fromJson<List<int>>(json['anchors']),
       reverseAnchors: serializer.fromJson<List<int>>(json['reverseAnchors']),
       isClipped: serializer.fromJson<bool>(json['isClipped']),
@@ -754,6 +779,7 @@ class Comment extends DataClass implements Insertable<Comment> {
       'plus': serializer.toJson<int>(plus),
       'minus': serializer.toJson<int>(minus),
       'imageUrl': serializer.toJson<String?>(imageUrl),
+      'originalImageUrl': serializer.toJson<String?>(originalImageUrl),
       'anchors': serializer.toJson<List<int>>(anchors),
       'reverseAnchors': serializer.toJson<List<int>>(reverseAnchors),
       'isClipped': serializer.toJson<bool>(isClipped),
@@ -763,7 +789,7 @@ class Comment extends DataClass implements Insertable<Comment> {
     };
   }
 
-  Comment copyWith(
+  CommentEntry copyWith(
           {int? topicId,
           int? number,
           String? body,
@@ -772,13 +798,14 @@ class Comment extends DataClass implements Insertable<Comment> {
           int? plus,
           int? minus,
           Value<String?> imageUrl = const Value.absent(),
+          Value<String?> originalImageUrl = const Value.absent(),
           List<int>? anchors,
           List<int>? reverseAnchors,
           bool? isClipped,
           Value<DateTime?> clippedAt = const Value.absent(),
           Value<String?> clipMemo = const Value.absent(),
           int? labelId}) =>
-      Comment(
+      CommentEntry(
         topicId: topicId ?? this.topicId,
         number: number ?? this.number,
         body: body ?? this.body,
@@ -787,6 +814,9 @@ class Comment extends DataClass implements Insertable<Comment> {
         plus: plus ?? this.plus,
         minus: minus ?? this.minus,
         imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
+        originalImageUrl: originalImageUrl.present
+            ? originalImageUrl.value
+            : this.originalImageUrl,
         anchors: anchors ?? this.anchors,
         reverseAnchors: reverseAnchors ?? this.reverseAnchors,
         isClipped: isClipped ?? this.isClipped,
@@ -794,8 +824,8 @@ class Comment extends DataClass implements Insertable<Comment> {
         clipMemo: clipMemo.present ? clipMemo.value : this.clipMemo,
         labelId: labelId ?? this.labelId,
       );
-  Comment copyWithCompanion(CommentsCompanion data) {
-    return Comment(
+  CommentEntry copyWithCompanion(CommentsCompanion data) {
+    return CommentEntry(
       topicId: data.topicId.present ? data.topicId.value : this.topicId,
       number: data.number.present ? data.number.value : this.number,
       body: data.body.present ? data.body.value : this.body,
@@ -804,6 +834,9 @@ class Comment extends DataClass implements Insertable<Comment> {
       plus: data.plus.present ? data.plus.value : this.plus,
       minus: data.minus.present ? data.minus.value : this.minus,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
+      originalImageUrl: data.originalImageUrl.present
+          ? data.originalImageUrl.value
+          : this.originalImageUrl,
       anchors: data.anchors.present ? data.anchors.value : this.anchors,
       reverseAnchors: data.reverseAnchors.present
           ? data.reverseAnchors.value
@@ -817,7 +850,7 @@ class Comment extends DataClass implements Insertable<Comment> {
 
   @override
   String toString() {
-    return (StringBuffer('Comment(')
+    return (StringBuffer('CommentEntry(')
           ..write('topicId: $topicId, ')
           ..write('number: $number, ')
           ..write('body: $body, ')
@@ -826,6 +859,7 @@ class Comment extends DataClass implements Insertable<Comment> {
           ..write('plus: $plus, ')
           ..write('minus: $minus, ')
           ..write('imageUrl: $imageUrl, ')
+          ..write('originalImageUrl: $originalImageUrl, ')
           ..write('anchors: $anchors, ')
           ..write('reverseAnchors: $reverseAnchors, ')
           ..write('isClipped: $isClipped, ')
@@ -846,6 +880,7 @@ class Comment extends DataClass implements Insertable<Comment> {
       plus,
       minus,
       imageUrl,
+      originalImageUrl,
       anchors,
       reverseAnchors,
       isClipped,
@@ -855,7 +890,7 @@ class Comment extends DataClass implements Insertable<Comment> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Comment &&
+      (other is CommentEntry &&
           other.topicId == this.topicId &&
           other.number == this.number &&
           other.body == this.body &&
@@ -864,6 +899,7 @@ class Comment extends DataClass implements Insertable<Comment> {
           other.plus == this.plus &&
           other.minus == this.minus &&
           other.imageUrl == this.imageUrl &&
+          other.originalImageUrl == this.originalImageUrl &&
           other.anchors == this.anchors &&
           other.reverseAnchors == this.reverseAnchors &&
           other.isClipped == this.isClipped &&
@@ -872,7 +908,7 @@ class Comment extends DataClass implements Insertable<Comment> {
           other.labelId == this.labelId);
 }
 
-class CommentsCompanion extends UpdateCompanion<Comment> {
+class CommentsCompanion extends UpdateCompanion<CommentEntry> {
   final Value<int> topicId;
   final Value<int> number;
   final Value<String> body;
@@ -881,6 +917,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
   final Value<int> plus;
   final Value<int> minus;
   final Value<String?> imageUrl;
+  final Value<String?> originalImageUrl;
   final Value<List<int>> anchors;
   final Value<List<int>> reverseAnchors;
   final Value<bool> isClipped;
@@ -897,6 +934,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
     this.plus = const Value.absent(),
     this.minus = const Value.absent(),
     this.imageUrl = const Value.absent(),
+    this.originalImageUrl = const Value.absent(),
     this.anchors = const Value.absent(),
     this.reverseAnchors = const Value.absent(),
     this.isClipped = const Value.absent(),
@@ -914,6 +952,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
     this.plus = const Value.absent(),
     this.minus = const Value.absent(),
     this.imageUrl = const Value.absent(),
+    this.originalImageUrl = const Value.absent(),
     this.anchors = const Value.absent(),
     this.reverseAnchors = const Value.absent(),
     this.isClipped = const Value.absent(),
@@ -924,7 +963,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
   })  : topicId = Value(topicId),
         number = Value(number),
         body = Value(body);
-  static Insertable<Comment> custom({
+  static Insertable<CommentEntry> custom({
     Expression<int>? topicId,
     Expression<int>? number,
     Expression<String>? body,
@@ -933,6 +972,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
     Expression<int>? plus,
     Expression<int>? minus,
     Expression<String>? imageUrl,
+    Expression<String>? originalImageUrl,
     Expression<String>? anchors,
     Expression<String>? reverseAnchors,
     Expression<bool>? isClipped,
@@ -950,6 +990,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
       if (plus != null) 'plus': plus,
       if (minus != null) 'minus': minus,
       if (imageUrl != null) 'image_url': imageUrl,
+      if (originalImageUrl != null) 'original_image_url': originalImageUrl,
       if (anchors != null) 'anchors': anchors,
       if (reverseAnchors != null) 'reverse_anchors': reverseAnchors,
       if (isClipped != null) 'is_clipped': isClipped,
@@ -969,6 +1010,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
       Value<int>? plus,
       Value<int>? minus,
       Value<String?>? imageUrl,
+      Value<String?>? originalImageUrl,
       Value<List<int>>? anchors,
       Value<List<int>>? reverseAnchors,
       Value<bool>? isClipped,
@@ -985,6 +1027,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
       plus: plus ?? this.plus,
       minus: minus ?? this.minus,
       imageUrl: imageUrl ?? this.imageUrl,
+      originalImageUrl: originalImageUrl ?? this.originalImageUrl,
       anchors: anchors ?? this.anchors,
       reverseAnchors: reverseAnchors ?? this.reverseAnchors,
       isClipped: isClipped ?? this.isClipped,
@@ -1021,6 +1064,9 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
     }
     if (imageUrl.present) {
       map['image_url'] = Variable<String>(imageUrl.value);
+    }
+    if (originalImageUrl.present) {
+      map['original_image_url'] = Variable<String>(originalImageUrl.value);
     }
     if (anchors.present) {
       map['anchors'] = Variable<String>(
@@ -1059,6 +1105,7 @@ class CommentsCompanion extends UpdateCompanion<Comment> {
           ..write('plus: $plus, ')
           ..write('minus: $minus, ')
           ..write('imageUrl: $imageUrl, ')
+          ..write('originalImageUrl: $originalImageUrl, ')
           ..write('anchors: $anchors, ')
           ..write('reverseAnchors: $reverseAnchors, ')
           ..write('isClipped: $isClipped, ')
@@ -1319,12 +1366,12 @@ typedef $$TopicsTableUpdateCompanionBuilder = TopicsCompanion Function({
 });
 
 final class $$TopicsTableReferences
-    extends BaseReferences<_$AppDatabase, $TopicsTable, Topic> {
+    extends BaseReferences<_$AppDatabase, $TopicsTable, TopicEntry> {
   $$TopicsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static MultiTypedResultKey<$CommentsTable, List<Comment>> _commentsRefsTable(
-          _$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(db.comments,
+  static MultiTypedResultKey<$CommentsTable, List<CommentEntry>>
+      _commentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.comments,
           aliasName: $_aliasNameGenerator(db.topics.id, db.comments.topicId));
 
   $$CommentsTableProcessedTableManager get commentsRefs {
@@ -1477,14 +1524,14 @@ class $$TopicsTableAnnotationComposer
 class $$TopicsTableTableManager extends RootTableManager<
     _$AppDatabase,
     $TopicsTable,
-    Topic,
+    TopicEntry,
     $$TopicsTableFilterComposer,
     $$TopicsTableOrderingComposer,
     $$TopicsTableAnnotationComposer,
     $$TopicsTableCreateCompanionBuilder,
     $$TopicsTableUpdateCompanionBuilder,
-    (Topic, $$TopicsTableReferences),
-    Topic,
+    (TopicEntry, $$TopicsTableReferences),
+    TopicEntry,
     PrefetchHooks Function({bool commentsRefs})> {
   $$TopicsTableTableManager(_$AppDatabase db, $TopicsTable table)
       : super(TableManagerState(
@@ -1544,7 +1591,8 @@ class $$TopicsTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (commentsRefs)
-                    await $_getPrefetchedData<Topic, $TopicsTable, Comment>(
+                    await $_getPrefetchedData<TopicEntry, $TopicsTable,
+                            CommentEntry>(
                         currentTable: table,
                         referencedTable:
                             $$TopicsTableReferences._commentsRefsTable(db),
@@ -1564,14 +1612,14 @@ class $$TopicsTableTableManager extends RootTableManager<
 typedef $$TopicsTableProcessedTableManager = ProcessedTableManager<
     _$AppDatabase,
     $TopicsTable,
-    Topic,
+    TopicEntry,
     $$TopicsTableFilterComposer,
     $$TopicsTableOrderingComposer,
     $$TopicsTableAnnotationComposer,
     $$TopicsTableCreateCompanionBuilder,
     $$TopicsTableUpdateCompanionBuilder,
-    (Topic, $$TopicsTableReferences),
-    Topic,
+    (TopicEntry, $$TopicsTableReferences),
+    TopicEntry,
     PrefetchHooks Function({bool commentsRefs})>;
 typedef $$CommentsTableCreateCompanionBuilder = CommentsCompanion Function({
   required int topicId,
@@ -1582,6 +1630,7 @@ typedef $$CommentsTableCreateCompanionBuilder = CommentsCompanion Function({
   Value<int> plus,
   Value<int> minus,
   Value<String?> imageUrl,
+  Value<String?> originalImageUrl,
   Value<List<int>> anchors,
   Value<List<int>> reverseAnchors,
   Value<bool> isClipped,
@@ -1599,6 +1648,7 @@ typedef $$CommentsTableUpdateCompanionBuilder = CommentsCompanion Function({
   Value<int> plus,
   Value<int> minus,
   Value<String?> imageUrl,
+  Value<String?> originalImageUrl,
   Value<List<int>> anchors,
   Value<List<int>> reverseAnchors,
   Value<bool> isClipped,
@@ -1609,7 +1659,7 @@ typedef $$CommentsTableUpdateCompanionBuilder = CommentsCompanion Function({
 });
 
 final class $$CommentsTableReferences
-    extends BaseReferences<_$AppDatabase, $CommentsTable, Comment> {
+    extends BaseReferences<_$AppDatabase, $CommentsTable, CommentEntry> {
   $$CommentsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $TopicsTable _topicIdTable(_$AppDatabase db) => db.topics
@@ -1656,6 +1706,10 @@ class $$CommentsTableFilterComposer
 
   ColumnFilters<String> get imageUrl => $composableBuilder(
       column: $table.imageUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get originalImageUrl => $composableBuilder(
+      column: $table.originalImageUrl,
+      builder: (column) => ColumnFilters(column));
 
   ColumnWithTypeConverterFilters<List<int>, List<int>, String> get anchors =>
       $composableBuilder(
@@ -1730,6 +1784,10 @@ class $$CommentsTableOrderingComposer
   ColumnOrderings<String> get imageUrl => $composableBuilder(
       column: $table.imageUrl, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get originalImageUrl => $composableBuilder(
+      column: $table.originalImageUrl,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get anchors => $composableBuilder(
       column: $table.anchors, builder: (column) => ColumnOrderings(column));
 
@@ -1800,6 +1858,9 @@ class $$CommentsTableAnnotationComposer
   GeneratedColumn<String> get imageUrl =>
       $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
+  GeneratedColumn<String> get originalImageUrl => $composableBuilder(
+      column: $table.originalImageUrl, builder: (column) => column);
+
   GeneratedColumnWithTypeConverter<List<int>, String> get anchors =>
       $composableBuilder(column: $table.anchors, builder: (column) => column);
 
@@ -1843,14 +1904,14 @@ class $$CommentsTableAnnotationComposer
 class $$CommentsTableTableManager extends RootTableManager<
     _$AppDatabase,
     $CommentsTable,
-    Comment,
+    CommentEntry,
     $$CommentsTableFilterComposer,
     $$CommentsTableOrderingComposer,
     $$CommentsTableAnnotationComposer,
     $$CommentsTableCreateCompanionBuilder,
     $$CommentsTableUpdateCompanionBuilder,
-    (Comment, $$CommentsTableReferences),
-    Comment,
+    (CommentEntry, $$CommentsTableReferences),
+    CommentEntry,
     PrefetchHooks Function({bool topicId})> {
   $$CommentsTableTableManager(_$AppDatabase db, $CommentsTable table)
       : super(TableManagerState(
@@ -1871,6 +1932,7 @@ class $$CommentsTableTableManager extends RootTableManager<
             Value<int> plus = const Value.absent(),
             Value<int> minus = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
+            Value<String?> originalImageUrl = const Value.absent(),
             Value<List<int>> anchors = const Value.absent(),
             Value<List<int>> reverseAnchors = const Value.absent(),
             Value<bool> isClipped = const Value.absent(),
@@ -1888,6 +1950,7 @@ class $$CommentsTableTableManager extends RootTableManager<
             plus: plus,
             minus: minus,
             imageUrl: imageUrl,
+            originalImageUrl: originalImageUrl,
             anchors: anchors,
             reverseAnchors: reverseAnchors,
             isClipped: isClipped,
@@ -1905,6 +1968,7 @@ class $$CommentsTableTableManager extends RootTableManager<
             Value<int> plus = const Value.absent(),
             Value<int> minus = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
+            Value<String?> originalImageUrl = const Value.absent(),
             Value<List<int>> anchors = const Value.absent(),
             Value<List<int>> reverseAnchors = const Value.absent(),
             Value<bool> isClipped = const Value.absent(),
@@ -1922,6 +1986,7 @@ class $$CommentsTableTableManager extends RootTableManager<
             plus: plus,
             minus: minus,
             imageUrl: imageUrl,
+            originalImageUrl: originalImageUrl,
             anchors: anchors,
             reverseAnchors: reverseAnchors,
             isClipped: isClipped,
@@ -1975,14 +2040,14 @@ class $$CommentsTableTableManager extends RootTableManager<
 typedef $$CommentsTableProcessedTableManager = ProcessedTableManager<
     _$AppDatabase,
     $CommentsTable,
-    Comment,
+    CommentEntry,
     $$CommentsTableFilterComposer,
     $$CommentsTableOrderingComposer,
     $$CommentsTableAnnotationComposer,
     $$CommentsTableCreateCompanionBuilder,
     $$CommentsTableUpdateCompanionBuilder,
-    (Comment, $$CommentsTableReferences),
-    Comment,
+    (CommentEntry, $$CommentsTableReferences),
+    CommentEntry,
     PrefetchHooks Function({bool topicId})>;
 typedef $$ClipLabelsTableCreateCompanionBuilder = ClipLabelsCompanion Function({
   Value<int> id,

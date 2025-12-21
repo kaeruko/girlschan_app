@@ -32,6 +32,7 @@ class IntListConverter extends TypeConverter<List<int>, String> {
 
 /// トピックテーブル
 /// APIキャッシュと閲覧履歴を兼ねる
+@DataClassName('TopicEntry')
 class Topics extends Table {
   // APIのIDをそのまま主キーにする
   IntColumn get id => integer()();
@@ -52,6 +53,7 @@ class Topics extends Table {
 
 /// コメントテーブル
 /// トピックID + コメント番号 で一意になる
+@DataClassName('CommentEntry')
 class Comments extends Table {
   IntColumn get topicId => integer().references(Topics, #id)();
   IntColumn get number => integer()(); // コメント番号 (no)
@@ -61,6 +63,7 @@ class Comments extends Table {
   IntColumn get plus => integer().withDefault(const Constant(0))();
   IntColumn get minus => integer().withDefault(const Constant(0))();
   TextColumn get imageUrl => text().nullable()();
+  TextColumn get originalImageUrl => text().nullable()();
   
   // JSON変換して保存するカラム
   TextColumn get anchors => text().map(const IntListConverter()).withDefault(const Constant('[]'))();
@@ -95,7 +98,25 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (m) async {
+        await m.createAll();
+      },
+      onUpgrade: (m, from, to) async {
+        if (from < 2) {
+          // comments テーブルに original_image_url カラムを追加
+          await m.addColumn(comments, comments.originalImageUrl);
+        }
+      },
+      beforeOpen: (details) async {
+        // 必要に応じて処理を追加
+      },
+    );
+  }
 
   // ▼ ここにデータ操作メソッド(DAO)を書いていく
 
@@ -142,7 +163,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// 履歴一覧の取得
-  Future<List<Topic>> getHistory({int limit = 50}) {
+  Future<List<TopicEntry>> getHistory({int limit = 50}) {
     return (select(topics)
       ..where((t) => t.lastViewedAt.isNotNull())
       ..orderBy([(t) => OrderingTerm.desc(t.lastViewedAt)])
@@ -164,6 +185,8 @@ class AppDatabase extends _$AppDatabase {
             body: Constant(row.body.value),
             plus: Constant(row.plus.value),
             minus: Constant(row.minus.value),
+            imageUrl: row.imageUrl.present ? Constant(row.imageUrl.value) : null,
+            originalImageUrl: row.originalImageUrl.present ? Constant(row.originalImageUrl.value) : null,
             anchors: Constant(const IntListConverter().toSql(row.anchors.value)),
             reverseAnchors: Constant(const IntListConverter().toSql(row.reverseAnchors.value)),
             // isClipped, clipMemo 等は更新しないことで維持する
@@ -174,7 +197,7 @@ class AppDatabase extends _$AppDatabase {
   }
   
   /// トピックID指定でコメント取得
-  Future<List<Comment>> getCommentsForTopic(int topicId) {
+  Future<List<CommentEntry>> getCommentsForTopic(int topicId) {
     return (select(comments)
       ..where((c) => c.topicId.equals(topicId))
       ..orderBy([(c) => OrderingTerm.asc(c.number)])

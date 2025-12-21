@@ -540,6 +540,7 @@ class TopicDetailController extends ChangeNotifier {
         anchors: comment.anchors,
         reverse_anchors: comment.reverseAnchors,
         imageUrl: comment.imageUrl, // ★ 追加
+        originalImageUrl: comment.originalImageUrl, // ★ 追加
         urls: comment.urls.map((u) => { // ★ 追加
           'url': u.url,
           'title': u.title,

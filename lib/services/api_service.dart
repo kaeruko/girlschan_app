@@ -303,6 +303,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
         plus: drift.Value(c['plus'] ?? 0),
         minus: drift.Value(c['minus'] ?? 0),
         imageUrl: drift.Value(c['image_url']),
+        originalImageUrl: drift.Value(c['original_image_url']),
         anchors: drift.Value(List<int>.from(c['anchors'] ?? [])),
         reverseAnchors: drift.Value(List<int>.from(c['reverse_anchors'] ?? [])),
       );
@@ -448,6 +449,7 @@ Future<List<Map<String, dynamic>>> getClippedComments() async {
       'anchors': comment.anchors,
       'reverse_anchors': comment.reverseAnchors,
       'image_url': comment.imageUrl,
+      'original_image_url': comment.originalImageUrl,
       'clipDate': comment.clippedAt?.toIso8601String(),
       'labelId': comment.labelId,
       'memo': comment.clipMemo,
@@ -467,6 +469,7 @@ Future<void> addClippedComment({
   List<dynamic> anchors = const [],
   List<dynamic> reverse_anchors = const [],
   String? imageUrl,
+  String? originalImageUrl,
   List<dynamic> urls = const [], // DBには未対応だが引数は維持
   int labelId = 0,
 }) async {
@@ -495,6 +498,7 @@ Future<void> addClippedComment({
         plus: drift.Value(plus),
         minus: drift.Value(minus),
         imageUrl: drift.Value(imageUrl),
+        originalImageUrl: drift.Value(originalImageUrl),
         anchors: drift.Value(List<int>.from(anchors)),
         reverseAnchors: drift.Value(List<int>.from(reverse_anchors)),
         isClipped: const drift.Value(true),
@@ -509,6 +513,8 @@ Future<void> addClippedComment({
         body: drift.Constant(commentBody),
         plus: drift.Constant(plus),
         minus: drift.Constant(minus),
+        imageUrl: drift.Constant(imageUrl),
+        originalImageUrl: drift.Constant(originalImageUrl),
       )),
     );
   });
@@ -625,6 +631,7 @@ Future<void> importClipDirectly(Map<String, dynamic> clipData) async {
     anchors: clipData['anchors'] ?? [],
     reverse_anchors: clipData['reverse_anchors'] ?? [],
     imageUrl: clipData['image_url'],
+    originalImageUrl: clipData['original_image_url'],
     labelId: clipData['labelId'] ?? 0,
   );
   
@@ -667,6 +674,7 @@ Future<List<Map<String, dynamic>>> getCommentsFromDb(int topicId) async {
     'plus': c.plus,
     'minus': c.minus,
     'image_url': c.imageUrl,
+    'original_image_url': c.originalImageUrl,
     'anchors': c.anchors,
     'reverse_anchors': c.reverseAnchors,
   }).toList();
