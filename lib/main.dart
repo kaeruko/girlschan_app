@@ -8,6 +8,7 @@ import 'utils/platform_helper.dart';
 import 'utils/log.dart';
 import 'services/cache_service.dart';
 import 'services/api_service.dart';
+import 'services/settings_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,9 @@ void main() async {
     
     // 🏷️ ラベル初期化（マイコメントラベルを確保）
     await getOrCreateMyCommentLabel();
+
+    // ⚙️ 設定読み込み
+    await SettingsService().load();
   } catch (e, stackTrace) {
     logd('❌ AppConfig 初期化失敗: $e');
     logd('❌ スタックトレース: $stackTrace');
