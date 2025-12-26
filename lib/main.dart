@@ -32,7 +32,7 @@ void main() async {
   } catch (e, stackTrace) {
     logd('❌ AppConfig 初期化失敗: $e');
     logd('❌ スタックトレース: $stackTrace');
-    AppConfig.apiBase = 'https://evhch6a2hc.execute-api.us-west-2.amazonaws.com/dev';
+    AppConfig.apiBase = 'https://d1d4vb4xomterw.cloudfront.net';
   }
 
   // 📱 モバイル広告SDK初期化（デスクトップでは自動的にスキップされる）
