@@ -18,9 +18,10 @@ class PlatformHelper {
   // ===== 判定系 =====
   static bool get isMacOS => _override == PlatformKind.macOS || Platform.isMacOS;
   static bool get isIOS => _override == PlatformKind.iOS || Platform.isIOS;
+  static bool get isWindows => _override == PlatformKind.windows || Platform.isWindows;
   static bool get isApple => isMacOS || isIOS;
 
-  static bool get isDesktop => isMacOS; // 今回は macOS だけ想定
+  static bool get isDesktop => isMacOS || isWindows;
   static bool get isMobile => isIOS; // iOS だけ想定
 
   /// テスト用：明示的にプラットフォームを上書き（テスト終了時は reset）
