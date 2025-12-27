@@ -295,13 +295,16 @@ class _MacShellState extends State<MacShell> {
             onPressed: () {
               // 今アクティブなタブの Navigator を取ってくる
               final nav = _tabNavKeys[_index].currentState;
-              if (nav == null) return;
-
-              nav.push(
-                CupertinoPageRoute(
-                  builder: (_) => const SearchScreen(),
-                ),
+              final route = CupertinoPageRoute(
+                builder: (_) => const SearchScreen(),
               );
+
+              // Navigator がないタブ（新着・人気）ではルートの Navigator にフォールバック
+              if (nav != null) {
+                nav.push(route);
+              } else {
+                Navigator.of(context).push(route);
+              }
             },
             child: const Icon(
               CupertinoIcons.search,
