@@ -29,7 +29,12 @@ enum CommentFilterLevel {
   legend,   // プラス > マイナス × 3.0
 }
 
-class TopicDetailScreen extends StatefulWidget {
+enum TopicDetailLayout {
+  fullPage,
+  embeddedPane,
+}
+
+class TopicDetailScreen extends StatelessWidget {
   final int topicId;
   final String title;
   final int commentCount;
@@ -50,10 +55,82 @@ class TopicDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<TopicDetailScreen> createState() => _TopicDetailScreenState();
+  Widget build(BuildContext context) {
+    return TopicDetailView(
+      topicId: topicId,
+      title: title,
+      commentCount: commentCount,
+      posted_at: posted_at,
+      initialJumpTo: initialJumpTo,
+      enableRefresh: enableRefresh,
+      saveReadPosition: saveReadPosition,
+      layout: TopicDetailLayout.fullPage,
+    );
+  }
 }
 
-class _TopicDetailScreenState extends State<TopicDetailScreen> {
+class TopicDetailPane extends StatelessWidget {
+  final int topicId;
+  final String title;
+  final int commentCount;
+  final String posted_at;
+  final int? initialJumpTo;
+  final bool enableRefresh;
+  final bool saveReadPosition;
+
+  const TopicDetailPane({
+    super.key,
+    required this.topicId,
+    required this.title,
+    required this.commentCount,
+    required this.posted_at,
+    this.initialJumpTo,
+    this.enableRefresh = true,
+    this.saveReadPosition = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TopicDetailView(
+      topicId: topicId,
+      title: title,
+      commentCount: commentCount,
+      posted_at: posted_at,
+      initialJumpTo: initialJumpTo,
+      enableRefresh: enableRefresh,
+      saveReadPosition: saveReadPosition,
+      layout: TopicDetailLayout.embeddedPane,
+    );
+  }
+}
+
+class TopicDetailView extends StatefulWidget {
+  final int topicId;
+  final String title;
+  final int commentCount;
+  final String posted_at;
+  final int? initialJumpTo;
+  final bool enableRefresh;
+  final bool saveReadPosition;
+  final TopicDetailLayout layout;
+
+  const TopicDetailView({
+    super.key,
+    required this.topicId,
+    required this.title,
+    required this.commentCount,
+    required this.posted_at,
+    this.initialJumpTo,
+    this.enableRefresh = true,
+    this.saveReadPosition = true,
+    required this.layout,
+  });
+
+  @override
+  State<TopicDetailView> createState() => _TopicDetailViewState();
+}
+
+class _TopicDetailViewState extends State<TopicDetailView> {
   // ========== フィールド群 ==========
   late final TopicDetailController _vm;
   static const int _pageSize = 100;
@@ -104,7 +181,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
   }
 
   @override
-  void didUpdateWidget(TopicDetailScreen oldWidget) {
+  void didUpdateWidget(TopicDetailView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.topicId == widget.topicId) {
       if (oldWidget.title != widget.title ||
@@ -610,151 +687,368 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     )..load();
   }
 
+  String _subtitleText(List<Comment> items) {
+    return _currentFilter == CommentFilterLevel.all
+        ? '${widget.posted_at} • コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}'
+        : '絞り込み中: ${items.length}件を表示';
+  }
+
+  TextStyle _subtitleTextStyle() {
+    return TextStyle(
+      fontSize: 11,
+      color: _currentFilter == CommentFilterLevel.all
+          ? CupertinoColors.secondaryLabel
+          : CupertinoColors.systemOrange,
+      fontWeight: _currentFilter == CommentFilterLevel.all
+          ? FontWeight.normal
+          : FontWeight.bold,
+    );
+  }
+
+  Widget _buildHeaderTitle(List<Comment> items, {required CrossAxisAlignment alignment}) {
+    return Column(
+      crossAxisAlignment: alignment,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(
+          _subtitleText(items),
+          style: _subtitleTextStyle(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    EdgeInsets padding = const EdgeInsets.all(6),
+  }) {
+    return CupertinoButton(
+      padding: padding,
+      minSize: 0,
+      onPressed: onPressed,
+      child: Icon(icon, size: 20),
+    );
+  }
+
+  List<Widget> _buildHeaderActions({
+    required bool includeFilter,
+    EdgeInsets padding = const EdgeInsets.all(6),
+  }) {
+    return [
+      _buildHeaderButton(
+        icon: CupertinoIcons.search,
+        onPressed: _showSearchDialog,
+        padding: padding,
+      ),
+      if (includeFilter)
+        _buildHeaderButton(
+          icon: CupertinoIcons.slider_horizontal_3,
+          onPressed: _showFilterSheet,
+          padding: padding,
+        ),
+      if (_vm.hasDraft)
+        _buildHeaderButton(
+          icon: CupertinoIcons.pencil,
+          onPressed: () => _openPostDialog(),
+          padding: padding,
+        ),
+      _buildHeaderButton(
+        icon: CupertinoIcons.ellipsis,
+        onPressed: _showMenu,
+        padding: padding,
+      ),
+    ];
+  }
+
+  Widget _buildEmbeddedHeader(List<Comment> items) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: CupertinoColors.separator)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _buildHeaderTitle(
+              items,
+              alignment: CrossAxisAlignment.start,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: _buildHeaderActions(includeFilter: true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainContent(List<Comment> items, Widget pageView) {
+    if (_vm.loading) {
+      return Center(child: PlatformHelper.buildLoadingIndicator());
+    }
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(CupertinoIcons.slash_circle, size: 48, color: CupertinoColors.systemGrey3),
+            const SizedBox(height: 16),
+            Text(
+              _currentFilter == CommentFilterLevel.all
+                  ? 'コメントがありません'
+                  : '条件に合うコメントがありません',
+              style: const TextStyle(color: CupertinoColors.systemGrey),
+            ),
+            if (_currentFilter != CommentFilterLevel.all)
+              CupertinoButton(
+                child: const Text('フィルターを解除'),
+                onPressed: () => _onFilterChanged(CommentFilterLevel.all),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        pageView,
+        if (_pageCountLive > 1 && _hasPrev)
+          Positioned(
+            left: 8, top: 0, bottom: 0,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: CupertinoButton(
+                padding: const EdgeInsets.all(8),
+                onPressed: _hasPrev ? _goPrevPage : null,
+                child: const Icon(CupertinoIcons.chevron_left, size: 22),
+              ),
+            ),
+          ),
+        if (_pageCountLive > 1 && _hasNext)
+          Positioned(
+            right: 8, top: 0, bottom: 0,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: CupertinoButton(
+                padding: const EdgeInsets.all(8),
+                onPressed: _hasNext ? _goNextPage : null,
+                child: const Icon(CupertinoIcons.chevron_right, size: 22),
+              ),
+            ),
+          ),
+        if (_pageCountLive > 1)
+          Positioned(
+            bottom: 8, left: 0, right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemGrey6.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  '${_currentPage + 1} / $_pageCountLive',
+                  style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                ),
+              ),
+            ),
+          ),
+        if (_vm.savedCommentNo > 0 && !_restoredOnce && _currentFilter == CommentFilterLevel.all)
+          Positioned(
+            top: 8, right: 8,
+            child: CupertinoButton.filled(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              onPressed: _restoring ? null : _tryRestoreIfNeeded,
+              child: Text('続き: No.${_vm.savedCommentNo}', style: const TextStyle(fontSize: 13)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildContentColumn(List<Comment> items, Widget pageView) {
+    return Column(
+      children: [
+        Expanded(child: _buildMainContent(items, pageView)),
+        if (_isAdLoaded && _bannerAd != null)
+          SizedBox(
+            width: _bannerAd!.size.width.toDouble(),
+            height: _bannerAd!.size.height.toDouble(),
+            child: AdWidget(ad: _bannerAd!),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _displayComments;
     final pageCount = _pageCountFor(items.length);
+    final allowPopGesture = widget.layout == TopicDetailLayout.fullPage;
 
-    final pageView = NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification.depth == 0 && notification is ScrollUpdateNotification) {
-          if (notification.metrics.pixels < -70 && !_isPopping) {
-            if (notification.dragDetails != null) {
-              _isPopping = true;
-              Navigator.of(context).maybePop();
-              return true;
-            }
-          }
-        }
-        return false;
+    Widget pageView = PageView.builder(
+      controller: _pc,
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      onPageChanged: (p) {
+        _saveFromPage(_currentPage);
+        setState(() => _currentPage = p);
       },
-      child: PageView.builder(
-        controller: _pc,
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        onPageChanged: (p) {
-          _saveFromPage(_currentPage);
-          setState(() => _currentPage = p);
-        },
-        itemCount: pageCount > 0 ? pageCount : 1,
-        itemBuilder: (ctx, page) {
-          final pageItems = _itemsOfPage(page, items);
-          final meas = _measForPage(page);
-          meas.ensureCapacity(pageItems.length);
-          final sc = _scForPage(page);
+      itemCount: pageCount > 0 ? pageCount : 1,
+      itemBuilder: (ctx, page) {
+        final pageItems = _itemsOfPage(page, items);
+        final meas = _measForPage(page);
+        meas.ensureCapacity(pageItems.length);
+        final sc = _scForPage(page);
 
-          return NotificationListener<ScrollNotification>(
-            onNotification: (n) {
-              if (n is ScrollEndNotification) {
-                _saveFromPage(page);
-              }
-              return false;
-            },
-            child: CupertinoScrollbar(
+        return NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            if (n is ScrollEndNotification) {
+              _saveFromPage(page);
+            }
+            return false;
+          },
+          child: CupertinoScrollbar(
+            controller: sc,
+            child: CustomScrollView(
               controller: sc,
-              child: CustomScrollView(
-                controller: sc,
-                cacheExtent: (_boostCacheDuringRestore && _restoreTargetPageNo == page)
-                    ? 50000.0 : 1200.0,
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
-                ),
-                slivers: [
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (ctx2, i) {
-                        final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, postedAt: '', body: '', plus: 0, minus: 0);
-                        final bool shouldMeasure = _restoring || meas.needsUpdate;
-                        Widget content = Container(
-                          key: c.id > 0 ? _vm.keyForCommentNo(c.id) : null,
-                          child: CommentTile(
-                            comment: c,
-                            userStatus: _vm.getUserStatus(c.id),
-                            onLongPress: () => _showCommentActionSheet(ctx2, c),
-                            onAnchorTap: (no) => _showAnchorPreview(no),
-                            onImageTap: (url) {
-                              Navigator.of(context).push(
-                                CupertinoPageRoute(
-                                  fullscreenDialog: true,
-                                  builder: (_) => ImageViewerPage(url: url),
-                                ),
-                              );
-                            },
-                            // ★ 返信ボタンが押された時の処理
-                            onRepliesTap: (ids) => _showRepliesList(ids), 
+              cacheExtent: (_boostCacheDuringRestore && _restoreTargetPageNo == page)
+                  ? 50000.0 : 1200.0,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx2, i) {
+                      final Comment c = pageItems.isNotEmpty ? pageItems[i] : Comment(id: 0, postedAt: '', body: '', plus: 0, minus: 0);
+                      final bool shouldMeasure = _restoring || meas.needsUpdate;
+                      Widget content = Container(
+                        key: c.id > 0 ? _vm.keyForCommentNo(c.id) : null,
+                        child: CommentTile(
+                          comment: c,
+                          userStatus: _vm.getUserStatus(c.id),
+                          onLongPress: () => _showCommentActionSheet(ctx2, c),
+                          onAnchorTap: (no) => _showAnchorPreview(no),
+                          onImageTap: (url) {
+                            Navigator.of(context).push(
+                              CupertinoPageRoute(
+                                fullscreenDialog: true,
+                                builder: (_) => ImageViewerPage(url: url),
+                              ),
+                            );
+                          },
+                          // ★ 返信ボタンが押された時の処理
+                          onRepliesTap: (ids) => _showRepliesList(ids), 
 
-                            onVote: (isPlus) async {
-                              final no = c.id;
-                              final commentId = 'vbox$no';
-                              final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
-                              if (!mounted) return;
-                              if (success) {
-                                setState(() {
-                                  if (isPlus) {
-                                    c.plus += 1;
-                                  } else {
-                                    c.minus += 1;
-                                  }
-                                });
-                              }
-                            },
-                            checkAnchorAvailability: (no) => _vm.getCommentByNo(no) != null,
-                            fontSize: _settings.fontSize,
-                          ),
+                          onVote: (isPlus) async {
+                            final no = c.id;
+                            final commentId = 'vbox$no';
+                            final success = await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
+                            if (!mounted) return;
+                            if (success) {
+                              setState(() {
+                                if (isPlus) {
+                                  c.plus += 1;
+                                } else {
+                                  c.minus += 1;
+                                }
+                              });
+                            }
+                          },
+                          checkAnchorAvailability: (no) => _vm.getCommentByNo(no) != null,
+                          fontSize: _settings.fontSize,
+                        ),
+                      );
+                      if (shouldMeasure) {
+                        return MeasureSize(
+                          onChange: (sz) {
+                            meas.onItemSize(i, sz.height, sc: sc);
+                            meas.needsUpdate = false;
+                          },
+                          child: content,
                         );
-                        if (shouldMeasure) {
-                          return MeasureSize(
-                            onChange: (sz) {
-                              meas.onItemSize(i, sz.height, sc: sc);
-                              meas.needsUpdate = false;
-                            },
-                            child: content,
-                          );
-                        } else {
-                          return content;
-                        }
-                      },
-                      childCount: pageItems.length,
+                      } else {
+                        return content;
+                      }
+                    },
+                    childCount: pageItems.length,
+                  ),
+                ),
+                if (page < pageCount - 1)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: CupertinoButton(
+                          onPressed: () => _goToPage(page + 1),
+                          child: const Text('次の100件へ'),
+                        ),
+                      ),
                     ),
                   ),
-                  if (page < pageCount - 1)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Center(
-                          child: CupertinoButton(
-                            onPressed: () => _goToPage(page + 1),
-                            child: const Text('次の100件へ'),
-                          ),
+                if (page == pageCount - 1 && _currentFilter == CommentFilterLevel.all)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: CupertinoButton.filled(
+                          onPressed: _loadingMore ? null : _fetchMoreDelta,
+                          child: Text(_loadingMore ? '読み込み中…' : 'さらに読み込む'),
                         ),
                       ),
                     ),
-                  if (page == pageCount - 1 && _currentFilter == CommentFilterLevel.all)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Center(
-                          child: CupertinoButton.filled(
-                            onPressed: _loadingMore ? null : _fetchMoreDelta,
-                            child: Text(_loadingMore ? '読み込み中…' : 'さらに読み込む'),
-                          ),
-                        ),
-                      ),
+                  ),
+                if (page == pageCount - 1 && _loadingMore)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CupertinoActivityIndicator()),
                     ),
-                  if (page == pageCount - 1 && _loadingMore)
-                    const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(child: CupertinoActivityIndicator()),
-                      ),
-                    ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
-                ],
-              ),
+                  ),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
+              ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
+
+    if (allowPopGesture) {
+      pageView = NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.depth == 0 && notification is ScrollUpdateNotification) {
+            if (notification.metrics.pixels < -70 && !_isPopping) {
+              if (notification.dragDetails != null) {
+                _isPopping = true;
+                Navigator.of(context).maybePop();
+                return true;
+              }
+            }
+          }
+          return false;
+        },
+        child: pageView,
+      );
+    }
+
+    final contentColumn = _buildContentColumn(items, pageView);
+
+    if (widget.layout == TopicDetailLayout.embeddedPane) {
+      return Container(
+        color: _settings.backgroundColor,
+        child: Column(
+          children: [
+            _buildEmbeddedHeader(items),
+            Expanded(child: contentColumn),
+          ],
+        ),
+      );
+    }
 
     return PopScope(
       canPop: _allowPop,
@@ -772,143 +1066,21 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       child: CupertinoPageScaffold(
         backgroundColor: _settings.backgroundColor,
         navigationBar: CupertinoNavigationBar(
-          middle: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-              // ★ フィルター適用時は状態を表示
-              Text(
-                _currentFilter == CommentFilterLevel.all
-                    ? '${widget.posted_at} • コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}'
-                    : '絞り込み中: ${items.length}件を表示',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: _currentFilter == CommentFilterLevel.all
-                      ? CupertinoColors.secondaryLabel
-                      : CupertinoColors.systemOrange,
-                  fontWeight: _currentFilter == CommentFilterLevel.all
-                      ? FontWeight.normal
-                      : FontWeight.bold,
-                ),
-              ),
-            ],
+          middle: _buildHeaderTitle(
+            items,
+            alignment: CrossAxisAlignment.center,
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _showSearchDialog,
-                child: const Icon(CupertinoIcons.search),
-              ),
-              if (_vm.hasDraft)
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => _openPostDialog(),
-                  child: const Icon(CupertinoIcons.pencil),
-                ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _showMenu,
-                child: const Icon(CupertinoIcons.ellipsis),
-              ),
-            ],
+            children: _buildHeaderActions(
+              includeFilter: false,
+              padding: EdgeInsets.zero,
+            ),
           ),
         ),
         child: SafeArea(
           bottom: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: _vm.loading
-                    ? Center(child: PlatformHelper.buildLoadingIndicator())
-                    : items.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(CupertinoIcons.slash_circle, size: 48, color: CupertinoColors.systemGrey3),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _currentFilter == CommentFilterLevel.all
-                                      ? 'コメントがありません'
-                                      : '条件に合うコメントがありません',
-                                  style: const TextStyle(color: CupertinoColors.systemGrey),
-                                ),
-                                if (_currentFilter != CommentFilterLevel.all)
-                                  CupertinoButton(
-                                    child: const Text('フィルターを解除'),
-                                    onPressed: () => _onFilterChanged(CommentFilterLevel.all),
-                                  )
-                              ],
-                            ),
-                          )
-                        : Stack(
-                            children: [
-                              pageView,
-                              if (_pageCountLive > 1 && _hasPrev)
-                                Positioned(
-                                  left: 8, top: 0, bottom: 0,
-                                  child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: CupertinoButton(
-                                      padding: const EdgeInsets.all(8),
-                                      onPressed: _hasPrev ? _goPrevPage : null,
-                                      child: const Icon(CupertinoIcons.chevron_left, size: 22),
-                                    ),
-                                  ),
-                                ),
-                              if (_pageCountLive > 1 && _hasNext)
-                                Positioned(
-                                  right: 8, top: 0, bottom: 0,
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: CupertinoButton(
-                                      padding: const EdgeInsets.all(8),
-                                      onPressed: _hasNext ? _goNextPage : null,
-                                      child: const Icon(CupertinoIcons.chevron_right, size: 22),
-                                    ),
-                                  ),
-                                ),
-                              if (_pageCountLive > 1)
-                                Positioned(
-                                  bottom: 8, left: 0, right: 0,
-                                  child: Center(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: CupertinoColors.systemGrey6.withOpacity(0.9),
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Text(
-                                        '${_currentPage + 1} / $_pageCountLive',
-                                        style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              if (_vm.savedCommentNo > 0 && !_restoredOnce && _currentFilter == CommentFilterLevel.all)
-                                Positioned(
-                                  top: 8, right: 8,
-                                  child: CupertinoButton.filled(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    onPressed: _restoring ? null : _tryRestoreIfNeeded,
-                                    child: Text('続き: No.${_vm.savedCommentNo}', style: const TextStyle(fontSize: 13)),
-                                  ),
-                                ),
-                            ],
-                          ),
-              ),
-              // 広告バナー表示
-              if (_isAdLoaded && _bannerAd != null)
-                SizedBox(
-                  width: _bannerAd!.size.width.toDouble(),
-                  height: _bannerAd!.size.height.toDouble(),
-                  child: AdWidget(ad: _bannerAd!),
-                ),
-            ],
-          ),
+          child: contentColumn,
         ),
       ),
     );

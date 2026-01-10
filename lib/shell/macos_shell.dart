@@ -8,6 +8,7 @@ import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../controllers/selection_controller.dart'; // ★追加
+import '../utils/platform_helper.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -212,15 +213,25 @@ class _MacShellState extends State<MacShell> {
                           }
 
                           // 選ばれていれば詳細画面を埋め込む
-                          return TopicDetailScreen(
-                            key: ValueKey(selectedId), // IDが変わったら作り直す
-                            topicId: selectedId,
-                            title: _selectionController.title,
-                            commentCount: _selectionController.commentCount,
-                            posted_at: _selectionController.postedAt,
-                            enableRefresh: true,
-                            saveReadPosition: true,
-                          );
+                          return PlatformHelper.isDesktop
+                              ? TopicDetailPane(
+                                  key: ValueKey(selectedId), // IDが変わったら作り直す
+                                  topicId: selectedId,
+                                  title: _selectionController.title,
+                                  commentCount: _selectionController.commentCount,
+                                  posted_at: _selectionController.postedAt,
+                                  enableRefresh: true,
+                                  saveReadPosition: true,
+                                )
+                              : TopicDetailScreen(
+                                  key: ValueKey(selectedId), // IDが変わったら作り直す
+                                  topicId: selectedId,
+                                  title: _selectionController.title,
+                                  commentCount: _selectionController.commentCount,
+                                  posted_at: _selectionController.postedAt,
+                                  enableRefresh: true,
+                                  saveReadPosition: true,
+                                );
                         },
                       ),
                     ),
