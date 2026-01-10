@@ -6,13 +6,13 @@ import 'macos_shell.dart';
 
 /// プラットフォーム別に適切なシェルを選択
 /// iOS: IOSShell（ボトムタブ）
-/// macOS: MacShell（サイドバー）
+/// macOS/Windows: MacShell（サイドバー）
 class AdaptiveShell extends StatelessWidget {
   final List<TabSpec> tabs;
   const AdaptiveShell({super.key, required this.tabs});
 
   @override
   Widget build(BuildContext context) {
-    return PlatformHelper.isMacOS ? MacShell(tabs: tabs) : IOSShell(tabs: tabs);
+    return PlatformHelper.isDesktop ? MacShell(tabs: tabs) : IOSShell(tabs: tabs);
   }
 }
