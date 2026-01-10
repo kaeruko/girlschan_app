@@ -3,12 +3,10 @@ import 'package:flutter/material.dart'; // AnimatedBuilder, Scaffold etc
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import '../app/app_tabs.dart';
-import '../widgets/history_sidebar.dart';
 import '../screens/topic_detail.dart';
 import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
-import '../screens/search_screen.dart';
 import '../controllers/selection_controller.dart'; // ★追加
 
 class MacShell extends StatefulWidget {
@@ -19,14 +17,23 @@ class MacShell extends StatefulWidget {
   State<MacShell> createState() => _MacShellState();
 }
 
+class _SectionNavItem {
+  final String id;
+  final String label;
+  final IconData icon;
+
+  const _SectionNavItem({
+    required this.id,
+    required this.label,
+    required this.icon,
+  });
+}
+
 class _MacShellState extends State<MacShell> {
-  int _index = 0;
-  late final List<TabSpec> _effectiveTabs;
-  // NavigatorKeys は 3ペイン化で不要になる可能性があるが、
-  // 検索画面や設定画面など、ドリルダウンが必要なタブのために残す
-  late final List<GlobalKey<NavigatorState>> _tabNavKeys;
-  late final GlobalKey<ClipsScreenState> _clipsKey;
-  late final GlobalKey<FavoritesScreenState> _favoritesKey;
+  late final Map<String, TabSpec> _tabsById;
+  late final List<_SectionNavItem> _sectionItems;
+  late String _selectedSectionId;
+  final Map<String, GlobalKey<NavigatorState>> _sectionNavKeys = {};
   double _captionHeight = 28.0;
 
   // ★ 選択状態を管理
@@ -35,13 +42,14 @@ class _MacShellState extends State<MacShell> {
   @override
   void initState() {
     super.initState();
-    _effectiveTabs = widget.tabs.where((t) =>
-      t.id == 'tab_new' || t.id == 'tab_popular' || t.id == 'tab_favorites' || t.id == 'tab_clips'
-    ).toList();
-
-    _tabNavKeys = List.generate(_effectiveTabs.length, (_) => GlobalKey<NavigatorState>());
-    _clipsKey = GlobalKey<ClipsScreenState>();
-    _favoritesKey = GlobalKey<FavoritesScreenState>();
+    _tabsById = {for (final tab in widget.tabs) tab.id: tab};
+    _sectionItems = _buildSectionItems();
+    _selectedSectionId = _sectionItems.first.id;
+    _sectionNavKeys.addEntries(
+      _sectionItems
+          .where((item) => _usesNestedNavigator(item.id))
+          .map((item) => MapEntry(item.id, GlobalKey<NavigatorState>())),
+    );
     _loadCaptionHeight();
   }
 
@@ -57,25 +65,67 @@ class _MacShellState extends State<MacShell> {
     }
   }
 
-  void _onTabChanged(int newIndex) {
-    setState(() => _index = newIndex);
-    _refreshCurrentTab();
+  List<_SectionNavItem> _buildSectionItems() {
+    const order = [
+      'tab_new',
+      'tab_popular',
+      'tab_favorites',
+      'tab_clips',
+      'tab_search',
+      'tab_settings',
+    ];
+
+    final items = <_SectionNavItem>[];
+    for (final id in order) {
+      final spec = _tabsById[id];
+      if (spec == null) continue;
+      items.add(
+        _SectionNavItem(
+          id: spec.id,
+          label: spec.label,
+          icon: spec.icon,
+        ),
+      );
+    }
+    return items;
   }
 
-  void _refreshCurrentTab() {
-    final tabId = _effectiveTabs[_index].id;
+  bool _usesNestedNavigator(String sectionId) {
+    return sectionId == 'tab_favorites' ||
+        sectionId == 'tab_clips' ||
+        sectionId == 'tab_search' ||
+        sectionId == 'tab_settings';
+  }
 
-    // ★ 履歴タブのリロード（型安全）
+  void _onSectionSelected(String sectionId) {
+    if (_selectedSectionId == sectionId) return;
+    setState(() => _selectedSectionId = sectionId);
+    _selectionController.clearSelection();
+    _refreshCurrentSection();
+  }
+
+  void _refreshCurrentSection() {
+    final tabId = _selectedSectionId;
+    final spec = _tabsById[tabId];
+
+    if (spec == null) return;
+
     if (tabId == 'tab_favorites') {
-      _favoritesKey.currentState?.reloadFromOutside();
+      final key = spec.stateKey;
+      if (key is GlobalKey<FavoritesScreenState>) {
+        key.currentState?.reloadFromOutside();
+      }
     }
-    // ★ クリップタブのリロード（型安全）
+
     if (tabId == 'tab_clips') {
-      _clipsKey.currentState?.reloadFromOutside();
+      final key = spec.stateKey;
+      if (key is GlobalKey<ClipsScreenState>) {
+        key.currentState?.reloadFromOutside();
+      }
     }
-    // ★ 新着・人気タブのリフレッシュ（TopicListScreenState）
+
     if (tabId == 'tab_new' || tabId == 'tab_popular') {
-      final key = _effectiveTabs[_index].stateKey;
+      final key = spec.stateKey;
       if (key is GlobalKey<tl.TopicListScreenState>) {
         key.currentState?.refreshTiles();
       }
@@ -91,16 +141,16 @@ class _MacShellState extends State<MacShell> {
         bindings: {
           // Cmd + R (または F5) でリロード
           const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
-            _refreshCurrentTab();
+            _refreshCurrentSection();
           },
           const SingleActivator(LogicalKeyboardKey.f5): () {
-            _refreshCurrentTab();
+            _refreshCurrentSection();
           },
           // Esc で戻る（詳細画面を開いている時など）
           const SingleActivator(LogicalKeyboardKey.escape): () {
             // 3ペインの場合、Escで選択解除などが考えられるが、
             // とりあえず既存のNavigatorがあればpopする
-            final nav = _tabNavKeys[_index].currentState;
+            final nav = _sectionNavKeys[_selectedSectionId]?.currentState;
             if (nav != null && nav.canPop()) {
               nav.pop();
             } else {
@@ -116,26 +166,14 @@ class _MacShellState extends State<MacShell> {
             children: [
               // ネイティブ信号下のスペーサ
               SizedBox(height: _captionHeight),
-              // 上バー：タブ切替のみ（更新ボタンは置かない）
-              _buildTopTabBar(),
               // 本体：3ペイン構成
               Expanded(
                 child: Row(
                   children: [
-                    // 【左】サイドバー（履歴など）
+                    // 【左】セクションナビ
                     SizedBox(
-                      width: 250,
-                      child: HistorySidebar(
-                        onSelectTopic: (id, title, count, posted_at) {
-                          // 選択状態を更新
-                          _selectionController.selectTopic(
-                            id,
-                            title: title,
-                            comments: count ?? 0,
-                            postedAt: posted_at,
-                          );
-                        },
-                      ),
+                      width: 220,
+                      child: _buildSectionNav(),
                     ),
                     
                     // 縦の区切り線
@@ -145,10 +183,10 @@ class _MacShellState extends State<MacShell> {
                     SizedBox(
                       width: 350,
                       child: IndexedStack(
-                        index: _index,
+                        index: _selectedSectionIndex,
                         children: [
-                          for (int i = 0; i < _effectiveTabs.length; i++)
-                            _buildCenterPaneContent(i),
+                          for (final section in _sectionItems)
+                            _buildCenterPaneContent(section.id),
                         ],
                       ),
                     ),
@@ -198,13 +236,16 @@ class _MacShellState extends State<MacShell> {
   }
 
   /// センターペインのコンテンツをビルド
-  Widget _buildCenterPaneContent(int index) {
-    final spec = _effectiveTabs[index];
-
+  Widget _buildCenterPaneContent(String sectionId) {
+    final spec = _tabsById[sectionId];
+    if (spec == null) {
+      return const SizedBox.shrink();
+    }
     // 新着・人気タブは TopicListScreen を直接生成してコールバックを渡す
     if (spec.id == 'tab_new' || spec.id == 'tab_popular') {
+      final key = spec.stateKey;
       return tl.TopicListScreen(
-        key: spec.stateKey,
+        key: key is GlobalKey<tl.TopicListScreenState> ? key : null,
         sortOrder: spec.id == 'tab_new' ? 'new' : 'popular',
         onTopicTap: (id, title, comments, postedAt) {
           _selectionController.selectTopic(
@@ -220,99 +261,75 @@ class _MacShellState extends State<MacShell> {
     // その他のタブ（履歴、クリップなど）は既存の Navigator 構成を維持
     // ※ これらも onTopicTap 対応すれば Navigator 不要にできるが、
     //    今回は TopicListScreen を優先
-    return Navigator(
-      key: _tabNavKeys[index],
-      onGenerateRoute: (settings) {
-        if (settings.name == '/') {
-          Widget screen;
-          if (spec.id == 'tab_clips') {
-            screen = ClipsScreen(key: _clipsKey);
-          } else if (spec.id == 'tab_favorites') {
-            screen = FavoritesScreen(key: _favoritesKey);
-          } else {
+    if (_usesNestedNavigator(spec.id)) {
+      return Navigator(
+        key: _sectionNavKeys[spec.id],
+        onGenerateRoute: (settings) {
+          if (settings.name == '/') {
+            Widget screen;
             screen = spec.builder(context);
+            return CupertinoPageRoute(
+              builder: (_) => screen,
+              settings: settings,
+            );
           }
-          return CupertinoPageRoute(
-            builder: (_) => screen,
-            settings: settings,
-          );
-        }
-        return null;
-      },
+          return null;
+        },
+      );
+    }
+
+    return spec.builder(context);
+  }
+
+  int get _selectedSectionIndex {
+    final index = _sectionItems.indexWhere((item) => item.id == _selectedSectionId);
+    return index >= 0 ? index : 0;
+  }
+
+  Widget _buildSectionNav() {
+    return Container(
+      color: CupertinoColors.systemGrey6,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        children: [
+          for (final item in _sectionItems)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: _buildSectionNavItem(item),
+            ),
+        ],
+      ),
     );
   }
 
-  /// 上バー：タブ切替のみ
-  Widget _buildTopTabBar() {
-    return Container(
-      height: 44,
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemGrey6,
-        border: Border(
-          bottom: BorderSide(
-            color: CupertinoColors.separator,
-            width: 0.5,
-          ),
+  Widget _buildSectionNavItem(_SectionNavItem item) {
+    final isSelected = item.id == _selectedSectionId;
+    final textColor = isSelected ? CupertinoColors.systemPink : CupertinoColors.label;
+    final iconColor = isSelected ? CupertinoColors.systemPink : CupertinoColors.secondaryLabel;
+
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: () => _onSectionSelected(item.id),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? CupertinoColors.systemGrey4 : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          for (int i = 0; i < _effectiveTabs.length; i++) ...[
-            CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              onPressed: () => _onTabChanged(i),
-              child: Row(
-                children: [
-                  Icon(
-                    _effectiveTabs[i].icon,
-                    size: 16,
-                    color: i == _index
-                        ? CupertinoColors.systemPink
-                        : CupertinoColors.secondaryLabel,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _effectiveTabs[i].label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: i == _index ? FontWeight.w600 : FontWeight.normal,
-                      color: i == _index
-                          ? CupertinoColors.label
-                          : CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                ],
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(item.icon, size: 18, color: iconColor),
+            const SizedBox(width: 10),
+            Text(
+              item.label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: textColor,
               ),
             ),
-            if (i < _effectiveTabs.length - 1)
-              const SizedBox(width: 8),
           ],
-          const Spacer(),
-          // 検索アイコン追加
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            onPressed: () {
-              // 今アクティブなタブの Navigator を取ってくる
-              final nav = _tabNavKeys[_index].currentState;
-              final route = CupertinoPageRoute(
-                builder: (_) => const SearchScreen(),
-              );
-
-              // Navigator がないタブ（新着・人気）ではルートの Navigator にフォールバック
-              if (nav != null) {
-                nav.push(route);
-              } else {
-                Navigator.of(context).push(route);
-              }
-            },
-            child: const Icon(
-              CupertinoIcons.search,
-              size: 22,
-              color: CupertinoColors.activeBlue,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
