@@ -30,6 +30,7 @@ class _SectionNavItem {
 }
 
 class _MacShellState extends State<MacShell> {
+  static const double _compactBreakpoint = 1000;
   late final Map<String, TabSpec> _tabsById;
   late final List<_SectionNavItem> _sectionItems;
   late String _selectedSectionId;
@@ -161,78 +162,172 @@ class _MacShellState extends State<MacShell> {
         },
         child: Focus(
           autofocus: true, // キーイベントを受け取るために必要
-          child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
-            body: Column(
-            children: [
-              // ネイティブ信号下のスペーサ
-              SizedBox(height: _captionHeight),
-              // 本体：3ペイン構成
-              Expanded(
-                child: Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < _compactBreakpoint;
+              return Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
+                drawer: isCompact
+                    ? Drawer(
+                        child: SafeArea(
+                          child: _buildSectionNav(),
+                        ),
+                      )
+                    : null,
+                body: Column(
                   children: [
-                    // 【左】セクションナビ
-                    SizedBox(
-                      width: 220,
-                      child: _buildSectionNav(),
-                    ),
-                    
-                    // 縦の区切り線
-                    const VerticalDivider(width: 1),
-
-                    // 【中】トピック一覧（タブの中身）
-                    SizedBox(
-                      width: 350,
-                      child: IndexedStack(
-                        index: _selectedSectionIndex,
-                        children: [
-                          for (final section in _sectionItems)
-                            _buildCenterPaneContent(section.id),
-                        ],
-                      ),
-                    ),
-
-                    // 縦の区切り線
-                    const VerticalDivider(width: 1),
-
-                    // 【右】詳細エリア（選択状態に応じて中身が変わる）
+                    // ネイティブ信号下のスペーサ
+                    SizedBox(height: _captionHeight),
+                    if (isCompact) _buildCompactHeader(context),
+                    // 本体：3ペイン構成 or 1ペイン
                     Expanded(
-                      child: AnimatedBuilder(
-                        animation: _selectionController,
-                        builder: (context, _) {
-                          final selectedId = _selectionController.selectedTopicId;
-                          
-                          if (selectedId == null) {
-                            // 何も選ばれていない時
-                            return const Center(
-                              child: Text(
-                                "トピックを選択してください",
-                                style: TextStyle(color: CupertinoColors.systemGrey),
-                              ),
-                            );
-                          }
-
-                          // 選ばれていれば詳細画面を埋め込む
-                          return TopicDetailScreen(
-                            key: ValueKey(selectedId), // IDが変わったら作り直す
-                            topicId: selectedId,
-                            title: _selectionController.title,
-                            commentCount: _selectionController.commentCount,
-                            posted_at: _selectionController.postedAt,
-                            enableRefresh: true,
-                            saveReadPosition: true,
-                          );
-                        },
-                      ),
+                      child: isCompact ? _buildCompactBody() : _buildWideBody(),
                     ),
                   ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWideBody() {
+    return Row(
+      children: [
+        // 【左】セクションナビ
+        SizedBox(
+          width: 220,
+          child: _buildSectionNav(),
+        ),
+
+        // 縦の区切り線
+        const VerticalDivider(width: 1),
+
+        // 【中】トピック一覧（タブの中身）
+        SizedBox(
+          width: 350,
+          child: IndexedStack(
+            index: _selectedSectionIndex,
+            children: [
+              for (final section in _sectionItems) _buildCenterPaneContent(section.id),
+            ],
+          ),
+        ),
+
+        // 縦の区切り線
+        const VerticalDivider(width: 1),
+
+        // 【右】詳細エリア（選択状態に応じて中身が変わる）
+        Expanded(
+          child: AnimatedBuilder(
+            animation: _selectionController,
+            builder: (context, _) {
+              final selectedId = _selectionController.selectedTopicId;
+
+              if (selectedId == null) {
+                // 何も選ばれていない時
+                return const Center(
+                  child: Text(
+                    "トピックを選択してください",
+                    style: TextStyle(color: CupertinoColors.systemGrey),
+                  ),
+                );
+              }
+
+              // 選ばれていれば詳細画面を埋め込む
+              return TopicDetailScreen(
+                key: ValueKey(selectedId), // IDが変わったら作り直す
+                topicId: selectedId,
+                title: _selectionController.title,
+                commentCount: _selectionController.commentCount,
+                posted_at: _selectionController.postedAt,
+                enableRefresh: true,
+                saveReadPosition: true,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactHeader(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _selectionController,
+      builder: (context, _) {
+        final showsDetail = _showsCompactDetail;
+        final title = showsDetail ? '詳細' : _selectedSectionLabel;
+        return Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: CupertinoColors.separator, width: 0),
+            ),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(showsDetail ? Icons.arrow_back : Icons.menu),
+                onPressed: () {
+                  if (showsDetail) {
+                    _selectionController.clearSelection();
+                    return;
+                  }
+                  Scaffold.of(context).openDrawer();
+                },
+              ),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-      ),
+        );
+      },
     );
+  }
+
+  Widget _buildCompactBody() {
+    return AnimatedBuilder(
+      animation: _selectionController,
+      builder: (context, _) {
+        if (_showsCompactDetail) {
+          final selectedId = _selectionController.selectedTopicId;
+          if (selectedId == null) {
+            return const SizedBox.shrink();
+          }
+          return TopicDetailScreen(
+            key: ValueKey(selectedId),
+            topicId: selectedId,
+            title: _selectionController.title,
+            commentCount: _selectionController.commentCount,
+            posted_at: _selectionController.postedAt,
+            enableRefresh: true,
+            saveReadPosition: true,
+          );
+        }
+        return _buildCenterPaneContent(_selectedSectionId);
+      },
+    );
+  }
+
+  bool get _showsCompactDetail {
+    final selectedId = _selectionController.selectedTopicId;
+    final isTopicSection =
+        _selectedSectionId == 'tab_new' || _selectedSectionId == 'tab_popular';
+    return selectedId != null && isTopicSection;
+  }
+
+  String get _selectedSectionLabel {
+    final item = _sectionItems.firstWhere(
+      (entry) => entry.id == _selectedSectionId,
+      orElse: () => _sectionItems.first,
+    );
+    return item.label;
   }
 
   /// センターペインのコンテンツをビルド
@@ -309,7 +404,13 @@ class _MacShellState extends State<MacShell> {
 
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      onPressed: () => _onSectionSelected(item.id),
+      onPressed: () {
+        _onSectionSelected(item.id);
+        final scaffold = Scaffold.maybeOf(context);
+        if (scaffold != null && scaffold.isDrawerOpen) {
+          Navigator.of(context).pop();
+        }
+      },
       child: Container(
         decoration: BoxDecoration(
           color: isSelected ? CupertinoColors.systemGrey4 : Colors.transparent,
