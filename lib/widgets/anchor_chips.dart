@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 class AnchorChips extends StatelessWidget {
   final List<int> anchors;
-  final Function(int no) onTap;
+  final Function(int no, Offset pos) onTap;
   final bool isReverse; // trueなら逆アンカー(<<)、falseなら通常(>>)
   
   /// 指定した番号のコメントが存在するかチェックする関数（オプション）
@@ -43,7 +43,7 @@ class AnchorChips extends StatelessWidget {
           final exists = checkExists?.call(no) ?? true;
           
           return GestureDetector(
-            onTap: () => onTap(no),
+            onTapDown: (details) => onTap(no, details.globalPosition),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(

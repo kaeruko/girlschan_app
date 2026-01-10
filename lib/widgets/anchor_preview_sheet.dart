@@ -11,6 +11,7 @@ class AnchorPreviewSheet extends StatelessWidget {
   final Function(int no) onAnchorTap;
   final Function(String url) onImageTap;
   final VoidCallback onClipToggle;
+  final VoidCallback? onGoTo; // ★ 追加: 移動用コールバック
   final Function(bool isPlus)? onVote; // true: plus, false: minus
 
   const AnchorPreviewSheet({
@@ -20,6 +21,7 @@ class AnchorPreviewSheet extends StatelessWidget {
     required this.onAnchorTap,
     required this.onImageTap,
     required this.onClipToggle,
+    this.onGoTo,
     this.onVote,
   });
 
@@ -47,12 +49,13 @@ class AnchorPreviewSheet extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Column(
+          mainAxisSize: MainAxisSize.min, // コンテンツサイズに合わせる
           children: [
             // --- ヘッダー ---
             _buildHeader(context, no, name, postedAt),
             
             // --- スクロール可能な本文 ---
-            Expanded(
+            Flexible(
               child: CupertinoScrollbar(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(12),
@@ -102,6 +105,30 @@ class AnchorPreviewSheet extends StatelessWidget {
                 ),
               ),
             ),
+             // --- アクションボタン ---
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: CupertinoColors.separator)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CupertinoButton.filled(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      onPressed: onGoTo,
+                      child: const Text('このコメントへ移動', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('閉じる', style: TextStyle(color: CupertinoColors.secondaryLabel)),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -143,7 +170,7 @@ class AnchorPreviewSheet extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withOpacity(0.1),
                 border: Border.all(color: color, width: 1),
                 borderRadius: BorderRadius.circular(4),
               ),

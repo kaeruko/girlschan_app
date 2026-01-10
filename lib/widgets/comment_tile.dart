@@ -10,12 +10,13 @@ class CommentTile extends StatelessWidget {
   final CommentUserStatus userStatus;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
-  final Function(int no)? onAnchorTap;
+  final Function(int no, Offset? pos)? onAnchorTap;
   final Function(String url)? onImageTap;
   final Function(List<int> replyIds)? onRepliesTap; // ★ 追加: 返信ボタン用コールバック
   final Function(bool isPlus)? onVote;
   final bool Function(int no)? checkAnchorAvailability;
   final double fontSize;
+  final bool highlighted; // ★ 追加: ハイライト表示用
 
   const CommentTile({
     super.key,
@@ -29,6 +30,7 @@ class CommentTile extends StatelessWidget {
     this.onVote,
     this.checkAnchorAvailability,
     this.fontSize = 15.0,
+    this.highlighted = false, // ★ 追加
   });
 
   @override
@@ -70,7 +72,7 @@ class CommentTile extends StatelessWidget {
         if (anchors.isNotEmpty)
           AnchorChips(
             anchors: anchors,
-            onTap: (no) => onAnchorTap?.call(no),
+            onTap: (no, pos) => onAnchorTap?.call(no, pos),
             isReverse: false,
             checkExists: checkAnchorAvailability,
           ),
@@ -186,9 +188,11 @@ class CommentTile extends StatelessWidget {
         onLongPress: onLongPress,
         hoverColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         mouseCursor: SystemMouseCursors.click,
-        child: Container(
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            color: highlighted ? Colors.yellow.withValues(alpha: 0.3) : null, // ★ ハイライト時の背景色
+            border: const Border(bottom: BorderSide(color: CupertinoColors.separator, width: 0.5)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: innerWidget,
