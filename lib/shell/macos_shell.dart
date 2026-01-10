@@ -8,6 +8,7 @@ import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../controllers/selection_controller.dart'; // ★追加
+import '../controllers/topic_detail_shortcut_controller.dart';
 import '../utils/platform_helper.dart';
 
 class MacShell extends StatefulWidget {
@@ -39,6 +40,7 @@ class _MacShellState extends State<MacShell> {
 
   // ★ 選択状態を管理
   final _selectionController = SelectionController();
+  final _topicDetailShortcuts = TopicDetailShortcutController();
 
   @override
   void initState() {
@@ -147,6 +149,25 @@ class _MacShellState extends State<MacShell> {
           const SingleActivator(LogicalKeyboardKey.f5): () {
             _refreshCurrentSection();
           },
+          // 検索・ヒット移動・未読移動・ジャンプ
+          const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
+            _topicDetailShortcuts.focusSearch?.call();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () {
+            _topicDetailShortcuts.nextHit?.call();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyG, meta: true, shift: true): () {
+            _topicDetailShortcuts.prevHit?.call();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyN, meta: true, shift: true): () {
+            _topicDetailShortcuts.nextUnread?.call();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyP, meta: true, shift: true): () {
+            _topicDetailShortcuts.prevUnread?.call();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): () {
+            _topicDetailShortcuts.jumpToComment?.call();
+          },
           // Esc で戻る（詳細画面を開いている時など）
           const SingleActivator(LogicalKeyboardKey.escape): () {
             // 3ペインの場合、Escで選択解除などが考えられるが、
@@ -222,6 +243,7 @@ class _MacShellState extends State<MacShell> {
                                   posted_at: _selectionController.postedAt,
                                   enableRefresh: true,
                                   saveReadPosition: true,
+                                  shortcutController: _topicDetailShortcuts,
                                 )
                               : TopicDetailScreen(
                                   key: ValueKey(selectedId), // IDが変わったら作り直す
@@ -231,6 +253,7 @@ class _MacShellState extends State<MacShell> {
                                   posted_at: _selectionController.postedAt,
                                   enableRefresh: true,
                                   saveReadPosition: true,
+                                  shortcutController: _topicDetailShortcuts,
                                 );
                         },
                       ),

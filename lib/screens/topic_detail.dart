@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/log.dart';
@@ -11,6 +12,7 @@ import '../models/comment.dart';
 import '../services/api_service.dart';
 import '../utils/platform_helper.dart';
 import '../controllers/topic_detail_controller.dart';
+import '../controllers/topic_detail_shortcut_controller.dart';
 import '../widgets/measure_size.dart';
 import '../utils/variable_list_measurer.dart';
 import 'comment_compose_page.dart';
@@ -42,6 +44,7 @@ class TopicDetailScreen extends StatelessWidget {
   final int? initialJumpTo;
   final bool enableRefresh;
   final bool saveReadPosition;
+  final TopicDetailShortcutController? shortcutController;
 
   const TopicDetailScreen({
     super.key,
@@ -52,6 +55,7 @@ class TopicDetailScreen extends StatelessWidget {
     this.initialJumpTo,
     this.enableRefresh = true,
     this.saveReadPosition = true,
+    this.shortcutController,
   });
 
   @override
@@ -65,6 +69,7 @@ class TopicDetailScreen extends StatelessWidget {
       enableRefresh: enableRefresh,
       saveReadPosition: saveReadPosition,
       layout: TopicDetailLayout.fullPage,
+      shortcutController: shortcutController,
     );
   }
 }
@@ -77,6 +82,7 @@ class TopicDetailPane extends StatelessWidget {
   final int? initialJumpTo;
   final bool enableRefresh;
   final bool saveReadPosition;
+  final TopicDetailShortcutController? shortcutController;
 
   const TopicDetailPane({
     super.key,
@@ -87,6 +93,7 @@ class TopicDetailPane extends StatelessWidget {
     this.initialJumpTo,
     this.enableRefresh = true,
     this.saveReadPosition = true,
+    this.shortcutController,
   });
 
   @override
@@ -100,6 +107,7 @@ class TopicDetailPane extends StatelessWidget {
       enableRefresh: enableRefresh,
       saveReadPosition: saveReadPosition,
       layout: TopicDetailLayout.embeddedPane,
+      shortcutController: shortcutController,
     );
   }
 }
@@ -113,6 +121,7 @@ class TopicDetailView extends StatefulWidget {
   final bool enableRefresh;
   final bool saveReadPosition;
   final TopicDetailLayout layout;
+  final TopicDetailShortcutController? shortcutController;
 
   const TopicDetailView({
     super.key,
@@ -124,6 +133,7 @@ class TopicDetailView extends StatefulWidget {
     this.enableRefresh = true,
     this.saveReadPosition = true,
     required this.layout,
+    this.shortcutController,
   });
 
   @override
@@ -140,6 +150,10 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   final Map<int, ScrollController> _pageScroll = {};
   final Map<int, VariableListMeasurer> _pageMeas = {};
   int _currentPage = 0;
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchQuery = '';
+  List<int> _searchHitNos = [];
+  int _searchHitIndex = -1;
 
   DateTime _lastFetchTime = DateTime.fromMillisecondsSinceEpoch(0);
   bool _isPopping = false;
@@ -186,6 +200,10 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   @override
   void didUpdateWidget(TopicDetailView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.shortcutController != widget.shortcutController) {
+      oldWidget.shortcutController?.clear();
+      _registerShortcutController(widget.shortcutController);
+    }
     if (oldWidget.topicId == widget.topicId) {
       if (oldWidget.title != widget.title ||
           oldWidget.commentCount != widget.commentCount ||
@@ -202,6 +220,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   @override
   void initState() {
     super.initState();
+    _registerShortcutController(widget.shortcutController);
     _vm = TopicDetailController(
       topicId: widget.topicId,
       title: widget.title,
@@ -229,6 +248,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   @override
   void dispose() {
     _bannerAd?.dispose();
+    _searchFocusNode.dispose();
     _saveFromPage(_currentPage);
     for (final sc in _pageScroll.values) {
       sc.dispose();
@@ -237,6 +257,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
     _settings.removeListener(_onSettingsChanged);
+    widget.shortcutController?.clear();
     super.dispose();
   }
 
@@ -255,6 +276,17 @@ class _TopicDetailViewState extends State<TopicDetailView> {
 
   void _onSettingsChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _registerShortcutController(TopicDetailShortcutController? controller) {
+    controller?.bind(
+      focusSearch: _handleSearchFocus,
+      nextHit: () => _jumpToSearchHit(1),
+      prevHit: () => _jumpToSearchHit(-1),
+      nextUnread: _jumpToNextUnread,
+      prevUnread: _jumpToPrevUnread,
+      jumpToComment: _showJumpDialog,
+    );
   }
 
   // ========== ページング ==========
@@ -539,12 +571,15 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   void _showSearchDialog() async {
     final int? selectedNo = await showCupertinoModalPopup<int>(
       context: context,
-      builder: (ctx) => TopicSearchModal(allComments: _vm.comments),
+      builder: (ctx) => TopicSearchModal(
+        allComments: _vm.comments,
+        onQueryChanged: _updateSearchQuery,
+      ),
     );
 
     if (!mounted) return;
     if (selectedNo != null && selectedNo > 0) {
-      _tryRestoreIfNeeded(targetNo: selectedNo);
+      _jumpToCommentNo(selectedNo);
     }
   }
 
@@ -554,6 +589,151 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       return;
     }
     _showSearchDialog();
+  }
+
+  void _handleSearchFocus() {
+    final width = MediaQuery.of(context).size.width;
+    if (width >= _railBreakpoint) {
+      if (!_showSearchRail) {
+        setState(() => _showSearchRail = true);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _searchFocusNode.requestFocus();
+        }
+      });
+      return;
+    }
+    _showSearchDialog();
+  }
+
+  void _updateSearchQuery(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _searchQuery = '';
+        _searchHitNos = [];
+        _searchHitIndex = -1;
+      });
+      return;
+    }
+
+    final lowerQuery = trimmed.toLowerCase();
+    final hits = _vm.comments.where((c) {
+      return c.body.toLowerCase().contains(lowerQuery) ||
+          (c.id.toString() == lowerQuery);
+    }).map((c) => c.id).toList();
+
+    setState(() {
+      if (_searchQuery != trimmed) {
+        _searchHitIndex = -1;
+      }
+      _searchQuery = trimmed;
+      _searchHitNos = hits;
+      if (_searchHitIndex >= _searchHitNos.length) {
+        _searchHitIndex = -1;
+      }
+    });
+  }
+
+  void _jumpToSearchHit(int delta) {
+    if (_searchQuery.isEmpty || _searchHitNos.isEmpty) {
+      PlatformHelper.showSnackBar(context, '検索結果がありません');
+      return;
+    }
+    final count = _searchHitNos.length;
+    final nextIndex = _searchHitIndex == -1
+        ? (delta > 0 ? 0 : count - 1)
+        : (_searchHitIndex + delta) % count;
+    _searchHitIndex = nextIndex < 0 ? count - 1 : nextIndex;
+    _jumpToCommentNo(_searchHitNos[_searchHitIndex]);
+  }
+
+  int? _currentVisibleCommentNo() {
+    final all = _vm.comments;
+    if (all.isEmpty) return null;
+    final pageItems = _itemsOfPage(_currentPage, all);
+    if (pageItems.isEmpty) return null;
+    final sc = _scForPage(_currentPage);
+    if (!sc.hasClients) return null;
+    final meas = _measForPage(_currentPage);
+    meas.ensureCapacity(pageItems.length);
+    final idx = meas.offsetToIndex(sc.offset, pageItems.length);
+    final safe = idx.clamp(0, pageItems.length - 1);
+    return pageItems[safe].id;
+  }
+
+  void _ensureAllFilterThen(VoidCallback action) {
+    if (_currentFilter == CommentFilterLevel.all) {
+      action();
+      return;
+    }
+    setState(() {
+      _currentFilter = CommentFilterLevel.all;
+      _currentPage = 0;
+    });
+    if (_pc.hasClients) {
+      _pc.jumpToPage(0);
+    }
+    PlatformHelper.showSnackBar(context, '全件表示に戻しました');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        action();
+      }
+    });
+  }
+
+  void _jumpToCommentNo(int no) {
+    final hasTarget = _displayComments.any((c) => c.id == no);
+    if (hasTarget) {
+      _tryRestoreIfNeeded(targetNo: no);
+      return;
+    }
+    _ensureAllFilterThen(() => _tryRestoreIfNeeded(targetNo: no));
+  }
+
+  void _jumpToNextUnread() {
+    _jumpToUnread(forward: true);
+  }
+
+  void _jumpToPrevUnread() {
+    _jumpToUnread(forward: false);
+  }
+
+  void _jumpToUnread({required bool forward}) {
+    _ensureAllFilterThen(() {
+      final savedNo = _vm.savedCommentNo;
+      final comments = _vm.comments;
+      if (comments.isEmpty || savedNo <= 0) {
+        PlatformHelper.showSnackBar(context, '未読コメントがありません');
+        return;
+      }
+      final unread = comments.where((c) => c.id > savedNo).toList();
+      if (unread.isEmpty) {
+        PlatformHelper.showSnackBar(context, '未読コメントがありません');
+        return;
+      }
+
+      final currentNo = _currentVisibleCommentNo();
+      int targetNo;
+      if (forward) {
+        final baseNo = currentNo != null && currentNo > savedNo ? currentNo : savedNo;
+        targetNo = unread.firstWhere(
+          (c) => c.id > baseNo,
+          orElse: () => unread.first,
+        ).id;
+      } else {
+        if (currentNo == null || currentNo <= savedNo) {
+          targetNo = unread.last.id;
+        } else {
+          targetNo = unread.lastWhere(
+            (c) => c.id < currentNo,
+            orElse: () => unread.last,
+          ).id;
+        }
+      }
+      _jumpToCommentNo(targetNo);
+    });
   }
 
   void _showFilterSheet() {
@@ -901,6 +1081,23 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     );
   }
 
+  Widget _wrapWithShortcuts(Widget child) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _handleSearchFocus,
+        const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () => _jumpToSearchHit(1),
+        const SingleActivator(LogicalKeyboardKey.keyG, meta: true, shift: true): () => _jumpToSearchHit(-1),
+        const SingleActivator(LogicalKeyboardKey.keyN, meta: true, shift: true): _jumpToNextUnread,
+        const SingleActivator(LogicalKeyboardKey.keyP, meta: true, shift: true): _jumpToPrevUnread,
+        const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): _showJumpDialog,
+      },
+      child: Focus(
+        autofocus: true,
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _displayComments;
@@ -1072,7 +1269,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
               allComments: _vm.comments,
               currentFilter: _currentFilter,
               onFilterChanged: _onFilterChanged,
-              onJumpToComment: (no) => _tryRestoreIfNeeded(targetNo: no),
+              onJumpToComment: _jumpToCommentNo,
               currentPage: _currentPage,
               pageCount: _pageCountLive,
               hasPrev: _hasPrev,
@@ -1081,55 +1278,61 @@ class _TopicDetailViewState extends State<TopicDetailView> {
               onNextPage: _goNextPage,
               settings: _settings,
               onClose: () => setState(() => _showSearchRail = false),
+              onQueryChanged: _updateSearchQuery,
+              searchFocusNode: _searchFocusNode,
             ),
           ),
       ],
     );
 
     if (widget.layout == TopicDetailLayout.embeddedPane) {
-      return Container(
-        color: _settings.backgroundColor,
-        child: Column(
-          children: [
-            _buildEmbeddedHeader(items),
-            Expanded(child: contentRow),
-          ],
+      return _wrapWithShortcuts(
+        Container(
+          color: _settings.backgroundColor,
+          child: Column(
+            children: [
+              _buildEmbeddedHeader(items),
+              Expanded(child: contentRow),
+            ],
+          ),
         ),
       );
     }
 
-    return PopScope(
-      canPop: _allowPop,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-        _saveFromPage(_currentPage);
-        await _vm.flushPendingScrollSave();
-        if (mounted) {
-          setState(() => _allowPop = true);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(context).pop();
-          });
-        }
-      },
-      child: CupertinoPageScaffold(
-        backgroundColor: _settings.backgroundColor,
-        navigationBar: CupertinoNavigationBar(
-          middle: _buildHeaderTitle(
-            items,
-            alignment: CrossAxisAlignment.center,
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: _buildHeaderActions(
-              includeFilter: false,
-              availableWidth: width,
-              padding: EdgeInsets.zero,
+    return _wrapWithShortcuts(
+      PopScope(
+        canPop: _allowPop,
+        onPopInvoked: (didPop) async {
+          if (didPop) return;
+          _saveFromPage(_currentPage);
+          await _vm.flushPendingScrollSave();
+          if (mounted) {
+            setState(() => _allowPop = true);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.of(context).pop();
+            });
+          }
+        },
+        child: CupertinoPageScaffold(
+          backgroundColor: _settings.backgroundColor,
+          navigationBar: CupertinoNavigationBar(
+            middle: _buildHeaderTitle(
+              items,
+              alignment: CrossAxisAlignment.center,
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: _buildHeaderActions(
+                includeFilter: false,
+                availableWidth: width,
+                padding: EdgeInsets.zero,
+              ),
             ),
           ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: contentRow,
+          child: SafeArea(
+            bottom: false,
+            child: contentRow,
+          ),
         ),
       ),
     );
@@ -1275,7 +1478,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
               final no = int.tryParse(text);
               Navigator.pop(ctx);
               if (no != null && no > 0) {
-                _tryRestoreIfNeeded(targetNo: no);
+                _jumpToCommentNo(no);
               }
             },
             child: const Text('ジャンプ'),
@@ -1366,8 +1569,13 @@ class _TopicDetailViewState extends State<TopicDetailView> {
 
 class TopicSearchModal extends StatefulWidget {
   final List<Comment> allComments;
+  final ValueChanged<String>? onQueryChanged;
 
-  const TopicSearchModal({super.key, required this.allComments});
+  const TopicSearchModal({
+    super.key,
+    required this.allComments,
+    this.onQueryChanged,
+  });
 
   @override
   State<TopicSearchModal> createState() => _TopicSearchModalState();
@@ -1396,6 +1604,7 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
   }
 
   void _onSearchChanged(String query) {
+    widget.onQueryChanged?.call(query);
     if (query.isEmpty) {
       setState(() => _filteredComments = []);
       return;
@@ -1488,6 +1697,8 @@ class TopicSearchRail extends StatefulWidget {
   final VoidCallback onNextPage;
   final SettingsService settings;
   final VoidCallback? onClose;
+  final ValueChanged<String>? onQueryChanged;
+  final FocusNode? searchFocusNode;
 
   const TopicSearchRail({
     super.key,
@@ -1503,6 +1714,8 @@ class TopicSearchRail extends StatefulWidget {
     required this.onNextPage,
     required this.settings,
     this.onClose,
+    this.onQueryChanged,
+    this.searchFocusNode,
   });
 
   @override
@@ -1520,6 +1733,7 @@ class _TopicSearchRailState extends State<TopicSearchRail> {
   }
 
   void _onSearchChanged(String query) {
+    widget.onQueryChanged?.call(query);
     if (query.isEmpty) {
       setState(() => _filteredComments = []);
       return;
@@ -1600,6 +1814,7 @@ class _TopicSearchRailState extends State<TopicSearchRail> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: CupertinoSearchTextField(
               controller: _searchCtrl,
+              focusNode: widget.searchFocusNode,
               onChanged: _onSearchChanged,
               placeholder: 'キーワード / No',
             ),
