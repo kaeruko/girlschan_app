@@ -286,6 +286,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       nextUnread: _jumpToNextUnread,
       prevUnread: _jumpToPrevUnread,
       jumpToComment: _showJumpDialog,
+      refresh: _fetchMoreDelta,
     );
   }
 
@@ -352,6 +353,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   }
 
   Future<void> _fetchMoreDelta() async {
+    logd('🔄 [TopicDetailScreen] _fetchMoreDelta called');
     if (_loadingMore) return;
     _lastFetchTime = DateTime.now();
     _loadingMore = true;
@@ -1913,6 +1915,7 @@ class _TopicSearchRailState extends State<TopicSearchRail> {
                   ),
           ),
         ],
+      ),
       ),
     );
   }

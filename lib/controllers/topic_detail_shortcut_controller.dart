@@ -7,6 +7,7 @@ class TopicDetailShortcutController {
   VoidCallback? nextUnread;
   VoidCallback? prevUnread;
   VoidCallback? jumpToComment;
+  VoidCallback? refresh;
 
   void bind({
     required VoidCallback focusSearch,
@@ -15,6 +16,7 @@ class TopicDetailShortcutController {
     required VoidCallback nextUnread,
     required VoidCallback prevUnread,
     required VoidCallback jumpToComment,
+    VoidCallback? refresh,
   }) {
     this.focusSearch = focusSearch;
     this.nextHit = nextHit;
@@ -22,6 +24,7 @@ class TopicDetailShortcutController {
     this.nextUnread = nextUnread;
     this.prevUnread = prevUnread;
     this.jumpToComment = jumpToComment;
+    this.refresh = refresh;
   }
 
   void clear() {
@@ -31,5 +34,6 @@ class TopicDetailShortcutController {
     nextUnread = null;
     prevUnread = null;
     jumpToComment = null;
+    refresh = null;
   }
 }

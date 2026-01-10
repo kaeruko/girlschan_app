@@ -13,7 +13,13 @@ import '../app/app_tabs.dart';
 import 'label_management_screen.dart';
 
 class ClipsScreen extends StatefulWidget {
-  const ClipsScreen({super.key});
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
+
+  const ClipsScreen({
+    super.key,
+    this.onTopicTap,
+  });
+
   @override
   State<ClipsScreen> createState() => ClipsScreenState();
 }
@@ -643,6 +649,10 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
     return GestureDetector(
       onLongPress: () => _showClipMenu(clip),
       onTap: () {
+        if (widget.onTopicTap != null) {
+          widget.onTopicTap!(topicId, topicTitle, 0, posted_at);
+          return;
+        }
         Navigator.of(context).push(
           CupertinoPageRoute(
             builder: (_) => TopicDetailScreen(

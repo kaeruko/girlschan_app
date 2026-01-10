@@ -11,7 +11,12 @@ import '../utils/log.dart';
 import '../services/history_notifier.dart';
 
 class FavoritesScreen extends StatefulWidget {
-  const FavoritesScreen({super.key});
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
+
+  const FavoritesScreen({
+    super.key,
+    this.onTopicTap,
+  });
 
   @override
   State<FavoritesScreen> createState() => FavoritesScreenState();
@@ -327,6 +332,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
                                 await _removeFromWatch(id);
                               },
                               onAfterPop: _onDetailReturned,
+                              onTopicTap: widget.onTopicTap,
                             );
                           },
                           childCount: _watchedTopics.length,
