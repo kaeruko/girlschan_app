@@ -185,86 +185,86 @@ class _MacShellState extends State<MacShell> {
           autofocus: true, // キーイベントを受け取るために必要
           child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
             body: Column(
-            children: [
-              // ネイティブ信号下のスペーサ
-              SizedBox(height: _captionHeight),
-              // 本体：3ペイン構成
-              Expanded(
-                child: Row(
-                  children: [
-                    // 【左】セクションナビ
-                    SizedBox(
-                      width: 220,
-                      child: _buildSectionNav(),
-                    ),
-                    
-                    // 縦の区切り線
-                    const VerticalDivider(width: 1),
-
-                    // 【中】トピック一覧（タブの中身）
-                    SizedBox(
-                      width: 350,
-                      child: IndexedStack(
-                        index: _selectedSectionIndex,
-                        children: [
-                          for (final section in _sectionItems)
-                            _buildCenterPaneContent(section.id),
-                        ],
+              children: <Widget>[
+                // ネイティブ信号下のスペーサ
+                SizedBox(height: _captionHeight),
+                // 本体：3ペイン構成
+                Expanded(
+                  child: Row(
+                    children: <Widget>[
+                      // 【左】セクションナビ
+                      SizedBox(
+                        width: 220,
+                        child: _buildSectionNav(),
                       ),
-                    ),
 
-                    // 縦の区切り線
-                    const VerticalDivider(width: 1),
+                      // 縦の区切り線
+                      const VerticalDivider(width: 1),
 
-                    // 【右】詳細エリア（選択状態に応じて中身が変わる）
-                    Expanded(
-                      child: AnimatedBuilder(
-                        animation: _selectionController,
-                        builder: (context, _) {
-                          final selectedId = _selectionController.selectedTopicId;
-                          
-                          if (selectedId == null) {
-                            // 何も選ばれていない時
-                            return const Center(
-                              child: Text(
-                                "トピックを選択してください",
-                                style: TextStyle(color: CupertinoColors.systemGrey),
-                              ),
-                            );
-                          }
-
-                          // 選ばれていれば詳細画面を埋め込む
-                          return PlatformHelper.isDesktop
-                              ? TopicDetailPane(
-                                  key: ValueKey(selectedId), // IDが変わったら作り直す
-                                  topicId: selectedId,
-                                  title: _selectionController.title,
-                                  commentCount: _selectionController.commentCount,
-                                  posted_at: _selectionController.postedAt,
-                                  enableRefresh: true,
-                                  saveReadPosition: true,
-                                  shortcutController: _topicDetailShortcuts,
-                                )
-                              : TopicDetailScreen(
-                                  key: ValueKey(selectedId), // IDが変わったら作り直す
-                                  topicId: selectedId,
-                                  title: _selectionController.title,
-                                  commentCount: _selectionController.commentCount,
-                                  posted_at: _selectionController.postedAt,
-                                  enableRefresh: true,
-                                  saveReadPosition: true,
-                                  shortcutController: _topicDetailShortcuts,
-                                );
-                        },
+                      // 【中】トピック一覧（タブの中身）
+                      SizedBox(
+                        width: 350,
+                        child: IndexedStack(
+                          index: _selectedSectionIndex,
+                          children: <Widget>[
+                            for (final section in _sectionItems)
+                              _buildCenterPaneContent(section.id),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+
+                      // 縦の区切り線
+                      const VerticalDivider(width: 1),
+
+                      // 【右】詳細エリア（選択状態に応じて中身が変わる）
+                      Expanded(
+                        child: AnimatedBuilder(
+                          animation: _selectionController,
+                          builder: (context, _) {
+                            final selectedId = _selectionController.selectedTopicId;
+
+                            if (selectedId == null) {
+                              // 何も選ばれていない時
+                              return const Center(
+                                child: Text(
+                                  "トピックを選択してください",
+                                  style: TextStyle(color: CupertinoColors.systemGrey),
+                                ),
+                              );
+                            }
+
+                            // 選ばれていれば詳細画面を埋め込む
+                            return PlatformHelper.isDesktop
+                                ? TopicDetailPane(
+                                    key: ValueKey(selectedId), // IDが変わったら作り直す
+                                    topicId: selectedId,
+                                    title: _selectionController.title,
+                                    commentCount: _selectionController.commentCount,
+                                    posted_at: _selectionController.postedAt,
+                                    enableRefresh: true,
+                                    saveReadPosition: true,
+                                    shortcutController: _topicDetailShortcuts,
+                                  )
+                                : TopicDetailScreen(
+                                    key: ValueKey(selectedId), // IDが変わったら作り直す
+                                    topicId: selectedId,
+                                    title: _selectionController.title,
+                                    commentCount: _selectionController.commentCount,
+                                    posted_at: _selectionController.postedAt,
+                                    enableRefresh: true,
+                                    saveReadPosition: true,
+                                    shortcutController: _topicDetailShortcuts,
+                                  );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
