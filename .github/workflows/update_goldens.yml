@@ -1,0 +1,26 @@
+name: Update Goldens (Ubuntu)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-goldens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.38.6'
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter test --update-goldens
+
+      - name: Upload updated goldens
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldens
+          path: test/golden
