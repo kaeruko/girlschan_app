@@ -367,7 +367,29 @@ class _MacShellState extends State<MacShell> {
       );
     }
 
-    // その他のタブ（検索、設定など）は既存の Navigator 構成を維持
+    if (spec.id == 'tab_search') {
+      return Navigator(
+        key: _sectionNavKeys[spec.id],
+        onGenerateRoute: (settings) {
+          return CupertinoPageRoute(
+            builder: (_) => SearchScreen(
+              initialQuery: null,
+              onTopicTap: (id, title, comments, postedAt) {
+                 _selectionController.selectTopic(
+                  id,
+                  title: title,
+                  comments: comments,
+                  postedAt: postedAt,
+                );
+              },
+            ),
+            settings: settings,
+          );
+        },
+      );
+    }
+
+    // その他のタブ（設定など）は既存の Navigator 構成を維持
     if (_usesNestedNavigator(spec.id)) {
       return Navigator(
         key: _sectionNavKeys[spec.id],
