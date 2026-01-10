@@ -47,7 +47,7 @@ dev_dependencies:
   mocktail: ^1.0.3
   # どちらか一方に揃える。両OSで通る方へ
   network_image_mock: ^2.1.1   # ← もしmacOSで不具合なら ^2.1.0 に落とす
-  dart_code_linter: ^3.2.0
+  dart_code_linter: <3.2.0
   drift_dev: ^2.0.0
   build_runner: ^2.0.0
 
