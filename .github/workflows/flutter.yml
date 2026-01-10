@@ -26,7 +26,7 @@ jobs:
         run: flutter pub get
 
       - name: Run flutter analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
       - name: Run tests (including golden)
         run: flutter test

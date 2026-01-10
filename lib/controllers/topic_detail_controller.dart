@@ -533,7 +533,7 @@ class TopicDetailController extends ChangeNotifier {
         topicTitle: title,
         commentNo: no,
         commentBody: comment.body,
-        posted_at: comment.postedAt,
+        postedAt: comment.postedAt,
         name: comment.name,
         plus: comment.plus,
         minus: comment.minus,
@@ -613,7 +613,7 @@ class TopicDetailController extends ChangeNotifier {
     required int comments,
     required String postedAt,
   }) async {
-    await addWatchedTopic(id: id, title: title, comments: comments, posted_at: postedAt);
+    await addWatchedTopic(id: id, title: title, comments: comments, postedAt: postedAt);
   }
 
   bool get _isOld {

@@ -48,8 +48,8 @@ class AnchorChips extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: exists 
-                    ? color.withOpacity(0.1) 
-                    : CupertinoColors.systemGrey.withOpacity(0.1),
+                    ? color.withValues(alpha: 0.1) 
+                    : CupertinoColors.systemGrey.withValues(alpha: 0.1),
                 border: Border.all(
                   color: exists ? color : CupertinoColors.systemGrey3,
                   width: 1,

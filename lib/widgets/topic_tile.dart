@@ -160,19 +160,19 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final comments = widget.topic['comments'] is int
         ? widget.topic['comments'] as int
         : int.tryParse('${widget.topic['comments']}') ?? 0;
-    final posted_at = (widget.topic['posted_at'] as String? ?? '').replaceAllMapped(
+    final postedAt = (widget.topic['posted_at'] as String? ?? '').replaceAllMapped(
         RegExp(r'(\d{1,2}:\d{2}):\d{2}'), (match) => match.group(1)!);
     final thumb = widget.topic['thumb'] as String?;
 
     // 表示用データの計算
-    final displayData = _calculateDisplayData(comments, posted_at);
+    final displayData = _calculateDisplayData(comments, postedAt);
     final bgColor = _calculateBackgroundColor(displayData.isOld);
 
     return Material(
       color: bgColor,
       child: InkWell(
-        onTap: () => _handleTap(context, id, title, comments, posted_at),
-        hoverColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+        onTap: () => _handleTap(context, id, title, comments, postedAt),
+        hoverColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         mouseCursor: SystemMouseCursors.click,
         child: Container(
           decoration: BoxDecoration(
@@ -353,12 +353,12 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     int id,
     String title,
     int comments,
-    String posted_at,
+    String postedAt,
   ) async {
     // ★追加: 親から挙動が指定されていればそちらを優先実行
     if (widget.onTopicTap != null) {
-      print('🔍 [TopicTile] onTopicTap called: id=$id, title="$title", comments=$comments, posted_at="$posted_at"');
-      widget.onTopicTap!(id, title, comments, posted_at);
+
+      widget.onTopicTap!(id, title, comments, postedAt);
       return;
     }
 
@@ -370,7 +370,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
           topicId: id,
           title: title,
           commentCount: comments,
-          posted_at: posted_at,
+          postedAt: postedAt,
         ),
       ),
     );
@@ -394,8 +394,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   }
 
   /// 表示データの計算
-  _DisplayData _calculateDisplayData(int comments, String posted_at) {
-    String commentDisplay = '$comments $posted_at';
+  _DisplayData _calculateDisplayData(int comments, String postedAt) {
+    String commentDisplay = '$comments $postedAt';
     String cacheTimeDisplay = '';
     bool isBold = false;
     bool isOld = false;
@@ -428,7 +428,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       }
 
       final savedText = shown > 0 ? '$shown' : '0';
-      commentDisplay = '$savedText/$total $posted_at';
+      commentDisplay = '$savedText/$total $postedAt';
 
       // 未読がある場合は太字
       if (shown < total) {
@@ -437,8 +437,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     }
 
     // 1ヶ月以上前かどうか判定
-    if (posted_at.isNotEmpty) {
-      final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(posted_at);
+    if (postedAt.isNotEmpty) {
+      final m = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(postedAt);
       if (m != null) {
         final y = int.parse(m.group(1)!);
         final mo = int.parse(m.group(2)!);
@@ -465,7 +465,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       if (isOld) {
         return CupertinoColors.systemGrey6;
       } else {
-        return CupertinoColors.systemBlue.withOpacity(0.05);
+        return CupertinoColors.systemBlue.withValues(alpha: 0.05);
       }
     } else {
       return CupertinoColors.transparent;

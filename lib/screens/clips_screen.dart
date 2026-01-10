@@ -101,7 +101,7 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -337,7 +337,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
                         topicId: topicId,
                         title: topicTitle,
                         commentCount: 0,
-                        posted_at: postedAtStr,
+                        postedAt: postedAtStr,
                         initialJumpTo: commentNo,
                         saveReadPosition: false,
                       ),
@@ -584,7 +584,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
                     SliverToBoxAdapter(
                       child: Container(
                         width: double.infinity,
-                        color: CupertinoColors.systemBlue.withOpacity(0.1),
+                        color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -659,7 +659,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
               topicId: topicId,
               title: topicTitle,
               commentCount: 0,
-              posted_at: posted_at,
+              postedAt: posted_at,
               initialJumpTo: commentNo,
               saveReadPosition: false,
             ),
@@ -708,9 +708,9 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemRed.withOpacity(0.1),
+                  color: CupertinoColors.systemRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: CupertinoColors.systemRed.withOpacity(0.3)),
+                  border: Border.all(color: CupertinoColors.systemRed.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -768,7 +768,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemYellow.withOpacity(0.2),
+                  color: CupertinoColors.systemYellow.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(memo, style: const TextStyle(fontSize: 13)),

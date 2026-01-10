@@ -3,7 +3,7 @@ class Topic {
   final String title;
   final String url;
   final int comments;
-  final String posted_at;
+  final String postedAt;
   final String? thumb;
 
   Topic({
@@ -11,7 +11,7 @@ class Topic {
     required this.title,
     required this.url,
     required this.comments,
-    required this.posted_at,
+    required this.postedAt,
     this.thumb,
   });
 
@@ -21,7 +21,7 @@ class Topic {
       title: json['title'] as String? ?? '(タイトルなし)',
       url: json['url'] as String? ?? '/topics/${json['id']}/',
       comments: json['comments'] as int? ?? 0,
-      posted_at: json['posted_at'] as String? ?? '',
+      postedAt: json['posted_at'] as String? ?? '',
       thumb: json['thumb'] as String?,
     );
   }

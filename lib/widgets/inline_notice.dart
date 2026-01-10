@@ -15,8 +15,8 @@ class InlineNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isError
-        ? CupertinoColors.systemRed.withOpacity(0.08)
-        : CupertinoColors.activeBlue.withOpacity(0.07);
+        ? CupertinoColors.systemRed.withValues(alpha: 0.08)
+        : CupertinoColors.activeBlue.withValues(alpha: 0.07);
     final fg = isError ? CupertinoColors.systemRed : CupertinoColors.activeBlue;
 
     return Container(
@@ -24,7 +24,7 @@ class InlineNotice extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         border: Border(
-          bottom: BorderSide(color: fg.withOpacity(0.2), width: 0.5),
+          bottom: BorderSide(color: fg.withValues(alpha: 0.2), width: 0.5),
         ),
       ),
       child: Row(

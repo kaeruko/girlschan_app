@@ -288,7 +288,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     
     logd('📥 [fetchComments] topicId=$topicId offset=$offset limit=$limit -> comments=${comments.length}, total=$total (raw=${data['total']})');
 
-    final posted_at = data['posted_at'] as String? ?? '';
+    final postedAt = data['posted_at'] as String? ?? '';
     final thumb = data['thumb'] as String?;
     final title = data['title'] as String? ?? ''; // ★タイトルを取得
 
@@ -315,7 +315,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
       TopicsCompanion(
         title: title.isNotEmpty ? drift.Value(title) : drift.Value.absent(), // ★追加
         commentCount: drift.Value(total),
-        postedAt: posted_at.isNotEmpty ? drift.Value(posted_at) : drift.Value.absent(),
+        postedAt: postedAt.isNotEmpty ? drift.Value(postedAt) : drift.Value.absent(),
         thumbnail: thumb != null ? drift.Value(thumb) : drift.Value.absent(),
         fetchedAt: drift.Value(DateTime.now()),
       )
@@ -324,7 +324,7 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     return {
       'comments': comments,
       'total': total,
-      'posted_at': posted_at,
+      'posted_at': postedAt,
       'thumb': thumb,
       'title': title, // ★追加
       'offset': offset,
@@ -369,16 +369,16 @@ Future<void> addWatchedTopic({
   required int id,
   required String title,
   required int comments,
-  required String posted_at,
+  required String postedAt,
 }) async {
-  logd('📝 [addWatchedTopic] id=$id, title="$title", comments=$comments, posted_at="$posted_at"');
+  logd('📝 [addWatchedTopic] id=$id, title="$title", comments=$comments, posted_at="$postedAt"');
   
   // トピックを保存（または更新）
   await db.upsertTopics([TopicsCompanion.insert(
     id: drift.Value(id),
     title: title,
     commentCount: drift.Value(comments),
-    postedAt: drift.Value(posted_at),
+    postedAt: drift.Value(postedAt),
     fetchedAt: drift.Value(DateTime.now()),
   )]);
   
@@ -387,7 +387,7 @@ Future<void> addWatchedTopic({
     id,
     title: title,
     commentCount: comments,
-    postedAt: posted_at,
+    postedAt: postedAt,
   );
 
   // 履歴更新を通知
@@ -462,7 +462,7 @@ Future<void> addClippedComment({
   required String topicTitle,
   required int commentNo,
   required String commentBody,
-  required String posted_at,
+  required String postedAt,
   required String name,
   required int plus,
   required int minus,
@@ -479,7 +479,7 @@ Future<void> addClippedComment({
     await db.upsertTopics([TopicsCompanion.insert(
       id: drift.Value(topicId),
       title: topicTitle,
-      postedAt: drift.Value(posted_at),
+      postedAt: drift.Value(postedAt),
       fetchedAt: drift.Value(DateTime.now()),
     )]);
   }
@@ -494,7 +494,7 @@ Future<void> addClippedComment({
         number: commentNo,
         body: commentBody,
         name: drift.Value(name),
-        postedAt: drift.Value(posted_at),
+        postedAt: drift.Value(postedAt),
         plus: drift.Value(plus),
         minus: drift.Value(minus),
         imageUrl: drift.Value(imageUrl),
@@ -624,7 +624,7 @@ Future<void> importClipDirectly(Map<String, dynamic> clipData) async {
     topicTitle: clipData['topicTitle'] ?? '',
     commentNo: commentNo,
     commentBody: clipData['body'] ?? '',
-    posted_at: clipData['posted_at'] ?? '',
+    postedAt: clipData['posted_at'] ?? '',
     name: clipData['name'] ?? '',
     plus: clipData['plus'] ?? 0,
     minus: clipData['minus'] ?? 0,

@@ -40,7 +40,7 @@ class TopicDetailScreen extends StatelessWidget {
   final int topicId;
   final String title;
   final int commentCount;
-  final String posted_at;
+  final String postedAt;
   final int? initialJumpTo;
   final bool enableRefresh;
   final bool saveReadPosition;
@@ -51,7 +51,7 @@ class TopicDetailScreen extends StatelessWidget {
     required this.topicId,
     required this.title,
     required this.commentCount,
-    required this.posted_at,
+    required this.postedAt,
     this.initialJumpTo,
     this.enableRefresh = true,
     this.saveReadPosition = true,
@@ -64,7 +64,7 @@ class TopicDetailScreen extends StatelessWidget {
       topicId: topicId,
       title: title,
       commentCount: commentCount,
-      posted_at: posted_at,
+      postedAt: postedAt,
       initialJumpTo: initialJumpTo,
       enableRefresh: enableRefresh,
       saveReadPosition: saveReadPosition,
@@ -78,7 +78,7 @@ class TopicDetailPane extends StatelessWidget {
   final int topicId;
   final String title;
   final int commentCount;
-  final String posted_at;
+  final String postedAt;
   final int? initialJumpTo;
   final bool enableRefresh;
   final bool saveReadPosition;
@@ -89,7 +89,7 @@ class TopicDetailPane extends StatelessWidget {
     required this.topicId,
     required this.title,
     required this.commentCount,
-    required this.posted_at,
+    required this.postedAt,
     this.initialJumpTo,
     this.enableRefresh = true,
     this.saveReadPosition = true,
@@ -102,7 +102,7 @@ class TopicDetailPane extends StatelessWidget {
       topicId: topicId,
       title: title,
       commentCount: commentCount,
-      posted_at: posted_at,
+      postedAt: postedAt,
       initialJumpTo: initialJumpTo,
       enableRefresh: enableRefresh,
       saveReadPosition: saveReadPosition,
@@ -116,7 +116,7 @@ class TopicDetailView extends StatefulWidget {
   final int topicId;
   final String title;
   final int commentCount;
-  final String posted_at;
+  final String postedAt;
   final int? initialJumpTo;
   final bool enableRefresh;
   final bool saveReadPosition;
@@ -128,7 +128,7 @@ class TopicDetailView extends StatefulWidget {
     required this.topicId,
     required this.title,
     required this.commentCount,
-    required this.posted_at,
+    required this.postedAt,
     this.initialJumpTo,
     this.enableRefresh = true,
     this.saveReadPosition = true,
@@ -207,11 +207,11 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     if (oldWidget.topicId == widget.topicId) {
       if (oldWidget.title != widget.title ||
           oldWidget.commentCount != widget.commentCount ||
-          oldWidget.posted_at != widget.posted_at) {
+          oldWidget.postedAt != widget.postedAt) {
         _vm.updateMetadata(
           title: widget.title,
           comments: widget.commentCount,
-          postedAt: widget.posted_at,
+          postedAt: widget.postedAt,
         );
       }
     }
@@ -225,7 +225,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       topicId: widget.topicId,
       title: widget.title,
       commentCount: widget.commentCount,
-      postedAt: widget.posted_at,
+      postedAt: widget.postedAt,
       enableRefresh: widget.enableRefresh,
       saveReadPosition: widget.saveReadPosition,
     )..addListener(_onVmChanged);

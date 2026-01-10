@@ -144,7 +144,7 @@ class SettingsScreenState extends State<SettingsScreen> {
                             boxShadow: [
                               if (isSelected)
                                 BoxShadow(
-                                  color: CupertinoColors.activeBlue.withOpacity(0.3),
+                                  color: CupertinoColors.activeBlue.withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   spreadRadius: 2,
                                 )

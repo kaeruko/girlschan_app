@@ -4,7 +4,7 @@ import '../services/history_notifier.dart';
 import '../utils/log.dart';
 
 class HistorySidebar extends StatefulWidget {
-  final void Function(int topicId, String title, int? commentCount, String posted_at) onSelectTopic;
+  final void Function(int topicId, String title, int? commentCount, String postedAt) onSelectTopic;
 
   const HistorySidebar({super.key, required this.onSelectTopic});
 
@@ -69,10 +69,10 @@ class _HistorySidebarState extends State<HistorySidebar> {
           final id = t['id'] as int;
           final title = (t['title'] as String?) ?? 'タイトル不明';
           final comments = (t['comments'] is int) ? t['comments'] as int : null;
-          final posted_at = (t['posted_at'] as String?) ?? '';
+          final postedAt = (t['posted_at'] as String?) ?? '';
           return CupertinoButton(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            onPressed: () => widget.onSelectTopic(id, title, comments, posted_at),
+            onPressed: () => widget.onSelectTopic(id, title, comments, postedAt),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Column(

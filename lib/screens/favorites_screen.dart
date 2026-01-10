@@ -227,7 +227,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
                     topicId: id,
                     title: title,
                     commentCount: afterComments,
-                    posted_at: postedAtStr,
+                    postedAt: postedAtStr,
                   ),
                 ),
               );
@@ -297,7 +297,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
                         SliverToBoxAdapter(
                           child: Container(
                             width: double.infinity,
-                            color: CupertinoColors.systemBlue.withOpacity(0.1),
+                            color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
                             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,

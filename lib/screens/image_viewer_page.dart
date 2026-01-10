@@ -9,7 +9,7 @@ class ImageViewerPage extends StatelessWidget {
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
       navigationBar: CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.black.withOpacity(0.6),
+        backgroundColor: CupertinoColors.black.withValues(alpha: 0.6),
         // 閉じるボタン
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

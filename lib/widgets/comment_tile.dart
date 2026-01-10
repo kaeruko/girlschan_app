@@ -152,7 +152,7 @@ class CommentTile extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: CupertinoColors.activeBlue.withOpacity(0.1),
+                    color: CupertinoColors.activeBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
@@ -184,7 +184,7 @@ class CommentTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        hoverColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+        hoverColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         mouseCursor: SystemMouseCursors.click,
         child: Container(
           decoration: const BoxDecoration(
