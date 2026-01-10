@@ -142,7 +142,7 @@ class _MacShellState extends State<MacShell> {
     if (tabId == 'tab_new' || tabId == 'tab_popular') {
       final key = spec.stateKey;
       if (key is GlobalKey<tl.TopicListScreenState>) {
-        key.currentState?.refreshTiles();
+        key.currentState?.reload();
       }
     }
   }

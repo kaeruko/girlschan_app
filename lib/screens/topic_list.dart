@@ -83,6 +83,10 @@ class TopicListScreenState extends State<TopicListScreen>
     _controller.refreshAll();
   }
 
+  Future<void> reload() async {
+    await fetchFromServer();
+  }
+
   Future<void> _updateTopicInList(int index, int topicId) async {
     
     logd('🔄 [_updateTopicInList] Start processing index=$index, id=$topicId', name: 'TopicList');
