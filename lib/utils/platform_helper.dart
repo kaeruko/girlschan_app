@@ -16,9 +16,9 @@ class PlatformHelper {
   static PlatformKind? _override; // テスト用。通常は null のまま。
 
   // ===== 判定系 =====
-  static bool get isMacOS => _override == PlatformKind.macOS || Platform.isMacOS;
-  static bool get isIOS => _override == PlatformKind.iOS || Platform.isIOS;
-  static bool get isWindows => _override == PlatformKind.windows || Platform.isWindows;
+  static bool get isMacOS => _override != null ? _override == PlatformKind.macOS : Platform.isMacOS;
+  static bool get isIOS => _override != null ? _override == PlatformKind.iOS : Platform.isIOS;
+  static bool get isWindows => _override != null ? _override == PlatformKind.windows : Platform.isWindows;
   static bool get isApple => isMacOS || isIOS;
 
   static bool get isDesktop => isMacOS || isWindows;
