@@ -185,13 +185,13 @@ class _MacShellState extends State<MacShell> {
           autofocus: true, // キーイベントを受け取るために必要
           child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
             body: Column(
-              children: [
+              children: <Widget>[
                 // ネイティブ信号下のスペーサ
                 SizedBox(height: _captionHeight),
                 // 本体：3ペイン構成
                 Expanded(
                   child: Row(
-                    children: [
+                    children: <Widget>[
                       // 【左】セクションナビ
                       SizedBox(
                         width: 220,
@@ -206,7 +206,7 @@ class _MacShellState extends State<MacShell> {
                         width: 350,
                         child: IndexedStack(
                           index: _selectedSectionIndex,
-                          children: [
+                          children: <Widget>[
                             for (final section in _sectionItems)
                               _buildCenterPaneContent(section.id),
                           ],
