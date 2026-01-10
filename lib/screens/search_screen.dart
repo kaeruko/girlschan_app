@@ -164,7 +164,7 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
         'id': t.id,
         'title': t.title,
         'comments': t.comments,
-        'posted_at': t.posted_at,
+        'posted_at': t.postedAt,
         'thumb': t.thumb,
       };
 

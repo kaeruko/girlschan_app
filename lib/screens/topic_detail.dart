@@ -882,7 +882,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
 
   String _subtitleText(List<Comment> items) {
     return _currentFilter == CommentFilterLevel.all
-        ? '${widget.posted_at} • コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}'
+        ? '${widget.postedAt} • コメント: ${_vm.totalComments > 0 ? _vm.totalComments : widget.commentCount}'
         : '絞り込み中: ${items.length}件を表示';
   }
 

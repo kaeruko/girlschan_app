@@ -7,6 +7,7 @@ import '../screens/topic_detail.dart';
 import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
+import '../screens/search_screen.dart'; // ★追加
 import '../controllers/selection_controller.dart'; // ★追加
 import '../controllers/topic_detail_shortcut_controller.dart';
 import '../utils/platform_helper.dart';
