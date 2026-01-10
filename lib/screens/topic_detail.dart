@@ -134,6 +134,8 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   // ========== フィールド群 ==========
   late final TopicDetailController _vm;
   static const int _pageSize = 100;
+  static const double _railBreakpoint = 900;
+  static const double _railWidth = 320;
   final PageController _pc = PageController();
   final Map<int, ScrollController> _pageScroll = {};
   final Map<int, VariableListMeasurer> _pageMeas = {};
@@ -152,6 +154,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
 
   // 現在のフィルター設定
   CommentFilterLevel _currentFilter = CommentFilterLevel.all;
+  bool _showSearchRail = false;
 
   // 設定サービス
   final _settings = SettingsService();
@@ -545,6 +548,14 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     }
   }
 
+  void _handleSearchAction(double width) {
+    if (width >= _railBreakpoint) {
+      setState(() => _showSearchRail = !_showSearchRail);
+      return;
+    }
+    _showSearchDialog();
+  }
+
   void _showFilterSheet() {
     showCupertinoModalPopup(
       context: context,
@@ -734,12 +745,13 @@ class _TopicDetailViewState extends State<TopicDetailView> {
 
   List<Widget> _buildHeaderActions({
     required bool includeFilter,
+    required double availableWidth,
     EdgeInsets padding = const EdgeInsets.all(6),
   }) {
     return [
       _buildHeaderButton(
         icon: CupertinoIcons.search,
-        onPressed: _showSearchDialog,
+        onPressed: () => _handleSearchAction(availableWidth),
         padding: padding,
       ),
       if (includeFilter)
@@ -763,6 +775,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   }
 
   Widget _buildEmbeddedHeader(List<Comment> items) {
+    final width = MediaQuery.of(context).size.width;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
       decoration: const BoxDecoration(
@@ -780,7 +793,10 @@ class _TopicDetailViewState extends State<TopicDetailView> {
           const SizedBox(width: 8),
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: _buildHeaderActions(includeFilter: true),
+            children: _buildHeaderActions(
+              includeFilter: true,
+              availableWidth: width,
+            ),
           ),
         ],
       ),
@@ -890,6 +906,9 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     final items = _displayComments;
     final pageCount = _pageCountFor(items.length);
     final allowPopGesture = widget.layout == TopicDetailLayout.fullPage;
+    final width = MediaQuery.of(context).size.width;
+    final canShowRail = width >= _railBreakpoint;
+    final showRail = canShowRail && _showSearchRail;
 
     Widget pageView = PageView.builder(
       controller: _pc,
@@ -1037,6 +1056,35 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     }
 
     final contentColumn = _buildContentColumn(items, pageView);
+    final contentRow = Row(
+      children: [
+        Expanded(child: contentColumn),
+        if (showRail)
+          Container(
+            width: _railWidth,
+            decoration: BoxDecoration(
+              color: _settings.backgroundColor,
+              border: const Border(
+                left: BorderSide(color: CupertinoColors.separator),
+              ),
+            ),
+            child: TopicSearchRail(
+              allComments: _vm.comments,
+              currentFilter: _currentFilter,
+              onFilterChanged: _onFilterChanged,
+              onJumpToComment: (no) => _tryRestoreIfNeeded(targetNo: no),
+              currentPage: _currentPage,
+              pageCount: _pageCountLive,
+              hasPrev: _hasPrev,
+              hasNext: _hasNext,
+              onPrevPage: _goPrevPage,
+              onNextPage: _goNextPage,
+              settings: _settings,
+              onClose: () => setState(() => _showSearchRail = false),
+            ),
+          ),
+      ],
+    );
 
     if (widget.layout == TopicDetailLayout.embeddedPane) {
       return Container(
@@ -1044,7 +1092,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
         child: Column(
           children: [
             _buildEmbeddedHeader(items),
-            Expanded(child: contentColumn),
+            Expanded(child: contentRow),
           ],
         ),
       );
@@ -1074,13 +1122,14 @@ class _TopicDetailViewState extends State<TopicDetailView> {
             mainAxisSize: MainAxisSize.min,
             children: _buildHeaderActions(
               includeFilter: false,
+              availableWidth: width,
               padding: EdgeInsets.zero,
             ),
           ),
         ),
         child: SafeArea(
           bottom: false,
-          child: contentColumn,
+          child: contentRow,
         ),
       ),
     );
@@ -1421,6 +1470,234 @@ class _TopicSearchModalState extends State<TopicSearchModal> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class TopicSearchRail extends StatefulWidget {
+  final List<Comment> allComments;
+  final CommentFilterLevel currentFilter;
+  final ValueChanged<CommentFilterLevel> onFilterChanged;
+  final ValueChanged<int> onJumpToComment;
+  final int currentPage;
+  final int pageCount;
+  final bool hasPrev;
+  final bool hasNext;
+  final VoidCallback onPrevPage;
+  final VoidCallback onNextPage;
+  final SettingsService settings;
+  final VoidCallback? onClose;
+
+  const TopicSearchRail({
+    super.key,
+    required this.allComments,
+    required this.currentFilter,
+    required this.onFilterChanged,
+    required this.onJumpToComment,
+    required this.currentPage,
+    required this.pageCount,
+    required this.hasPrev,
+    required this.hasNext,
+    required this.onPrevPage,
+    required this.onNextPage,
+    required this.settings,
+    this.onClose,
+  });
+
+  @override
+  State<TopicSearchRail> createState() => _TopicSearchRailState();
+}
+
+class _TopicSearchRailState extends State<TopicSearchRail> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  List<Comment> _filteredComments = [];
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (query.isEmpty) {
+      setState(() => _filteredComments = []);
+      return;
+    }
+
+    final lowerQuery = query.toLowerCase();
+    setState(() {
+      _filteredComments = widget.allComments.where((c) {
+        return c.body.toLowerCase().contains(lowerQuery) ||
+            (c.id.toString() == lowerQuery);
+      }).toList();
+    });
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Widget _buildFilterButton(CommentFilterLevel level, String label, IconData icon) {
+    final isSelected = widget.currentFilter == level;
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      color: isSelected ? CupertinoColors.activeBlue : CupertinoColors.systemGrey5,
+      onPressed: () => widget.onFilterChanged(level),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: isSelected ? CupertinoColors.white : CupertinoColors.black),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSelected ? CupertinoColors.white : CupertinoColors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredComments;
+    return Container(
+      color: widget.settings.backgroundColor,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 12, 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '検索サイドレール',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (widget.onClose != null)
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: widget.onClose,
+                    child: const Icon(CupertinoIcons.xmark_circle_fill),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: CupertinoSearchTextField(
+              controller: _searchCtrl,
+              onChanged: _onSearchChanged,
+              placeholder: 'キーワード / No',
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: _buildSectionTitle('フィルタプリセット'),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterButton(CommentFilterLevel.all, 'すべて', CupertinoIcons.list_bullet),
+                _buildFilterButton(CommentFilterLevel.positive, '普通', CupertinoIcons.hand_thumbsup),
+                _buildFilterButton(CommentFilterLevel.popular, '人気', CupertinoIcons.sparkles),
+                _buildFilterButton(CommentFilterLevel.legend, '伝説', CupertinoIcons.flame),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: _buildSectionTitle('ミニマップ'),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemGrey6,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ページ ${widget.pageCount == 0 ? 0 : widget.currentPage + 1} / ${widget.pageCount}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CupertinoButton(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          onPressed: widget.hasPrev ? widget.onPrevPage : null,
+                          child: const Text('前へ', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: CupertinoButton(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          onPressed: widget.hasNext ? widget.onNextPage : null,
+                          child: const Text('次へ', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: _buildSectionTitle('検索結果'),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      _searchCtrl.text.isEmpty ? '検索キーワードを入力してください' : '見つかりませんでした',
+                      style: const TextStyle(color: CupertinoColors.systemGrey),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) {
+                      final c = filtered[i];
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          title: Text(
+                            '${c.id}. ${c.body.replaceAll('\n', ' ')}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          trailing: const Icon(CupertinoIcons.location, size: 16),
+                          onTap: () => widget.onJumpToComment(c.id),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
