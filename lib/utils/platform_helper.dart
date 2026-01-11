@@ -72,7 +72,7 @@ class PlatformHelper {
 
   // ===== デスクトップウィンドウ初期化（macOSのみ） =====
   static Future<void> initDesktopWindowIfNeeded() async {
-    if (isMacOS) {
+    if (isDesktop) {
       await DesktopWindow.init();
     }
   }
