@@ -209,6 +209,14 @@ class _MacShellState extends State<MacShell> {
             const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): () {
               _topicDetailShortcuts.jumpToComment?.call();
             },
+            // スペースキーで下スクロール（ブラウザ風）
+            const SingleActivator(LogicalKeyboardKey.space): () {
+              _topicDetailShortcuts.scrollDown?.call();
+            },
+            // Shift+スペースキーで上スクロール
+            const SingleActivator(LogicalKeyboardKey.space, shift: true): () {
+              _topicDetailShortcuts.scrollUp?.call();
+            },
             // Esc で戻る（詳細画面を開いている時など）
             const SingleActivator(LogicalKeyboardKey.escape): () {
               // 3ペインの場合、Escで選択解除などが考えられるが、
@@ -224,6 +232,20 @@ class _MacShellState extends State<MacShell> {
           },
           child: Focus(
             autofocus: true, // キーイベントを受け取るために必要
+            // スペースキーはフォーカスが子に移っても処理するため onKeyEvent で直接ハンドル
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent) {
+                if (event.logicalKey == LogicalKeyboardKey.space) {
+                  if (HardwareKeyboard.instance.isShiftPressed) {
+                    _topicDetailShortcuts.scrollUp?.call();
+                  } else {
+                    _topicDetailShortcuts.scrollDown?.call();
+                  }
+                  return KeyEventResult.handled;
+                }
+              }
+              return KeyEventResult.ignored;
+            },
             child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
               body: Column(
               children: [

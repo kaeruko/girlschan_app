@@ -487,6 +487,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('クリップ'),
+        heroTag: 'clips_nav',
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           child: const Icon(CupertinoIcons.bars),

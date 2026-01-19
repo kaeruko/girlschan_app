@@ -258,8 +258,9 @@ class FavoritesScreenState extends State<FavoritesScreen>
       // 単体で動作させるならあっても良い。今回はタブの一部として埋め込まれる前提で
       // Scaffold の body 相当部分を作るが、Cupertino統一のため PageScaffold を使用。
       // もしタブ側の AppBar と二重になる場合は navigationBar を削除してください。
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('履歴'),
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('履歴'),
+        heroTag: 'favorites_nav',
       ),
       child: SafeArea(
         bottom: false, // タブバーと被らないように

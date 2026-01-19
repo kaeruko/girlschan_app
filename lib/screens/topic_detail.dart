@@ -291,7 +291,27 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       prevUnread: _jumpToPrevUnread,
       jumpToComment: _showJumpDialog,
       refresh: _fetchMoreDelta,
+      scrollDown: _scrollDown,
+      scrollUp: _scrollUp,
     );
+  }
+
+  /// スペースキーで画面1つ分下にスクロール
+  void _scrollDown() {
+    final sc = _scForPage(_currentPage);
+    if (!sc.hasClients) return;
+    final viewportHeight = sc.position.viewportDimension;
+    final target = (sc.offset + viewportHeight * 0.9).clamp(0.0, sc.position.maxScrollExtent);
+    sc.animateTo(target, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+  }
+
+  /// Shift+スペースで画面1つ分上にスクロール
+  void _scrollUp() {
+    final sc = _scForPage(_currentPage);
+    if (!sc.hasClients) return;
+    final viewportHeight = sc.position.viewportDimension;
+    final target = (sc.offset - viewportHeight * 0.9).clamp(0.0, sc.position.maxScrollExtent);
+    sc.animateTo(target, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
   }
 
   // ========== ページング ==========
@@ -1140,9 +1160,10 @@ class _TopicDetailViewState extends State<TopicDetailView> {
               controller: sc,
               cacheExtent: (_boostCacheDuringRestore && _restoreTargetPageNo == page)
                   ? 50000.0 : 1200.0,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
+              // macOSではバウンス無効（連続スワイプ対策）、それ以外はバウンス有効
+              physics: PlatformHelper.isDesktop
+                  ? const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+                  : const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
               slivers: [
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
