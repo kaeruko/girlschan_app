@@ -260,7 +260,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
       // もしタブ側の AppBar と二重になる場合は navigationBar を削除してください。
       navigationBar: CupertinoNavigationBar(
         middle: const Text('履歴'),
-        heroTag: 'favorites_nav',
+        transitionBetweenRoutes: false, // エラー回避のため明示的に設定
       ),
       child: SafeArea(
         bottom: false, // タブバーと被らないように

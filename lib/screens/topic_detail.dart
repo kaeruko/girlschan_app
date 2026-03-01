@@ -973,6 +973,11 @@ class _TopicDetailViewState extends State<TopicDetailView> {
           padding: padding,
         ),
       _buildHeaderButton(
+        icon: CupertinoIcons.arrow_clockwise,
+        onPressed: _vm.hardReload,
+        padding: padding,
+      ),
+      _buildHeaderButton(
         icon: CupertinoIcons.ellipsis,
         onPressed: _showMenu,
         padding: padding,
@@ -1680,7 +1685,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);
-              _openPostDialog(initialText: '>>$no');
+              _openPostDialog(initialText: '>>$no', repliedComment: c);
             },
             child: const Text('このコメントに返信'),
           ),
@@ -1694,7 +1699,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     );
   }
 
-  Future<void> _openPostDialog({String? initialText}) async {
+  Future<void> _openPostDialog({String? initialText, Comment? repliedComment}) async {
     if (!mounted) return;
 
     final result = await Navigator.push<dynamic>(
@@ -1704,6 +1709,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
           topicId: widget.topicId,
           title: widget.title,
           initialText: initialText,
+          repliedComment: repliedComment,
         ),
       ),
     );

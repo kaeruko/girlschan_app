@@ -106,7 +106,6 @@ class _MacShellState extends State<MacShell> {
   void _onSectionSelected(String sectionId) {
     if (_selectedSectionId == sectionId) return;
     setState(() => _selectedSectionId = sectionId);
-    _selectionController.clearSelection();
     _refreshCurrentSection();
   }
 

@@ -1,0 +1,10 @@
+Unhandled exception:
+The file certificate not found in: C:\Users\mail\Downloads\code_sign_certificate.pfx, check "msix_config: certificate_path" at pubspec.yaml
+#0      Configuration.validateConfigValues (package:msix/src/configuration.dart:275:11)
+<asynchronous suspension>
+#1      Msix._initConfig (package:msix/msix.dart:98:5)
+<asynchronous suspension>
+#2      Msix.create (package:msix/msix.dart:58:5)
+<asynchronous suspension>
+#3      main (file:///C:/Users/mail/AppData/Local/Pub/Cache/hosted/pub.dev/msix-3.16.12/bin/create.dart:4:3)
+<asynchronous suspension>

@@ -5,17 +5,20 @@ import 'package:url_launcher/url_launcher.dart';
 import 'comment_post_webview.dart';
 import '../services/cache_service.dart';
 import '../utils/platform_helper.dart';
+import '../models/comment.dart';
 
 class CommentComposePage extends StatefulWidget {
   final int topicId;
   final String title;
   final String? initialText;
+  final Comment? repliedComment;
 
   const CommentComposePage({
     super.key,
     required this.topicId,
     required this.title,
     this.initialText,
+    this.repliedComment,
   });
 
   @override
@@ -229,6 +232,43 @@ class _CommentComposePageState extends State<CommentComposePage> {
                     ],
                   ),
                 ),
+                if (widget.repliedComment != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemGrey6,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: CupertinoColors.systemGrey4,
+                      ),
+                    ),
+                    constraints: const BoxConstraints(maxHeight: 120),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'No.${widget.repliedComment!.id}  ${widget.repliedComment!.name}  ${widget.repliedComment!.postedAt}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: CupertinoColors.secondaryLabel,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.repliedComment!.body.trim(),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: CupertinoColors.label,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 CupertinoTextField(
                   controller: _ctrl,

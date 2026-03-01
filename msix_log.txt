@@ -1,0 +1,28 @@
+running "flutter build windows"...      /-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/- 
+Building Windows application...                                 
+Building Windows application...                                     6.7s
+
+Unhandled exception:
+CMake Warning (dev) at flutter/ephemeral/.plugin_symlinks/flutter_inappwebview_windows/windows/CMakeLists.txt:31 (add_custom_command):
+  The following keywords are not supported when using
+  add_custom_command(TARGET): DEPENDS.
+
+  Policy CMP0175 is not set: add_custom_command() rejects invalid arguments.
+  Run "cmake --help-policy CMP0175" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+LINK : fatal error LNK1104: 繝輔ぃ繧､繝ｫ 'C:\Users\mail\work\girlschan_app\build\windows\x64\runner\Release\girlschan_app.exe' 繧帝幕縺上％縺ｨ縺後〒縺阪∪縺帙ｓ縲・[C:\Users\mail\work\girlschan_app\build\windows\x64\runner\girlschan_app.vcxproj]
+Build process failed.
+
+#0      ProcessResultExtensions.exitOnError (package:msix/src/method_extensions.dart:77:7)
+#1      WindowsBuild.build (package:msix/src/windows_build.dart:33:18)
+<asynchronous suspension>
+#2      Msix._buildMsixFiles (package:msix/msix.dart:107:31)
+<asynchronous suspension>
+#3      Msix._createMsix (package:msix/msix.dart:102:5)
+<asynchronous suspension>
+#4      Msix.create (package:msix/msix.dart:59:5)
+<asynchronous suspension>
+#5      main (file:///C:/Users/mail/AppData/Local/Pub/Cache/hosted/pub.dev/msix-3.16.12/bin/create.dart:4:3)
+<asynchronous suspension>

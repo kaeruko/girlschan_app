@@ -6,12 +6,13 @@ import '../app/app_tabs.dart';
 import '../screens/topic_detail.dart';
 import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
-import '../screens/favorites_screen.dart';
-import '../screens/search_screen.dart'; // ★追加
-import '../controllers/selection_controller.dart'; // ★追加
+import '../screens/favorites_screen.dart'; // ← 一旦残す（必要に応じて後で削除）
+import '../screens/search_screen.dart';
+import '../controllers/selection_controller.dart';
 import '../controllers/topic_detail_shortcut_controller.dart';
 import '../utils/platform_helper.dart';
-import '../utils/log.dart'; // ★追加
+import '../utils/log.dart';
+import '../widgets/history_panel.dart'; // ★追加
 
 class WindowsShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -39,7 +40,6 @@ class _WindowsShellState extends State<WindowsShell> {
   late final List<_SectionNavItem> _sectionItems;
   late String _selectedSectionId;
   final Map<String, GlobalKey<NavigatorState>> _sectionNavKeys = {};
-  double _captionHeight = 28.0;
 
   // ★ 選択状態を管理
   final _selectionController = SelectionController();
@@ -56,26 +56,12 @@ class _WindowsShellState extends State<WindowsShell> {
           .where((item) => _usesNestedNavigator(item.id))
           .map((item) => MapEntry(item.id, GlobalKey<NavigatorState>())),
     );
-    _loadCaptionHeight();
-  }
-
-  Future<void> _loadCaptionHeight() async {
-    try {
-      final h = await windowManager.getTitleBarHeight();
-      if (!mounted) return;
-      if (h != null && h > 0) {
-        setState(() => _captionHeight = h.toDouble());
-      }
-    } catch (_) {
-      // 取得できない環境では fallback の 28.0 を使う
-    }
   }
 
   List<_SectionNavItem> _buildSectionItems() {
     const order = [
       'tab_new',
       'tab_popular',
-      'tab_favorites',
       'tab_clips',
       'tab_search',
       'tab_settings',
@@ -106,7 +92,6 @@ class _WindowsShellState extends State<WindowsShell> {
   void _onSectionSelected(String sectionId) {
     if (_selectedSectionId == sectionId) return;
     setState(() => _selectedSectionId = sectionId);
-    _selectionController.clearSelection();
     _refreshCurrentSection();
   }
 
@@ -203,24 +188,18 @@ class _WindowsShellState extends State<WindowsShell> {
             child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
               body: Column(
               children: [
-                // ネイティブ信号下のスペーサ
-                SizedBox(height: _captionHeight),
-                // 本体：3ペイン構成
+                // ★ 全幅に広がるメニューバー
+                _buildMenuBar(),
+                
+                const Divider(height: 1),
+
+                // 本体：2ペイン（リスト・詳細）構成
                 Expanded(
                   child: Row(
                     children: [
-                      // 【左】セクションナビ
+                      // 【左】トピック一覧（タブの中身）
                       SizedBox(
-                        width: 220,
-                        child: _buildSectionNav(),
-                      ),
-                      
-                      // 縦の区切り線
-                      const VerticalDivider(width: 1),
-  
-                      // 【中】トピック一覧（タブの中身）
-                      SizedBox(
-                        width: 350,
+                        width: 350, // 幅は350に戻す
                         child: IndexedStack(
                           index: _selectedSectionIndex,
                           children: [
@@ -233,46 +212,65 @@ class _WindowsShellState extends State<WindowsShell> {
                       // 縦の区切り線
                       const VerticalDivider(width: 1),
   
-                      // 【右】詳細エリア（選択状態に応じて中身が変わる）
+                      // 【右】詳細エリア（選択状態に応じて中身が変わる） + 履歴パネル
                       Expanded(
-                        child: AnimatedBuilder(
-                          animation: _selectionController,
-                          builder: (context, _) {
-                            final selectedId = _selectionController.selectedTopicId;
+                        child: Column(
+                          children: [
+                            // ★ 履歴パネル（履歴がある場合のみ表示される）
+                            HistoryPanel(
+                              onTopicTap: (id, title, comments, postedAt) {
+                                _selectionController.selectTopic(
+                                  id,
+                                  title: title,
+                                  comments: comments,
+                                  postedAt: postedAt,
+                                );
+                              },
+                            ),
                             
-                            if (selectedId == null) {
-                              // 何も選ばれていない時
-                              return const Center(
-                                child: Text(
-                                  "トピックを選択してください",
-                                  style: TextStyle(color: CupertinoColors.systemGrey),
-                                ),
-                              );
-                            }
-  
-                            // 選ばれていれば詳細画面を埋め込む
-                            return PlatformHelper.isDesktop
-                                ? TopicDetailPane(
-                                    key: ValueKey(selectedId), // IDが変わったら作り直す
-                                    topicId: selectedId,
-                                    title: _selectionController.title,
-                                    commentCount: _selectionController.commentCount,
-                                    postedAt: _selectionController.postedAt,
-                                    enableRefresh: true,
-                                    saveReadPosition: true,
-                                    shortcutController: _topicDetailShortcuts,
-                                  )
-                                : TopicDetailScreen(
-                                    key: ValueKey(selectedId), // IDが変わったら作り直す
-                                    topicId: selectedId,
-                                    title: _selectionController.title,
-                                    commentCount: _selectionController.commentCount,
-                                    postedAt: _selectionController.postedAt,
-                                    enableRefresh: true,
-                                    saveReadPosition: true,
-                                    shortcutController: _topicDetailShortcuts,
-                                  );
-                          },
+                            // ★ トピック詳細（または未選択メッセージ）
+                            Expanded(
+                              child: AnimatedBuilder(
+                                animation: _selectionController,
+                                builder: (context, _) {
+                                  final selectedId = _selectionController.selectedTopicId;
+                                  
+                                  if (selectedId == null) {
+                                    // 何も選ばれていない時
+                                    return const Center(
+                                      child: Text(
+                                        "トピックを選択してください",
+                                        style: TextStyle(color: CupertinoColors.systemGrey),
+                                      ),
+                                    );
+                                  }
+                                  
+                                  // 選ばれていれば詳細画面を埋め込む
+                                  return PlatformHelper.isDesktop
+                                      ? TopicDetailPane(
+                                          key: ValueKey(selectedId), // IDが変わったら作り直す
+                                          topicId: selectedId,
+                                          title: _selectionController.title,
+                                          commentCount: _selectionController.commentCount,
+                                          postedAt: _selectionController.postedAt,
+                                          enableRefresh: true,
+                                          saveReadPosition: true,
+                                          shortcutController: _topicDetailShortcuts,
+                                        )
+                                      : TopicDetailScreen(
+                                          key: ValueKey(selectedId), // IDが変わったら作り直す
+                                          topicId: selectedId,
+                                          title: _selectionController.title,
+                                          commentCount: _selectionController.commentCount,
+                                          postedAt: _selectionController.postedAt,
+                                          enableRefresh: true,
+                                          saveReadPosition: true,
+                                          shortcutController: _topicDetailShortcuts,
+                                        );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -391,29 +389,29 @@ class _WindowsShellState extends State<WindowsShell> {
     return index >= 0 ? index : 0;
   }
 
-  Widget _buildSectionNav() {
+  // ★ 新しいメニューバー風の横並びナビゲーション
+  Widget _buildMenuBar() {
     return Container(
-      color: CupertinoColors.systemGrey6,
-      child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      color: CupertinoColors.systemBackground,
+      height: 36, // メニューバーらしく少し低めに
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start, // 左詰め
         children: [
           for (final item in _sectionItems)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: _buildSectionNavItem(item),
-            ),
+            _buildMenuBarItem(item),
         ],
       ),
     );
   }
 
-  Widget _buildSectionNavItem(_SectionNavItem item) {
+  Widget _buildMenuBarItem(_SectionNavItem item) {
     final isSelected = item.id == _selectedSectionId;
-    final textColor = isSelected ? CupertinoColors.systemPink : CupertinoColors.label;
-    final iconColor = isSelected ? CupertinoColors.systemPink : CupertinoColors.secondaryLabel;
+    final textColor = isSelected ? CupertinoColors.activeBlue : CupertinoColors.label;
 
     return CupertinoButton(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      minSize: 0, // 縦幅をContainerに合わせる
       onPressed: () {
         _onSectionSelected(item.id);
         final scaffold = Scaffold.maybeOf(context);
@@ -421,25 +419,12 @@ class _WindowsShellState extends State<WindowsShell> {
           Navigator.of(context).pop();
         }
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected ? CupertinoColors.systemGrey4 : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(item.icon, size: 18, color: iconColor),
-            const SizedBox(width: 10),
-            Text(
-              item.label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: textColor,
-              ),
-            ),
-          ],
+      child: Text(
+        item.label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: textColor,
         ),
       ),
     );

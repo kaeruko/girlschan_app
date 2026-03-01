@@ -66,4 +66,17 @@ flutter:
 
 flutter_launcher_icons:
   ios: true
-  image_path: "assets/icon/ios.png"
+  windows:
+    generate: true
+    image_path: "icons/icon.png"
+  image_path: "assets/icon.png"
+
+msix_config:
+  display_name: "がるなびWin版"
+  publisher: "CN=8EB0F831-522C-4276-859B-13446891CE84"
+  identity_name: "4E5E7526.Win"
+  publisher_display_name: "横田里奈子"
+  certificate_path: "C:\\Users\\mail\\Downloads\\code_sign_certificate.pfx"
+  certificate_password: "password1234"
+  logo_path: "icons\\icon.png"
+

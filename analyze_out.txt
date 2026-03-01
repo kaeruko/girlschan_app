@@ -1,0 +1,64 @@
+Analyzing girlschan_app...                                      
+
+   info - Don't invoke 'print' in production code - lib\controllers\selection_controller.dart:17:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\controllers\selection_controller.dart:41:7 - avoid_print
+   info - The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/widgets.dart' - lib\controllers\topic_detail_controller.dart:4:8 - unnecessary_import
+   info - The private field _savedSyncedCount could be 'final' - lib\controllers\topic_detail_controller.dart:95:7 - prefer_final_fields
+   info - Unnecessary use of getter and setter to wrap a field - lib\controllers\topic_detail_controller.dart:109:11 - unnecessary_getters_setters
+warning - The declaration '_kScrollNo' isn't referenced - lib\controllers\topic_detail_controller.dart:117:10 - unused_element
+   info - Unnecessary braces in a string interpolation - lib\controllers\topic_detail_controller.dart:214:38 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation - lib\controllers\topic_detail_controller.dart:214:72 - unnecessary_brace_in_string_interps
+   info - Unnecessary 'this.' qualifier - lib\controllers\topic_detail_controller.dart:234:5 - unnecessary_this
+warning - Unnecessary cast - lib\controllers\topic_detail_controller.dart:283:45 - unnecessary_cast
+   info - Dangling library doc comment - lib\desktop\desktop_window_stub.dart:1:1 - dangling_library_doc_comments
+warning - Unused import: 'package:super_sliver_list/super_sliver_list.dart' - lib\screens\_super_sliver_list_sample_helpers.dart:2:8 - unused_import
+warning - The declaration '_Measurer' isn't referenced - lib\screens\_super_sliver_list_sample_helpers.dart:5:7 - unused_element
+warning - A value for optional parameter 'fallbackHeight' isn't ever given - lib\screens\_super_sliver_list_sample_helpers.dart:8:31 - unused_element_parameter
+   info - Parameter 'key' could be a super parameter - lib\screens\_super_sliver_list_sample_helpers.dart:24:9 - use_super_parameters
+warning - Unused import: '../services/cache_service.dart' - lib\screens\clips_screen.dart:7:8 - unused_import
+warning - Unused import: '../widgets/common/app_toast.dart' - lib\screens\clips_screen.dart:11:8 - unused_import
+warning - The operand can't be 'null', so the condition is always 'true' - lib\screens\clips_screen.dart:250:20 - unnecessary_null_comparison
+   info - The variable name 'posted_at' isn't a lowerCamelCase identifier - lib\screens\clips_screen.dart:634:11 - non_constant_identifier_names
+   info - 'minSize' is deprecated and shouldn't be used. Use minimumSize instead. This feature was deprecated after v3.28.0-3.0.pre - lib\screens\clips_screen.dart:800:19 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\comment_compose_page.dart:184:36 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\screens\comment_post_webview.dart:197:18 - use_build_context_synchronously
+   info - 'onPopInvoked' is deprecated and shouldn't be used. Use onPopInvokedWithResult instead. This feature was deprecated after v3.22.0-12.0.pre - lib\screens\comment_post_webview.dart:221:7 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\comment_post_webview.dart:228:24 - use_build_context_synchronously
+warning - The declaration '_escapeForJs' isn't referenced - lib\screens\comment_post_webview.dart:277:8 - unused_element
+   info - The import of 'package:flutter/material.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/cupertino.dart' - lib\screens\favorites_screen.dart:2:8 - unnecessary_import
+warning - Unused import: '../services/cache_service.dart' - lib\screens\favorites_screen.dart:4:8 - unused_import
+   info - Don't use 'BuildContext's across async gaps - lib\screens\favorites_screen.dart:221:13 - use_build_context_synchronously
+   info - The 'child' argument should be last in widget constructor invocations - lib\screens\favorites_screen.dart:283:27 - sort_child_properties_last
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\label_management_screen.dart:67:44 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\label_management_screen.dart:115:44 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\label_management_screen.dart:147:42 - use_build_context_synchronously
+warning - The value of the local variable 'canSubmit' isn't used - lib\screens\search_screen.dart:187:11 - unused_local_variable
+warning - The value of the local variable 'bgColor' isn't used - lib\screens\settings_screen.dart:51:11 - unused_local_variable
+   info - 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion - lib\screens\settings_screen.dart:130:48 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion - lib\screens\settings_screen.dart:130:72 - deprecated_member_use
+warning - Unused import: 'comment_post_webview.dart' - lib\screens\topic_detail.dart:19:8 - unused_import
+   info - 'minSize' is deprecated and shouldn't be used. Use minimumSize instead. This feature was deprecated after v3.28.0-3.0.pre - lib\screens\topic_detail.dart:946:7 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. This feature was deprecated after v3.33.0-1.0.pre - lib\screens\topic_detail.dart:1078:54 - deprecated_member_use
+   info - 'onPopInvoked' is deprecated and shouldn't be used. Use onPopInvokedWithResult instead. This feature was deprecated after v3.22.0-12.0.pre - lib\screens\topic_detail.dart:1338:9 - deprecated_member_use
+warning - Unused import: 'dart:developer' - lib\screens\topic_list.dart:1:8 - unused_import
+warning - The stack trace variable 'st' isn't used and can be removed - lib\screens\topic_list.dart:143:17 - unused_catch_stack
+warning - Unused import: 'package:shared_preferences/shared_preferences.dart' - lib\services\api_service.dart:4:8 - unused_import
+   info - The variable name 'reverse_anchors' isn't a lowerCamelCase identifier - lib\services\api_service.dart:470:17 - non_constant_identifier_names
+   info - The variable name 'reverse_anchors' isn't a lowerCamelCase identifier - lib\services\api_service.dart:539:26 - non_constant_identifier_names
+   info - The imported package 'intl' isn't a dependency of the importing package - lib\services\data_backup_service.dart:7:8 - depend_on_referenced_packages
+warning - A value for optional parameter 'key' isn't ever given - lib\shell\ios_shell.dart:112:11 - unused_element_parameter
+warning - The value of the field '_compactBreakpoint' isn't used - lib\shell\macos_shell.dart:37:23 - unused_field
+warning - The operand can't be 'null', so the condition is always 'true' - lib\shell\macos_shell.dart:66:13 - unnecessary_null_comparison
+warning - Unused import: 'package:window_manager/window_manager.dart' - lib\shell\windows_shell.dart:4:8 - unused_import
+warning - The value of the field '_compactBreakpoint' isn't used - lib\shell\windows_shell.dart:38:23 - unused_field
+   info - 'minSize' is deprecated and shouldn't be used. Use minimumSize instead. This feature was deprecated after v3.28.0-3.0.pre - lib\shell\windows_shell.dart:415:7 - deprecated_member_use
+warning - The operand can't be 'null', so the condition is always 'false' - lib\utils\variable_list_measurer.dart:53:20 - unnecessary_null_comparison
+warning - Dead code - lib\utils\variable_list_measurer.dart:53:29 - dead_code
+   info - Don't use 'BuildContext's across async gaps - lib\utils\variable_list_measurer.dart:107:40 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. This feature was deprecated after v3.33.0-1.0.pre - lib\widgets\anchor_preview_sheet.dart:173:30 - deprecated_member_use
+   info - 'minSize' is deprecated and shouldn't be used. Use minimumSize instead. This feature was deprecated after v3.28.0-3.0.pre - lib\widgets\comment_tile.dart:123:19 - deprecated_member_use
+   info - 'minSize' is deprecated and shouldn't be used. Use minimumSize instead. This feature was deprecated after v3.28.0-3.0.pre - lib\widgets\comment_tile.dart:135:19 - deprecated_member_use
+  error - Expected an identifier - lib\widgets\history_panel.dart:118:11 - missing_identifier
+  error - Expected to find ']' - lib\widgets\history_panel.dart:118:11 - expected_token
+   info - The import of 'package:flutter/rendering.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/widgets.dart' - lib\widgets\measure_size.dart:2:8 - unnecessary_import
+

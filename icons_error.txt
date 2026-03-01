@@ -1,0 +1,8 @@
+  笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
+     FLUTTER LAUNCHER ICONS (v0.14.4)                               
+  笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
+  
+
+笨・Could not generate launcher icons
+PathNotFoundException: Cannot open file, path = 'assets/icon/ios.png' (OS Error: 謖・ｮ壹＆繧後◆繝代せ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ縲・ errno = 3)
+Failed to update packages.

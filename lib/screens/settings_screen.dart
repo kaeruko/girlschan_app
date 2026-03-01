@@ -52,9 +52,9 @@ class SettingsScreenState extends State<SettingsScreen> {
     final textColor = _settings.getTextColor(context);
 
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('設定'),
-        heroTag: 'settings_nav',
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('設定'),
+        transitionBetweenRoutes: false,
       ),
       backgroundColor: CupertinoColors.systemGroupedBackground,
       child: SafeArea(

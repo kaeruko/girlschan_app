@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../services/history_notifier.dart';
 import '../utils/log.dart';
+import 'topic_tile.dart';
+import 'topic_tile_controller.dart';
 
 class HistorySidebar extends StatefulWidget {
   final void Function(int topicId, String title, int? commentCount, String postedAt) onSelectTopic;
@@ -15,6 +17,7 @@ class HistorySidebar extends StatefulWidget {
 class _HistorySidebarState extends State<HistorySidebar> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
+  final _tileController = TopicTileController();
 
   @override
   void initState() {
@@ -26,6 +29,7 @@ class _HistorySidebarState extends State<HistorySidebar> {
   @override
   void dispose() {
     historyUpdateNotifier.removeListener(_load);
+    _tileController.clear();
     super.dispose();
   }
 
@@ -67,37 +71,16 @@ class _HistorySidebarState extends State<HistorySidebar> {
         itemBuilder: (ctx, i) {
           final t = _items[i];
           final id = t['id'] as int;
-          final title = (t['title'] as String?) ?? 'タイトル不明';
-          final comments = (t['comments'] is int) ? t['comments'] as int : null;
-          final postedAt = (t['posted_at'] as String?) ?? '';
-          return CupertinoButton(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            onPressed: () => widget.onSelectTopic(id, title, comments, postedAt),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  if (comments != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        'コメント $comments 件',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: CupertinoColors.secondaryLabel,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+          
+          return TopicTile(
+            key: ValueKey<int>(id),
+            topic: t,
+            controller: _tileController,
+            showThumb: true,
+            // TopicTile内で期待されるシグネチャ `(int, String, int, String)` に合わせる
+            onTopicTap: (topicId, title, comments, postedAt) {
+              widget.onSelectTopic(topicId, title, comments, postedAt);
+            },
           );
         },
         separatorBuilder: (context, __) => Container(

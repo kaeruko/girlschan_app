@@ -43,6 +43,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
   int _savedCommentNo = 0;
   DateTime? _cacheModifiedTime;
   bool _hasDraft = false; // ★ 下書き状態を管理
+  bool _isLoading = false; // ★ 読み込み中の状態を管理
   final _settings = SettingsService();
 
 
@@ -201,6 +202,12 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
               ),
               // 削除ボタン
               if (widget.onRemove != null && _hasCachedComments) _buildRemoveButton(id),
+              // ★ 読み込み中インジケーター
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(left: 8.0),
+                  child: CupertinoActivityIndicator(radius: 10),
+                ),
             ],
           ),
         ),
@@ -355,41 +362,83 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     int comments,
     String postedAt,
   ) async {
+    // 既に既読キャッシュがない場合はローディング開始
+    bool startLoading = !_hasCachedComments;
+    if (startLoading && mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    // ポーリング処理をバックグラウンドで開始
+    Future<void> pollForCache() async {
+      int attempts = 0;
+      while (attempts < 20) { // 最大10秒 (500ms * 20)
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+        
+        final hasCached = await hasCachedCommentsInDb(id);
+        if (hasCached) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            await refreshCacheState();
+          }
+          return;
+        }
+        attempts++;
+      }
+      // タイムアウト
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+
+    if (startLoading) {
+      pollForCache(); // awaitせず非同期で走らせる
+    }
+
+
     // ★追加: 親から挙動が指定されていればそちらを優先実行
     if (widget.onTopicTap != null) {
 
       widget.onTopicTap!(id, title, comments, postedAt);
-      return;
-    }
-
-    logd('👆 [TopicTile] Tap detected: ID=$id', name: 'TileNav');
-
-    await Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (_) => TopicDetailScreen(
-          topicId: id,
-          title: title,
-          commentCount: comments,
-          postedAt: postedAt,
-        ),
-      ),
-    );
-
-    logd('🔙 [TopicTile] Returned from Detail: ID=$id', name: 'TileNav');
-
-    final cb = widget.onAfterPop;
-    if (cb != null) {
-      logd('📞 [TopicTile] Calling onAfterPop hash=${identityHashCode(cb)}', name: 'TileNav');
-      try {
-        await cb();
-        logd('✅ [TopicTile] onAfterPop completed hash=${identityHashCode(cb)}', name: 'TileNav');
-      } catch (e, st) {
-        logd('❌ [TopicTile] onAfterPop error: $e\n$st', name: 'TileNav');
-      }
     } else {
-      logd('⚠️ [TopicTile] onAfterPop is NULL', name: 'TileNav');
-    }
 
+      logd('👆 [TopicTile] Tap detected: ID=$id', name: 'TileNav');
+
+      await Navigator.of(context).push(
+        CupertinoPageRoute(
+          builder: (_) => TopicDetailScreen(
+            topicId: id,
+            title: title,
+            commentCount: comments,
+            postedAt: postedAt,
+          ),
+        ),
+      );
+
+      logd('🔙 [TopicTile] Returned from Detail: ID=$id', name: 'TileNav');
+
+      final cb = widget.onAfterPop;
+      if (cb != null) {
+        logd('📞 [TopicTile] Calling onAfterPop hash=${identityHashCode(cb)}', name: 'TileNav');
+        try {
+          await cb();
+          logd('✅ [TopicTile] onAfterPop completed hash=${identityHashCode(cb)}', name: 'TileNav');
+        } catch (e, st) {
+          logd('❌ [TopicTile] onAfterPop error: $e\n$st', name: 'TileNav');
+        }
+      } else {
+        logd('⚠️ [TopicTile] onAfterPop is NULL', name: 'TileNav');
+      }
+
+    }
+    
+    // Navigator から戻った、もしくは直接タップ直後にも念の為リフレッシュ
     if (mounted) await refreshCacheState();
   }
 

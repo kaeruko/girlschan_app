@@ -188,7 +188,10 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
 
     return CupertinoPageScaffold(
       // ... (AppBar等はそのまま)
-      navigationBar: CupertinoNavigationBar(middle: const Text('検索'), heroTag: 'search_nav'),
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('検索'),
+        transitionBetweenRoutes: false, // エラー回避のため明示的に設定
+      ),
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusScope.of(context).unfocus(),
