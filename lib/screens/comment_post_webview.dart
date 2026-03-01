@@ -132,7 +132,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
     // initialText があれば → 確認画面へ直接 POST
     // なければ → これまで通りトピックページを開く
     if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-      final html = _buildConfirmPostHtml(
+      final html = buildConfirmPostHtml(
         topicId: widget.topicId,
         text: widget.initialText!,
       );
@@ -276,7 +276,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
 /// 文字列をJavaScriptリテラルにエスケープ
 String _escapeForJs(String s) => jsonEncode(s);
 
-String _buildConfirmPostHtml({
+String buildConfirmPostHtml({
     required int topicId,
     required String text,
   }) {
@@ -286,6 +286,9 @@ String _buildConfirmPostHtml({
     return '''
 <!doctype html>
 <html lang="ja">
+  <head>
+    <meta charset="utf-8">
+  </head>
   <body>
     <form id="f"
       action="https://girlschannel.net/make_comment/$topicId/"

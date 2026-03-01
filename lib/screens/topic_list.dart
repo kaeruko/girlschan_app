@@ -6,6 +6,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../utils/log.dart';
+import '../utils/platform_helper.dart'; // ★追加
 import '../widgets/topic_tile.dart';
 import '../widgets/topic_tile_controller.dart';
 import '../widgets/common/app_spinner.dart';
@@ -287,6 +288,21 @@ class TopicListScreenState extends State<TopicListScreen>
     // logd('🎨 [TopicList.build] UI描画: ${_topics.length}件のトピック表示 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
 
     return Scaffold(
+      appBar: PlatformHelper.isDesktop ? AppBar(
+        title: Text(widget.sortOrder == 'new' ? '新着トピック' : '人気トピック', style: const TextStyle(fontSize: 16)),
+        actions: [
+          IconButton(
+            icon: const Icon(CupertinoIcons.refresh),
+            tooltip: '更新',
+            onPressed: fetchFromServer,
+          ),
+          const SizedBox(width: 8),
+        ],
+        elevation: 1,
+        backgroundColor: CupertinoColors.systemBackground,
+        foregroundColor: CupertinoColors.label,
+        toolbarHeight: 44, // コンパクトな高さ
+      ) : null,
       body: Column(
               children: [
                 Expanded(

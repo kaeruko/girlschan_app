@@ -1,6 +1,10 @@
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'comment_post_webview.dart';
 import '../services/cache_service.dart';
+import '../utils/platform_helper.dart';
 
 class CommentComposePage extends StatefulWidget {
   final int topicId;
@@ -94,6 +98,32 @@ class _CommentComposePageState extends State<CommentComposePage> {
   Future<void> _goToConfirm() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty || _posting) return;
+
+    if (PlatformHelper.isDesktop) {
+      try {
+        final html = buildConfirmPostHtml(
+          topicId: widget.topicId,
+          text: text,
+        );
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File('${tempDir.path}/gc_post_${widget.topicId}_${DateTime.now().millisecondsSinceEpoch}.html');
+        await tempFile.writeAsString(html);
+
+        final url = Uri.file(tempFile.path);
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url);
+          // Clear draft since user opted to post in browser
+          await CacheService.deleteDraft(widget.topicId);
+          if (mounted) {
+            setState(() => _canPop = true);
+            Navigator.of(context).pop(text);
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to launch desktop browser post: $e');
+      }
+      return;
+    }
 
     setState(() => _posting = true);
 

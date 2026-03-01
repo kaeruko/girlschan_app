@@ -37,6 +37,7 @@ dependencies:
   # 可変高さリストの最適化
   super_sliver_list: ^0.4.1
   cached_network_image: ^3.4.1
+  msix: ^3.16.12
 
 dev_dependencies:
   flutter_test:
