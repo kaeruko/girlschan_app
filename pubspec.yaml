@@ -78,5 +78,8 @@ msix_config:
   publisher_display_name: "横田里奈子"
   certificate_path: "C:\\Users\\mail\\Downloads\\code_sign_certificate.pfx"
   certificate_password: "password1234"
-  logo_path: "icons\\icon.png"
+  logo_path: "C:\\Users\\mail\\work\\girlschan_app\\icons\\icon.png"
+  store_logo_path: "C:\\Users\\mail\\work\\girlschan_app\\icons\\icon.png"
+  start_menu_icon_path: "C:\\Users\\mail\\work\\girlschan_app\\icons\\icon.png"
+  tile_icon_path: "C:\\Users\\mail\\work\\girlschan_app\\icons\\icon.png"
 

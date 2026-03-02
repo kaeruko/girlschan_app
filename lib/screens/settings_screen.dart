@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 import '../services/settings_service.dart';
 import '../widgets/common/app_toast.dart';
 import '../services/data_backup_service.dart';
+import '../utils/platform_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -198,6 +200,29 @@ class SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+
+            // --- アプリケーション ---
+            CupertinoListSection.insetGrouped(
+              header: const Text('アプリケーション'),
+              children: [
+                CupertinoListTile(
+                  title: const Text(
+                    'アプリを終了',
+                    style: TextStyle(color: CupertinoColors.destructiveRed),
+                  ),
+                  leading: const Icon(
+                    CupertinoIcons.square_arrow_right,
+                    color: CupertinoColors.destructiveRed,
+                  ),
+                  onTap: () async {
+                    if (PlatformHelper.isDesktop) {
+                      await windowManager.close();
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
