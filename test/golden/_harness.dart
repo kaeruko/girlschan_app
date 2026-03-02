@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 
@@ -31,6 +33,13 @@ class _NoGlowScrollBehavior extends CupertinoScrollBehavior {
       child;
 }
 
+Future<void> _loadTestFonts() async {
+  final fontLoader = FontLoader('NotoSansCJKjp');
+  final bytes = File('assets/fonts/NotoSansCJKjp-VF.ttf').readAsBytesSync();
+  fontLoader.addFont(Future.value(bytes.buffer.asByteData()));
+  await fontLoader.load();
+}
+
 /// ゴールデンテスト用の pumpGolden 関数
 /// フォント読み込み、有限回のポンプで安定化
 Future<void> pumpGolden(
@@ -38,7 +47,7 @@ Future<void> pumpGolden(
   Widget widget, {
   Size size = const Size(390, 844), // iPhone 系デフォ
 }) async {
-  await loadAppFonts();
+  await _loadTestFonts();
   await tester.pumpWidgetBuilder(
     appShell(widget),
     surfaceSize: size,
