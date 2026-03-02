@@ -77,6 +77,14 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
       });
       // ignore: discarded_futures
       refreshCacheState();
+    } else {
+      // 同じIDでもコメント数等のデータが変わった場合はキャッシュを再取得
+      final oldComments = '${oldWidget.topic['comments']}';
+      final newComments = '${widget.topic['comments']}';
+      if (oldComments != newComments) {
+        // ignore: discarded_futures
+        refreshCacheState();
+      }
     }
   }
 

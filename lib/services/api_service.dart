@@ -174,6 +174,8 @@ Future<bool> updateWatchedTopicFromMeta(Map<String, dynamic> meta) async {
           fetchedAt: drift.Value(DateTime.now()),
         )
       );
+      // 履歴更新を通知
+      historyUpdateNotifier.value++;
       return true;
     }
   }
@@ -320,6 +322,9 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
         fetchedAt: drift.Value(DateTime.now()),
       )
     );
+    
+    // 履歴更新を通知して UI をリロード（コメント数が変わるため）
+    historyUpdateNotifier.value++;
     
     return {
       'comments': comments,
