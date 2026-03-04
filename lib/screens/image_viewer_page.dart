@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import '../services/window_notifier.dart';
+import '../utils/platform_helper.dart';
 
 class ImageViewerPage extends StatelessWidget {
   final String url;
@@ -6,7 +8,8 @@ class ImageViewerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
+    final topPadding = PlatformHelper.isMacOS ? captionHeightNotifier.value : 0.0;
+    final scaffold = CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
       navigationBar: CupertinoNavigationBar(
         backgroundColor: CupertinoColors.black.withValues(alpha: 0.6),
@@ -34,6 +37,13 @@ class ImageViewerPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (topPadding <= 0) return scaffold;
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        padding: MediaQuery.of(context).padding.copyWith(top: topPadding),
+      ),
+      child: scaffold,
     );
   }
 }

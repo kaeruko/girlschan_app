@@ -281,7 +281,7 @@ class TopicListScreenState extends State<TopicListScreen>
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        body: const Center(child: AppSpinner(size: 20)),
+        body: const Center(child: AppSpinner(size: 32, showLabel: true)),
       );
     }
 

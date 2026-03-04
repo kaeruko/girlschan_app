@@ -40,6 +40,7 @@ class _WindowsShellState extends State<WindowsShell> {
   late final List<_SectionNavItem> _sectionItems;
   late String _selectedSectionId;
   final Map<String, GlobalKey<NavigatorState>> _sectionNavKeys = {};
+  double _leftPaneWidth = 350.0;
 
   // ★ 選択状態を管理
   final _selectionController = SelectionController();
@@ -199,7 +200,7 @@ class _WindowsShellState extends State<WindowsShell> {
                     children: [
                       // 【左】トピック一覧（タブの中身）
                       SizedBox(
-                        width: 350, // 幅は350に戻す
+                        width: _leftPaneWidth,
                         child: IndexedStack(
                           index: _selectedSectionIndex,
                           children: [
@@ -208,9 +209,9 @@ class _WindowsShellState extends State<WindowsShell> {
                           ],
                         ),
                       ),
-  
-                      // 縦の区切り線
-                      const VerticalDivider(width: 1),
+
+                      // ドラッグ可能な縦の区切り線
+                      _buildResizableDivider(),
   
                       // 【右】詳細エリア（選択状態に応じて中身が変わる） + 履歴パネル
                       Expanded(
@@ -387,6 +388,26 @@ class _WindowsShellState extends State<WindowsShell> {
   int get _selectedSectionIndex {
     final index = _sectionItems.indexWhere((item) => item.id == _selectedSectionId);
     return index >= 0 ? index : 0;
+  }
+
+  Widget _buildResizableDivider() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragUpdate: (details) {
+          setState(() {
+            _leftPaneWidth = (_leftPaneWidth + details.delta.dx).clamp(200.0, 600.0);
+          });
+        },
+        child: SizedBox(
+          width: 8,
+          child: Center(
+            child: Container(width: 1, color: CupertinoColors.separator),
+          ),
+        ),
+      ),
+    );
   }
 
   // ★ 新しいメニューバー風の横並びナビゲーション

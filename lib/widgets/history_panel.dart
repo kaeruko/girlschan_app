@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../services/history_notifier.dart';
+import '../services/settings_service.dart';
 import 'topic_tile.dart';
 import 'topic_tile_controller.dart';
 
@@ -17,19 +18,26 @@ class _HistoryPanelState extends State<HistoryPanel> {
   List<Map<String, dynamic>> _watchedTopics = [];
   bool _loading = true;
   final _tileController = TopicTileController();
+  final _settings = SettingsService();
 
   @override
   void initState() {
     super.initState();
     _loadWatchedTopics();
     historyUpdateNotifier.addListener(_loadWatchedTopics);
+    _settings.addListener(_onSettingsChanged);
   }
 
   @override
   void dispose() {
     historyUpdateNotifier.removeListener(_loadWatchedTopics);
+    _settings.removeListener(_onSettingsChanged);
     _tileController.clear();
     super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadWatchedTopics() async {
@@ -69,9 +77,9 @@ class _HistoryPanelState extends State<HistoryPanel> {
       constraints: const BoxConstraints(
         maxHeight: 200, // パネルの最大高さ
       ),
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        border: Border(
+      decoration: BoxDecoration(
+        color: _settings.backgroundColor,
+        border: const Border(
           bottom: BorderSide(color: CupertinoColors.systemGrey4, width: 1.0),
         ),
       ),

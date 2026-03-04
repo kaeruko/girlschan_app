@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../services/webview_env.dart';
+import '../services/window_notifier.dart';
 import '../utils/log.dart';
+import '../utils/platform_helper.dart';
 
 typedef PostCompleted = void Function(); // 戻った側で再読込する用
 
@@ -228,7 +230,7 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
           Navigator.of(context).pop();
         }
       },
-      child: CupertinoPageScaffold(
+      child: _wrapWithCaptionPadding(context, CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
           middle: Text('コメント投稿 - ${widget.title}'),
           previousPageTitle: '戻る',
@@ -260,7 +262,18 @@ class _CommentPostWebViewState extends State<CommentPostWebView> {
             ],
           ),
         ),
+      )),
+    );
+  }
+
+  Widget _wrapWithCaptionPadding(BuildContext context, Widget child) {
+    final topPadding = PlatformHelper.isMacOS ? captionHeightNotifier.value : 0.0;
+    if (topPadding <= 0) return child;
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        padding: MediaQuery.of(context).padding.copyWith(top: topPadding),
       ),
+      child: child,
     );
   }
 

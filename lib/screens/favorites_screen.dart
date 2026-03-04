@@ -265,7 +265,7 @@ class FavoritesScreenState extends State<FavoritesScreen>
       child: SafeArea(
         bottom: false, // タブバーと被らないように
         child: _loading
-            ? const Center(child: AppSpinner(size: 20))
+            ? const Center(child: AppSpinner(size: 32, showLabel: true))
             : _watchedTopics.isEmpty
                 ? Center(
                     child: Column(

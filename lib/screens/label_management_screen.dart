@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'; // For Colors
 import '../services/api_service.dart';
+import '../services/window_notifier.dart';
+import '../utils/platform_helper.dart';
 import '../widgets/common/app_toast.dart';
 
 class LabelManagementScreen extends StatefulWidget {
@@ -155,7 +157,8 @@ class _LabelManagementScreenState extends State<LabelManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
+    final topPadding = PlatformHelper.isMacOS ? captionHeightNotifier.value : 0.0;
+    final scaffold = CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('ラベル管理'),
         trailing: CupertinoButton(
@@ -229,6 +232,13 @@ class _LabelManagementScreenState extends State<LabelManagementScreen> {
                 },
               ),
       ),
+    );
+    if (topPadding <= 0) return scaffold;
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        padding: MediaQuery.of(context).padding.copyWith(top: topPadding),
+      ),
+      child: scaffold,
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'comment_post_webview.dart';
 import '../services/cache_service.dart';
 import '../utils/platform_helper.dart';
+import '../services/window_notifier.dart';
 import '../models/comment.dart';
 
 class CommentComposePage extends StatefulWidget {
@@ -185,7 +186,7 @@ class _CommentComposePageState extends State<CommentComposePage> {
           nav.pop();
         }
       },
-      child: CupertinoPageScaffold(
+      child: _wrapWithCaptionPadding(context, CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
           middle: const Text('コメント入力'),
           previousPageTitle: '戻る',
@@ -282,7 +283,18 @@ class _CommentComposePageState extends State<CommentComposePage> {
             ),
           ),
         ),
+      )),
+    );
+  }
+
+  Widget _wrapWithCaptionPadding(BuildContext context, Widget child) {
+    final topPadding = PlatformHelper.isMacOS ? captionHeightNotifier.value : 0.0;
+    if (topPadding <= 0) return child;
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        padding: MediaQuery.of(context).padding.copyWith(top: topPadding),
       ),
+      child: child,
     );
   }
 }

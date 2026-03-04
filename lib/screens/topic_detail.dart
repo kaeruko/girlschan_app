@@ -22,6 +22,7 @@ import '../widgets/comment_tile.dart';
 import '../widgets/anchor_preview_sheet.dart';
 import '../widgets/topic_menu_sheet.dart';
 import '../services/settings_service.dart';
+import '../widgets/common/app_spinner.dart';
 
 // フィルタレベルの定義
 enum CommentFilterLevel {
@@ -1016,7 +1017,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
 
   Widget _buildMainContent(List<Comment> items, Widget pageView) {
     if (_vm.loading) {
-      return Center(child: PlatformHelper.buildLoadingIndicator());
+      return const Center(child: AppSpinner(size: 32, showLabel: true));
     }
     if (items.isEmpty) {
       return Center(

@@ -12,6 +12,8 @@ import '../controllers/selection_controller.dart'; // ★追加
 import '../controllers/topic_detail_shortcut_controller.dart';
 import '../utils/platform_helper.dart';
 import '../utils/log.dart'; // ★追加
+import '../services/window_notifier.dart';
+import '../widgets/history_panel.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -34,12 +36,12 @@ class _SectionNavItem {
 }
 
 class _MacShellState extends State<MacShell> {
-  static const double _compactBreakpoint = 1000;
   late final Map<String, TabSpec> _tabsById;
   late final List<_SectionNavItem> _sectionItems;
   late String _selectedSectionId;
   final Map<String, GlobalKey<NavigatorState>> _sectionNavKeys = {};
   double _captionHeight = 28.0;
+  double _leftPaneWidth = 350.0;
 
   // ★ 選択状態を管理
   final _selectionController = SelectionController();
@@ -64,7 +66,9 @@ class _MacShellState extends State<MacShell> {
       final h = await windowManager.getTitleBarHeight();
       if (!mounted) return;
       if (h != null && h > 0) {
-        setState(() => _captionHeight = h.toDouble());
+        final height = h.toDouble();
+        captionHeightNotifier.value = height;
+        setState(() => _captionHeight = height);
       }
     } catch (_) {
       // 取得できない環境では fallback の 28.0 を使う
@@ -149,7 +153,9 @@ class _MacShellState extends State<MacShell> {
   @override
   Widget build(BuildContext context) {
     // ★ InkWell を反応させるため、全体を Material でラップ
-    return PlatformMenuBar(
+    // ★ ScaffoldMessenger を提供（CupertinoApp は提供しないため）
+    return ScaffoldMessenger(
+      child: PlatformMenuBar(
       menus: [
         PlatformMenu(
           label: 'View',
@@ -178,9 +184,6 @@ class _MacShellState extends State<MacShell> {
         type: MaterialType.transparency, // 背景色を変えずにMaterial機能だけ提供
         child: CallbackShortcuts(
           bindings: {
-            // CallbackShortcuts はフォーカスがある時用として残しておくが、
-            // PlatformMenuBar があればそちらが優先されるはず。
-            // ログを入れておく
             const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
               logd('⌨️ [MacShell] CallbackShortcuts Cmd+R pressed (might be redundant)');
               _refreshCurrentSection();
@@ -189,7 +192,6 @@ class _MacShellState extends State<MacShell> {
               logd('⌨️ [MacShell] CallbackShortcuts F5 pressed (might be redundant)');
               _refreshCurrentSection();
             },
-            // 検索・ヒット移動・未読移動・ジャンプ
             const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
               _topicDetailShortcuts.focusSearch?.call();
             },
@@ -208,33 +210,27 @@ class _MacShellState extends State<MacShell> {
             const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): () {
               _topicDetailShortcuts.jumpToComment?.call();
             },
-            // スペースキーで下スクロール（ブラウザ風）
             const SingleActivator(LogicalKeyboardKey.space): () {
-              _topicDetailShortcuts.scrollDown?.call();
+              if (!_isTextInputFocused()) _topicDetailShortcuts.scrollDown?.call();
             },
-            // Shift+スペースキーで上スクロール
             const SingleActivator(LogicalKeyboardKey.space, shift: true): () {
-              _topicDetailShortcuts.scrollUp?.call();
+              if (!_isTextInputFocused()) _topicDetailShortcuts.scrollUp?.call();
             },
-            // Esc で戻る（詳細画面を開いている時など）
             const SingleActivator(LogicalKeyboardKey.escape): () {
-              // 3ペインの場合、Escで選択解除などが考えられるが、
-              // とりあえず既存のNavigatorがあればpopする
               final nav = _sectionNavKeys[_selectedSectionId]?.currentState;
               if (nav != null && nav.canPop()) {
                 nav.pop();
               } else {
-                // 選択解除
                 _selectionController.clearSelection();
               }
             },
           },
           child: Focus(
-            autofocus: true, // キーイベントを受け取るために必要
-            // スペースキーはフォーカスが子に移っても処理するため onKeyEvent で直接ハンドル
+            autofocus: true,
             onKeyEvent: (node, event) {
               if (event is KeyDownEvent) {
                 if (event.logicalKey == LogicalKeyboardKey.space) {
+                  if (_isTextInputFocused()) return KeyEventResult.ignored;
                   if (HardwareKeyboard.instance.isShiftPressed) {
                     _topicDetailShortcuts.scrollUp?.call();
                   } else {
@@ -245,27 +241,21 @@ class _MacShellState extends State<MacShell> {
               }
               return KeyEventResult.ignored;
             },
-            child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
+            child: Scaffold(
               body: Column(
               children: [
                 // ネイティブ信号下のスペーサ
                 SizedBox(height: _captionHeight),
-                // 本体：3ペイン構成
+                // メニューバー
+                _buildMenuBar(),
+                const Divider(height: 1),
+                // 本体：2ペイン構成
                 Expanded(
                   child: Row(
                     children: [
-                      // 【左】セクションナビ
+                      // 【左】トピック一覧（タブの中身）
                       SizedBox(
-                        width: 220,
-                        child: _buildSectionNav(),
-                      ),
-                      
-                      // 縦の区切り線
-                      const VerticalDivider(width: 1),
-  
-                      // 【中】トピック一覧（タブの中身）
-                      SizedBox(
-                        width: 350,
+                        width: _leftPaneWidth,
                         child: IndexedStack(
                           index: _selectedSectionIndex,
                           children: [
@@ -274,50 +264,64 @@ class _MacShellState extends State<MacShell> {
                           ],
                         ),
                       ),
-  
-                      // 縦の区切り線
-                      const VerticalDivider(width: 1),
-  
-                      // 【右】詳細エリア（選択状態に応じて中身が変わる）
+
+                      // ドラッグ可能な縦の区切り線
+                      _buildResizableDivider(),
+
+                      // 【右】履歴パネル＋詳細エリア
                       Expanded(
-                        child: AnimatedBuilder(
-                          animation: _selectionController,
-                          builder: (context, _) {
-                            final selectedId = _selectionController.selectedTopicId;
-                            
-                            if (selectedId == null) {
-                              // 何も選ばれていない時
-                              return const Center(
-                                child: Text(
-                                  "トピックを選択してください",
-                                  style: TextStyle(color: CupertinoColors.systemGrey),
-                                ),
-                              );
-                            }
-  
-                            // 選ばれていれば詳細画面を埋め込む
-                            return PlatformHelper.isDesktop
-                                ? TopicDetailPane(
-                                    key: ValueKey(selectedId), // IDが変わったら作り直す
-                                    topicId: selectedId,
-                                    title: _selectionController.title,
-                                    commentCount: _selectionController.commentCount,
-                                    postedAt: _selectionController.postedAt,
-                                    enableRefresh: true,
-                                    saveReadPosition: true,
-                                    shortcutController: _topicDetailShortcuts,
-                                  )
-                                : TopicDetailScreen(
-                                    key: ValueKey(selectedId), // IDが変わったら作り直す
-                                    topicId: selectedId,
-                                    title: _selectionController.title,
-                                    commentCount: _selectionController.commentCount,
-                                    postedAt: _selectionController.postedAt,
-                                    enableRefresh: true,
-                                    saveReadPosition: true,
-                                    shortcutController: _topicDetailShortcuts,
-                                  );
-                          },
+                        child: Column(
+                          children: [
+                            HistoryPanel(
+                              onTopicTap: (id, title, comments, postedAt) {
+                                _selectionController.selectTopic(
+                                  id,
+                                  title: title,
+                                  comments: comments,
+                                  postedAt: postedAt,
+                                );
+                              },
+                            ),
+                            Expanded(
+                              child: AnimatedBuilder(
+                                animation: _selectionController,
+                                builder: (context, _) {
+                                  final selectedId = _selectionController.selectedTopicId;
+
+                                  if (selectedId == null) {
+                                    return const Center(
+                                      child: Text(
+                                        "トピックを選択してください",
+                                        style: TextStyle(color: CupertinoColors.systemGrey),
+                                      ),
+                                    );
+                                  }
+
+                                  return PlatformHelper.isDesktop
+                                      ? TopicDetailPane(
+                                          key: ValueKey(selectedId),
+                                          topicId: selectedId,
+                                          title: _selectionController.title,
+                                          commentCount: _selectionController.commentCount,
+                                          postedAt: _selectionController.postedAt,
+                                          enableRefresh: true,
+                                          saveReadPosition: true,
+                                          shortcutController: _topicDetailShortcuts,
+                                        )
+                                      : TopicDetailScreen(
+                                          key: ValueKey(selectedId),
+                                          topicId: selectedId,
+                                          title: _selectionController.title,
+                                          commentCount: _selectionController.commentCount,
+                                          postedAt: _selectionController.postedAt,
+                                          enableRefresh: true,
+                                          saveReadPosition: true,
+                                          shortcutController: _topicDetailShortcuts,
+                                        );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -328,6 +332,68 @@ class _MacShellState extends State<MacShell> {
           ),
         ),
       ),
+      ),
+      ), // ScaffoldMessenger
+    );
+  }
+
+  Widget _buildResizableDivider() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragUpdate: (details) {
+          setState(() {
+            _leftPaneWidth = (_leftPaneWidth + details.delta.dx).clamp(200.0, 600.0);
+          });
+        },
+        child: SizedBox(
+          width: 8,
+          child: Center(
+            child: Container(width: 1, color: CupertinoColors.separator),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// テキスト入力フィールドにフォーカスがある場合 true を返す
+  /// （IME変換中のスペースキーをスクロールに横取りしないため）
+  bool _isTextInputFocused() {
+    final focus = FocusManager.instance.primaryFocus;
+    return focus?.context?.widget is EditableText;
+  }
+
+  Widget _buildMenuBar() {
+    return Container(
+      color: CupertinoColors.systemBackground,
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          for (final item in _sectionItems)
+            _buildMenuBarItem(item),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuBarItem(_SectionNavItem item) {
+    final isSelected = item.id == _selectedSectionId;
+    final textColor = isSelected ? CupertinoColors.activeBlue : CupertinoColors.label;
+
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      minSize: 0,
+      onPressed: () => _onSectionSelected(item.id),
+      child: Text(
+        item.label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: textColor,
+        ),
       ),
     );
   }
@@ -437,57 +503,4 @@ class _MacShellState extends State<MacShell> {
     return index >= 0 ? index : 0;
   }
 
-  Widget _buildSectionNav() {
-    return Container(
-      color: CupertinoColors.systemGrey6,
-      child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-        children: [
-          for (final item in _sectionItems)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: _buildSectionNavItem(item),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionNavItem(_SectionNavItem item) {
-    final isSelected = item.id == _selectedSectionId;
-    final textColor = isSelected ? CupertinoColors.systemPink : CupertinoColors.label;
-    final iconColor = isSelected ? CupertinoColors.systemPink : CupertinoColors.secondaryLabel;
-
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: () {
-        _onSectionSelected(item.id);
-        final scaffold = Scaffold.maybeOf(context);
-        if (scaffold != null && scaffold.isDrawerOpen) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected ? CupertinoColors.systemGrey4 : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(item.icon, size: 18, color: iconColor),
-            const SizedBox(width: 10),
-            Text(
-              item.label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: textColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

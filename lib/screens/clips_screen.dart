@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../services/history_notifier.dart';
 import '../services/settings_service.dart';
 import '../screens/topic_detail.dart';
 import '../widgets/common/app_spinner.dart';
@@ -57,6 +58,7 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _settings.addListener(_onSettingsChanged);
+    clipsUpdateNotifier.addListener(_loadClips);
     _loadClips();
   }
 
@@ -64,6 +66,7 @@ class ClipsScreenState extends State<ClipsScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _settings.removeListener(_onSettingsChanged);
+    clipsUpdateNotifier.removeListener(_loadClips);
     _scrollController.dispose();
     super.dispose();
   }
@@ -485,6 +488,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
     final filteredClips = _clips.where((c) => (c['labelId'] ?? 0) == _selectedLabelId).toList();
 
     return CupertinoPageScaffold(
+      backgroundColor: _settings.backgroundColor,
       navigationBar: CupertinoNavigationBar(
         middle: const Text('クリップ'),
         transitionBetweenRoutes: false, // エラー回避のため明示的に設定
@@ -525,7 +529,7 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
       child: SafeArea(
         bottom: false,
         child: _loading
-            ? const Center(child: AppSpinner(size: 20))
+            ? const Center(child: AppSpinner(size: 32, showLabel: true))
             : CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 controller: _scrollController,

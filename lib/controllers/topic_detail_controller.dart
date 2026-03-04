@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../services/history_notifier.dart';
 import '../models/comment.dart';
 // 既存の watch/clip ユーティリティを import
 import '../utils/log.dart';
@@ -551,6 +552,7 @@ class TopicDetailController extends ChangeNotifier {
       );
       _clipStatusMap[no] = labelId;
     }
+    clipsUpdateNotifier.value++;
     notifyListeners();
   }
 

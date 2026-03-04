@@ -35,12 +35,14 @@ void main() async {
     AppConfig.apiBase = 'https://d1d4vb4xomterw.cloudfront.net';
   }
 
-  // 📱 モバイル広告SDK初期化（デスクトップでは自動的にスキップされる）
-  try {
-    await MobileAds.instance.initialize();
-    logd('✅ 広告SDK初期化完了');
-  } catch (e) {
-    logd('⚠️ 広告SDK初期化スキップ: $e');
+  // 📱 モバイル広告SDK初期化（iOS/Android のみ）
+  if (PlatformHelper.isMobile) {
+    try {
+      await MobileAds.instance.initialize();
+      logd('✅ 広告SDK初期化完了');
+    } catch (e) {
+      logd('⚠️ 広告SDK初期化スキップ: $e');
+    }
   }
 
   runApp(const GirlsChanApp());
