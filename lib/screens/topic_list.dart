@@ -291,11 +291,17 @@ class TopicListScreenState extends State<TopicListScreen>
       appBar: PlatformHelper.isDesktop ? AppBar(
         title: Text(widget.sortOrder == 'new' ? '新着トピック' : '人気トピック', style: const TextStyle(fontSize: 16)),
         actions: [
-          IconButton(
-            icon: const Icon(CupertinoIcons.refresh),
-            tooltip: '更新',
-            onPressed: fetchFromServer,
-          ),
+          if (_fetching)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Center(child: AppSpinner(size: 18)),
+            )
+          else
+            IconButton(
+              icon: const Icon(CupertinoIcons.refresh),
+              tooltip: '更新',
+              onPressed: fetchFromServer,
+            ),
           const SizedBox(width: 8),
         ],
         elevation: 1,
