@@ -263,7 +263,10 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
     _settings.removeListener(_onSettingsChanged);
-    widget.shortcutController?.clear();
+    // clear() はここでは呼ばない。
+    // 同一フレーム内で新トピックの initState() → bind() の後に旧トピックの dispose() が走るため、
+    // clear() するとせっかくバインドされたコールバックが消えてしまう。
+    // 詳細ペインが閉じた後にコールバックが呼ばれても sc.hasClients == false で早期リターンするので安全。
     super.dispose();
   }
 

@@ -244,7 +244,6 @@ class _CommentComposePageState extends State<CommentComposePage> {
                         color: CupertinoColors.systemGrey4,
                       ),
                     ),
-                    constraints: const BoxConstraints(maxHeight: 120),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
