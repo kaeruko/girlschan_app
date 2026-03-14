@@ -10,6 +10,8 @@ class TopicDetailShortcutController {
   VoidCallback? refresh;
   VoidCallback? scrollDown;
   VoidCallback? scrollUp;
+  VoidCallback? scrollDownStep;
+  VoidCallback? scrollUpStep;
 
   void bind({
     required VoidCallback focusSearch,
@@ -21,6 +23,8 @@ class TopicDetailShortcutController {
     VoidCallback? refresh,
     VoidCallback? scrollDown,
     VoidCallback? scrollUp,
+    VoidCallback? scrollDownStep,
+    VoidCallback? scrollUpStep,
   }) {
     this.focusSearch = focusSearch;
     this.nextHit = nextHit;
@@ -31,6 +35,8 @@ class TopicDetailShortcutController {
     this.refresh = refresh;
     this.scrollDown = scrollDown;
     this.scrollUp = scrollUp;
+    this.scrollDownStep = scrollDownStep;
+    this.scrollUpStep = scrollUpStep;
   }
 
   void clear() {
@@ -43,5 +49,7 @@ class TopicDetailShortcutController {
     refresh = null;
     scrollDown = null;
     scrollUp = null;
+    scrollDownStep = null;
+    scrollUpStep = null;
   }
 }

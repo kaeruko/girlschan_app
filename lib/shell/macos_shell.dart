@@ -177,6 +177,14 @@ class _MacShellState extends State<MacShell> {
                 _refreshCurrentSection();
               },
             ),
+            PlatformMenuItem(
+              label: 'Quit',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyQ, meta: true),
+              onSelected: () {
+                logd('⌨️ [MacShell] PlatformMenuBar Cmd+Q selected');
+                windowManager.close();
+              },
+            ),
           ],
         ),
       ],
@@ -187,6 +195,10 @@ class _MacShellState extends State<MacShell> {
             const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
               logd('⌨️ [MacShell] CallbackShortcuts Cmd+R pressed (might be redundant)');
               _refreshCurrentSection();
+            },
+            const SingleActivator(LogicalKeyboardKey.keyQ, meta: true): () {
+              logd('⌨️ [MacShell] CallbackShortcuts Cmd+Q pressed');
+              windowManager.close();
             },
             const SingleActivator(LogicalKeyboardKey.f5): () {
               logd('⌨️ [MacShell] CallbackShortcuts F5 pressed (might be redundant)');
@@ -211,6 +223,7 @@ class _MacShellState extends State<MacShell> {
               _topicDetailShortcuts.jumpToComment?.call();
             },
             const SingleActivator(LogicalKeyboardKey.space): () {
+              logd('⌨️ [MacShell] CallbackShortcuts Space: scrollDown=${_topicDetailShortcuts.scrollDown != null}');
               if (!_isTextInputFocused()) _topicDetailShortcuts.scrollDown?.call();
             },
             const SingleActivator(LogicalKeyboardKey.space, shift: true): () {
@@ -230,6 +243,7 @@ class _MacShellState extends State<MacShell> {
             onKeyEvent: (node, event) {
               if (event is KeyDownEvent) {
                 if (event.logicalKey == LogicalKeyboardKey.space) {
+                  logd('⌨️ [MacShell] Focus.onKeyEvent Space: textFocused=${_isTextInputFocused()}, scrollDown=${_topicDetailShortcuts.scrollDown != null}');
                   if (_isTextInputFocused()) return KeyEventResult.ignored;
                   if (HardwareKeyboard.instance.isShiftPressed) {
                     _topicDetailShortcuts.scrollUp?.call();
@@ -237,6 +251,18 @@ class _MacShellState extends State<MacShell> {
                     _topicDetailShortcuts.scrollDown?.call();
                   }
                   return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                  if (!_isTextInputFocused() && _topicDetailShortcuts.scrollDownStep != null) {
+                    _topicDetailShortcuts.scrollDownStep!();
+                    return KeyEventResult.handled;
+                  }
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                  if (!_isTextInputFocused() && _topicDetailShortcuts.scrollUpStep != null) {
+                    _topicDetailShortcuts.scrollUpStep!();
+                    return KeyEventResult.handled;
+                  }
                 }
               }
               return KeyEventResult.ignored;

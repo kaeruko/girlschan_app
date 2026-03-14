@@ -150,6 +150,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   final PageController _pc = PageController();
   final Map<int, ScrollController> _pageScroll = {};
   final Map<int, VariableListMeasurer> _pageMeas = {};
+  final Map<int, double> _pageScrollOffsets = {}; // ページ内スクロール位置キャッシュ
   int _currentPage = 0;
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
@@ -294,12 +295,15 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       refresh: _fetchMoreDelta,
       scrollDown: _scrollDown,
       scrollUp: _scrollUp,
+      scrollDownStep: _scrollDownStep,
+      scrollUpStep: _scrollUpStep,
     );
   }
 
   /// スペースキーで画面1つ分下にスクロール
   void _scrollDown() {
     final sc = _scForPage(_currentPage);
+    logd('📜 [TopicDetail] _scrollDown: page=$_currentPage, hasClients=${sc.hasClients}');
     if (!sc.hasClients) return;
     final viewportHeight = sc.position.viewportDimension;
     final target = (sc.offset + viewportHeight * 0.9).clamp(0.0, sc.position.maxScrollExtent);
@@ -315,6 +319,23 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     sc.animateTo(target, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
   }
 
+  /// 矢印キーで小刻みに下スクロール
+  void _scrollDownStep() {
+    final sc = _scForPage(_currentPage);
+    logd('📜 [TopicDetail] _scrollDownStep: page=$_currentPage, hasClients=${sc.hasClients}');
+    if (!sc.hasClients) return;
+    final target = (sc.offset + 120.0).clamp(0.0, sc.position.maxScrollExtent);
+    sc.animateTo(target, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
+  }
+
+  /// 矢印キーで小刻みに上スクロール
+  void _scrollUpStep() {
+    final sc = _scForPage(_currentPage);
+    if (!sc.hasClients) return;
+    final target = (sc.offset - 120.0).clamp(0.0, sc.position.maxScrollExtent);
+    sc.animateTo(target, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
+  }
+
   // ========== ページング ==========
   int _pageCountFor(int total) => (total + _pageSize - 1) ~/ _pageSize;
 
@@ -327,6 +348,8 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   void _goToPage(int p) {
     final tgt = p.clamp(0, _pageCountLive > 0 ? _pageCountLive - 1 : 0);
     if (_pc.hasClients) {
+      final sc = _scForPage(_currentPage);
+      if (sc.hasClients) _pageScrollOffsets[_currentPage] = sc.offset;
       _saveFromPage(_currentPage);
       _pc.animateToPage(
         tgt,
@@ -430,6 +453,14 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       if (sc.hasClients && sc.position.hasPixels && sc.position.hasViewportDimension) return;
       await Future.delayed(const Duration(milliseconds: 16));
     }
+  }
+
+  Future<void> _restorePageOffset(int page, double offset) async {
+    final sc = _scForPage(page);
+    await _waitForAttach(sc);
+    if (!mounted) return;
+    final clamped = offset.clamp(0.0, sc.position.maxScrollExtent);
+    if (clamped > 0) sc.jumpTo(clamped);
   }
 
   Future<void> _waitForPageController() async {
@@ -1144,7 +1175,13 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       onPageChanged: (p) {
         _saveFromPage(_currentPage);
+        final savedOffset = _pageScrollOffsets[p];
         setState(() => _currentPage = p);
+        if (savedOffset != null && savedOffset > 0 && !_restoring) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _restorePageOffset(p, savedOffset);
+          });
+        }
       },
       itemCount: pageCount > 0 ? pageCount : 1,
       itemBuilder: (ctx, page) {

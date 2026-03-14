@@ -179,7 +179,7 @@ class TopicListScreenState extends State<TopicListScreen>
       // logd('⏳ [fetchFromServer] スキップ（既に実行中）', name: 'TopicList');
       return;
     }
-    _fetching = true;
+    if (mounted) setState(() => _fetching = true); // スピナーを即時表示
 
     try {
       // logd('🌐 [fetchFromServer] API呼び出し開始 (sortOrder=${widget.sortOrder}, cacheKey=$cacheKey)', name: 'TopicList');
@@ -227,7 +227,7 @@ class TopicListScreenState extends State<TopicListScreen>
         await AppToast.show(context, 'データの更新に失敗しました（キャッシュを使用）');
       }
     } finally {
-      _fetching = false; // ⭐ ロック解除
+      if (mounted) setState(() => _fetching = false); // ⭐ ロック解除 + UI更新
     }
   }
 

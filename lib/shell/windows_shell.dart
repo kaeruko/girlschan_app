@@ -148,6 +148,10 @@ class _WindowsShellState extends State<WindowsShell> {
               logd('⌨️ [WindowsShell] CallbackShortcuts Ctrl+R pressed');
               _refreshCurrentSection();
             },
+            const SingleActivator(LogicalKeyboardKey.keyQ, control: true): () {
+              logd('⌨️ [WindowsShell] CallbackShortcuts Ctrl+Q pressed');
+              windowManager.close();
+            },
             const SingleActivator(LogicalKeyboardKey.f5): () {
               logd('⌨️ [WindowsShell] CallbackShortcuts F5 pressed');
               _refreshCurrentSection();
@@ -185,7 +189,27 @@ class _WindowsShellState extends State<WindowsShell> {
             },
           },
           child: Focus(
-            autofocus: true, // キーイベントを受け取るために必要
+            autofocus: true,
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent && !_isTextInputFocused()) {
+                if (event.logicalKey == LogicalKeyboardKey.arrowDown &&
+                    _topicDetailShortcuts.scrollDownStep != null) {
+                  _topicDetailShortcuts.scrollDownStep!();
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowUp &&
+                    _topicDetailShortcuts.scrollUpStep != null) {
+                  _topicDetailShortcuts.scrollUpStep!();
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.space &&
+                    _topicDetailShortcuts.scrollDown != null) {
+                  _topicDetailShortcuts.scrollDown!();
+                  return KeyEventResult.handled;
+                }
+              }
+              return KeyEventResult.ignored;
+            },
             child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
               body: Column(
               children: [
@@ -388,6 +412,11 @@ class _WindowsShellState extends State<WindowsShell> {
   int get _selectedSectionIndex {
     final index = _sectionItems.indexWhere((item) => item.id == _selectedSectionId);
     return index >= 0 ? index : 0;
+  }
+
+  bool _isTextInputFocused() {
+    final focus = FocusManager.instance.primaryFocus;
+    return focus?.context?.widget is EditableText;
   }
 
   Widget _buildResizableDivider() {
