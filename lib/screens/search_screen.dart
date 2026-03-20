@@ -12,11 +12,13 @@ import '../widgets/topic_tile_controller.dart';
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
   final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicNewTabTap;
 
   const SearchScreen({
     super.key,
     this.initialQuery,
     this.onTopicTap,
+    this.onTopicNewTabTap,
   });
 
   @override
@@ -177,7 +179,8 @@ class SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver 
         await CacheService.clear('comments_$id');
         await _controller.refreshAll();
       },
-      onTopicTap: widget.onTopicTap, // ★ここ
+      onTopicTap: widget.onTopicTap,
+      onTopicNewTabTap: widget.onTopicNewTabTap,
     );
   }
 

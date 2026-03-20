@@ -15,10 +15,12 @@ import 'label_management_screen.dart';
 
 class ClipsScreen extends StatefulWidget {
   final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicNewTabTap;
 
   const ClipsScreen({
     super.key,
     this.onTopicTap,
+    this.onTopicNewTabTap,
   });
 
   @override
@@ -654,6 +656,15 @@ Future<void> _backgroundUpdateThreads({int? targetLabelId}) async {
     return GestureDetector(
       onLongPress: () => _showClipMenu(clip),
       onTap: () {
+        // Cmd+クリック (macOS) / Ctrl+クリック (Windows) → 新規タブで開く
+        if (widget.onTopicNewTabTap != null) {
+          final isMeta = HardwareKeyboard.instance.isMetaPressed;
+          final isCtrl = HardwareKeyboard.instance.isControlPressed;
+          if (isMeta || isCtrl) {
+            widget.onTopicNewTabTap!(topicId, topicTitle, 0, posted_at);
+            return;
+          }
+        }
         if (widget.onTopicTap != null) {
           widget.onTopicTap!(topicId, topicTitle, 0, posted_at);
           return;

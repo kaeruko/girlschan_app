@@ -19,10 +19,14 @@ class TopicListScreen extends StatefulWidget {
   /// トピックタップ時のコールバック（3ペイン構成用）
   final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
 
+  /// 新規タブで開くコールバック（Cmd+クリック / 中クリック）
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicNewTabTap;
+
   const TopicListScreen({
     super.key,
     this.sortOrder = 'popular',
     this.onTopicTap,
+    this.onTopicNewTabTap,
   });
 
   @override
@@ -335,7 +339,8 @@ class TopicListScreenState extends State<TopicListScreen>
                             showThumb: true,                      // 一覧はサムネ表示
                             onRemove: _removeCommentsCache,        // ×でコメントキャッシュ削除
                             onAfterPop: () => _onAfterPopFromTile(idx, id),
-                            onTopicTap: widget.onTopicTap, // ★ 親から渡されたコールバックを設定
+                            onTopicTap: widget.onTopicTap,
+                            onTopicNewTabTap: widget.onTopicNewTabTap,
                           );
                         },
                       ),

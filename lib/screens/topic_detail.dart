@@ -22,6 +22,7 @@ import '../widgets/comment_tile.dart';
 import '../widgets/anchor_preview_sheet.dart';
 import '../widgets/topic_menu_sheet.dart';
 import '../services/settings_service.dart';
+import '../services/block_service.dart';
 import '../widgets/common/app_spinner.dart';
 
 // フィルタレベルの定義
@@ -183,12 +184,16 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   int? _highlightedCommentId;
   int? _returnToCommentNo; // 戻るボタン用の元の位置
 
+  // 非表示（通報済み）コメントID
+  Set<int> _blockedCommentIds = {};
+
   // フィルタリングされたコメントリストを取得するゲッター
   List<Comment> get _displayComments {
+    final base = _vm.comments.where((c) => !_blockedCommentIds.contains(c.id));
     if (_currentFilter == CommentFilterLevel.all) {
-      return _vm.comments;
+      return base.toList();
     }
-    return _vm.comments.where((c) {
+    return base.where((c) {
       if (c.plus == 0) return false; // 荒らし対策（プラス0は除外）
       switch (_currentFilter) {
         case CommentFilterLevel.positive:
@@ -249,6 +254,11 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     });
 
     _loadBannerAd();
+
+    BlockService.loadBlockedComments(widget.topicId).then((ids) {
+      if (!mounted) return;
+      setState(() => _blockedCommentIds = ids);
+    });
   }
 
   @override
@@ -1729,6 +1739,22 @@ class _TopicDetailViewState extends State<TopicDetailView> {
               _openPostDialog(initialText: '>>$no', repliedComment: c);
             },
             child: const Text('このコメントに返信'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.pop(context);
+              await BlockService.addBlockedComment(widget.topicId, no);
+              if (!mounted) return;
+              setState(() => _blockedCommentIds = {..._blockedCommentIds, no});
+              final url = Uri.parse(
+                'https://docs.google.com/forms/d/e/1FAIpQLSdD0bu4VxiA6ZR_ehbi-Gs9w_QanfGhjA7dnTjiVWdMqBZecA/viewform?usp=publish-editor',
+              );
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: const Text('通報して非表示にする'),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(

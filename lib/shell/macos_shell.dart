@@ -7,13 +7,14 @@ import '../screens/topic_detail.dart';
 import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
-import '../screens/search_screen.dart'; // ★追加
-import '../controllers/selection_controller.dart'; // ★追加
+import '../screens/search_screen.dart';
+import '../controllers/tabs_controller.dart';
 import '../controllers/topic_detail_shortcut_controller.dart';
 import '../utils/platform_helper.dart';
-import '../utils/log.dart'; // ★追加
+import '../utils/log.dart';
 import '../services/window_notifier.dart';
 import '../widgets/history_panel.dart';
+import '../widgets/topic_tab_bar.dart';
 
 class MacShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -43,9 +44,16 @@ class _MacShellState extends State<MacShell> {
   double _captionHeight = 28.0;
   double _leftPaneWidth = 350.0;
 
-  // ★ 選択状態を管理
-  final _selectionController = SelectionController();
-  final _topicDetailShortcuts = TopicDetailShortcutController();
+  // タブ管理
+  final _tabsController = TabsController();
+  final List<TopicDetailShortcutController> _tabShortcuts = [];
+  final _noopShortcuts = TopicDetailShortcutController();
+
+  TopicDetailShortcutController get _activeShortcuts {
+    final idx = _tabsController.activeIndex;
+    if (idx < 0 || idx >= _tabShortcuts.length) return _noopShortcuts;
+    return _tabShortcuts[idx];
+  }
 
   @override
   void initState() {
@@ -59,6 +67,15 @@ class _MacShellState extends State<MacShell> {
           .map((item) => MapEntry(item.id, GlobalKey<NavigatorState>())),
     );
     _loadCaptionHeight();
+  }
+
+  @override
+  void dispose() {
+    _tabsController.dispose();
+    for (final sc in _tabShortcuts) {
+      sc.clear();
+    }
+    super.dispose();
   }
 
   Future<void> _loadCaptionHeight() async {
@@ -115,10 +132,10 @@ class _MacShellState extends State<MacShell> {
 
   void _refreshCurrentSection() {
     logd('🔄 [MacShell] _refreshCurrentSection called');
-    // 詳細が開いている時は詳細をリロード
-    if (_selectionController.selectedTopicId != null) {
-      logd('🔄 [MacShell] detail is open (id=${_selectionController.selectedTopicId}), calling refresh callback');
-      _topicDetailShortcuts.refresh?.call();
+    // 詳細タブが開いている時は詳細をリロード
+    if (_tabsController.activeTab != null) {
+      logd('🔄 [MacShell] detail tab is open (id=${_tabsController.activeTab!.topicId}), calling refresh callback');
+      _activeShortcuts.refresh?.call();
       return;
     }
 
@@ -150,10 +167,41 @@ class _MacShellState extends State<MacShell> {
     }
   }
 
+  void _openInCurrent(int id, String title, int comments, String postedAt) {
+    final tab = TopicTab(
+      topicId: id,
+      title: title,
+      commentCount: comments,
+      postedAt: postedAt,
+    );
+    final wasEmpty = _tabsController.tabs.isEmpty;
+    _tabsController.openInCurrent(tab);
+    if (wasEmpty) {
+      _tabShortcuts.add(TopicDetailShortcutController());
+    }
+  }
+
+  void _openInNew(int id, String title, int comments, String postedAt) {
+    if (_tabsController.tabs.length >= TabsController.maxTabs) return;
+    final tab = TopicTab(
+      topicId: id,
+      title: title,
+      commentCount: comments,
+      postedAt: postedAt,
+    );
+    _tabShortcuts.add(TopicDetailShortcutController());
+    _tabsController.openInNew(tab);
+  }
+
+  void _closeTab(int index) {
+    if (index < 0 || index >= _tabShortcuts.length) return;
+    _tabShortcuts[index].clear();
+    _tabShortcuts.removeAt(index);
+    _tabsController.closeTab(index);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ★ InkWell を反応させるため、全体を Material でラップ
-    // ★ ScaffoldMessenger を提供（CupertinoApp は提供しないため）
     return ScaffoldMessenger(
       child: PlatformMenuBar(
       menus: [
@@ -164,16 +212,15 @@ class _MacShellState extends State<MacShell> {
               label: 'Reload',
               shortcut: const SingleActivator(LogicalKeyboardKey.keyR, meta: true),
               onSelected: () {
-                 logd('⌨️ [MacShell] PlatformMenuBar Cmd+R selected');
+                logd('⌨️ [MacShell] PlatformMenuBar Cmd+R selected');
                 _refreshCurrentSection();
               },
             ),
-            // F5もサポートする場合（メニューには出ないかもしれないがショートカットとして）
-             PlatformMenuItem(
+            PlatformMenuItem(
               label: 'Reload (F5)',
               shortcut: const SingleActivator(LogicalKeyboardKey.f5),
               onSelected: () {
-                 logd('⌨️ [MacShell] PlatformMenuBar F5 selected');
+                logd('⌨️ [MacShell] PlatformMenuBar F5 selected');
                 _refreshCurrentSection();
               },
             ),
@@ -189,11 +236,11 @@ class _MacShellState extends State<MacShell> {
         ),
       ],
       child: Material(
-        type: MaterialType.transparency, // 背景色を変えずにMaterial機能だけ提供
+        type: MaterialType.transparency,
         child: CallbackShortcuts(
           bindings: {
             const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
-              logd('⌨️ [MacShell] CallbackShortcuts Cmd+R pressed (might be redundant)');
+              logd('⌨️ [MacShell] CallbackShortcuts Cmd+R pressed');
               _refreshCurrentSection();
             },
             const SingleActivator(LogicalKeyboardKey.keyQ, meta: true): () {
@@ -201,40 +248,44 @@ class _MacShellState extends State<MacShell> {
               windowManager.close();
             },
             const SingleActivator(LogicalKeyboardKey.f5): () {
-              logd('⌨️ [MacShell] CallbackShortcuts F5 pressed (might be redundant)');
+              logd('⌨️ [MacShell] CallbackShortcuts F5 pressed');
               _refreshCurrentSection();
             },
             const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
-              _topicDetailShortcuts.focusSearch?.call();
+              _activeShortcuts.focusSearch?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () {
-              _topicDetailShortcuts.nextHit?.call();
+              _activeShortcuts.nextHit?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyG, meta: true, shift: true): () {
-              _topicDetailShortcuts.prevHit?.call();
+              _activeShortcuts.prevHit?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyN, meta: true, shift: true): () {
-              _topicDetailShortcuts.nextUnread?.call();
+              _activeShortcuts.nextUnread?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyP, meta: true, shift: true): () {
-              _topicDetailShortcuts.prevUnread?.call();
+              _activeShortcuts.prevUnread?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyJ, meta: true): () {
-              _topicDetailShortcuts.jumpToComment?.call();
+              _activeShortcuts.jumpToComment?.call();
             },
             const SingleActivator(LogicalKeyboardKey.space): () {
-              logd('⌨️ [MacShell] CallbackShortcuts Space: scrollDown=${_topicDetailShortcuts.scrollDown != null}');
-              if (!_isTextInputFocused()) _topicDetailShortcuts.scrollDown?.call();
+              logd('⌨️ [MacShell] CallbackShortcuts Space: scrollDown=${_activeShortcuts.scrollDown != null}');
+              if (!_isTextInputFocused()) _activeShortcuts.scrollDown?.call();
             },
             const SingleActivator(LogicalKeyboardKey.space, shift: true): () {
-              if (!_isTextInputFocused()) _topicDetailShortcuts.scrollUp?.call();
+              if (!_isTextInputFocused()) _activeShortcuts.scrollUp?.call();
+            },
+            const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
+              logd('⌨️ [MacShell] CallbackShortcuts Cmd+W: closing active tab');
+              _closeTab(_tabsController.activeIndex);
             },
             const SingleActivator(LogicalKeyboardKey.escape): () {
               final nav = _sectionNavKeys[_selectedSectionId]?.currentState;
               if (nav != null && nav.canPop()) {
                 nav.pop();
-              } else {
-                _selectionController.clearSelection();
+              } else if (_tabsController.activeIndex >= 0) {
+                _closeTab(_tabsController.activeIndex);
               }
             },
           },
@@ -243,24 +294,24 @@ class _MacShellState extends State<MacShell> {
             onKeyEvent: (node, event) {
               if (event is KeyDownEvent) {
                 if (event.logicalKey == LogicalKeyboardKey.space) {
-                  logd('⌨️ [MacShell] Focus.onKeyEvent Space: textFocused=${_isTextInputFocused()}, scrollDown=${_topicDetailShortcuts.scrollDown != null}');
+                  logd('⌨️ [MacShell] Focus.onKeyEvent Space: textFocused=${_isTextInputFocused()}, scrollDown=${_activeShortcuts.scrollDown != null}');
                   if (_isTextInputFocused()) return KeyEventResult.ignored;
                   if (HardwareKeyboard.instance.isShiftPressed) {
-                    _topicDetailShortcuts.scrollUp?.call();
+                    _activeShortcuts.scrollUp?.call();
                   } else {
-                    _topicDetailShortcuts.scrollDown?.call();
+                    _activeShortcuts.scrollDown?.call();
                   }
                   return KeyEventResult.handled;
                 }
                 if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                  if (!_isTextInputFocused() && _topicDetailShortcuts.scrollDownStep != null) {
-                    _topicDetailShortcuts.scrollDownStep!();
+                  if (!_isTextInputFocused() && _activeShortcuts.scrollDownStep != null) {
+                    _activeShortcuts.scrollDownStep!();
                     return KeyEventResult.handled;
                   }
                 }
                 if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                  if (!_isTextInputFocused() && _topicDetailShortcuts.scrollUpStep != null) {
-                    _topicDetailShortcuts.scrollUpStep!();
+                  if (!_isTextInputFocused() && _activeShortcuts.scrollUpStep != null) {
+                    _activeShortcuts.scrollUpStep!();
                     return KeyEventResult.handled;
                   }
                 }
@@ -270,16 +321,13 @@ class _MacShellState extends State<MacShell> {
             child: Scaffold(
               body: Column(
               children: [
-                // ネイティブ信号下のスペーサ
                 SizedBox(height: _captionHeight),
-                // メニューバー
                 _buildMenuBar(),
                 const Divider(height: 1),
-                // 本体：2ペイン構成
                 Expanded(
                   child: Row(
                     children: [
-                      // 【左】トピック一覧（タブの中身）
+                      // 【左】トピック一覧
                       SizedBox(
                         width: _leftPaneWidth,
                         child: IndexedStack(
@@ -291,30 +339,43 @@ class _MacShellState extends State<MacShell> {
                         ),
                       ),
 
-                      // ドラッグ可能な縦の区切り線
                       _buildResizableDivider(),
 
-                      // 【右】履歴パネル＋詳細エリア
+                      // 【右】履歴パネル＋タブバー＋詳細エリア
                       Expanded(
                         child: Column(
                           children: [
                             HistoryPanel(
                               onTopicTap: (id, title, comments, postedAt) {
-                                _selectionController.selectTopic(
-                                  id,
-                                  title: title,
-                                  comments: comments,
-                                  postedAt: postedAt,
+                                _openInNew(id, title, comments, postedAt);
+                              },
+                              onTopicNewTabTap: (id, title, comments, postedAt) {
+                                _openInNew(id, title, comments, postedAt);
+                              },
+                            ),
+                            // タブバー（タブが1枚以上のとき表示）
+                            AnimatedBuilder(
+                              animation: _tabsController,
+                              builder: (_, __) {
+                                if (_tabsController.tabs.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                return TopicTabBar(
+                                  tabs: _tabsController.tabs,
+                                  activeIndex: _tabsController.activeIndex,
+                                  onTabTap: _tabsController.setActive,
+                                  onTabClose: _closeTab,
                                 );
                               },
                             ),
+                            // 詳細エリア
                             Expanded(
                               child: AnimatedBuilder(
-                                animation: _selectionController,
+                                animation: _tabsController,
                                 builder: (context, _) {
-                                  final selectedId = _selectionController.selectedTopicId;
+                                  final tabs = _tabsController.tabs;
 
-                                  if (selectedId == null) {
+                                  if (tabs.isEmpty) {
                                     return const Center(
                                       child: Text(
                                         "トピックを選択してください",
@@ -323,27 +384,33 @@ class _MacShellState extends State<MacShell> {
                                     );
                                   }
 
-                                  return PlatformHelper.isDesktop
-                                      ? TopicDetailPane(
-                                          key: ValueKey(selectedId),
-                                          topicId: selectedId,
-                                          title: _selectionController.title,
-                                          commentCount: _selectionController.commentCount,
-                                          postedAt: _selectionController.postedAt,
-                                          enableRefresh: true,
-                                          saveReadPosition: true,
-                                          shortcutController: _topicDetailShortcuts,
-                                        )
-                                      : TopicDetailScreen(
-                                          key: ValueKey(selectedId),
-                                          topicId: selectedId,
-                                          title: _selectionController.title,
-                                          commentCount: _selectionController.commentCount,
-                                          postedAt: _selectionController.postedAt,
-                                          enableRefresh: true,
-                                          saveReadPosition: true,
-                                          shortcutController: _topicDetailShortcuts,
-                                        );
+                                  return IndexedStack(
+                                    index: _tabsController.activeIndex,
+                                    children: [
+                                      for (int i = 0; i < tabs.length; i++)
+                                        PlatformHelper.isDesktop
+                                            ? TopicDetailPane(
+                                                key: ValueKey(tabs[i].topicId),
+                                                topicId: tabs[i].topicId,
+                                                title: tabs[i].title,
+                                                commentCount: tabs[i].commentCount,
+                                                postedAt: tabs[i].postedAt,
+                                                enableRefresh: true,
+                                                saveReadPosition: true,
+                                                shortcutController: _tabShortcuts[i],
+                                              )
+                                            : TopicDetailScreen(
+                                                key: ValueKey(tabs[i].topicId),
+                                                topicId: tabs[i].topicId,
+                                                title: tabs[i].title,
+                                                commentCount: tabs[i].commentCount,
+                                                postedAt: tabs[i].postedAt,
+                                                enableRefresh: true,
+                                                saveReadPosition: true,
+                                                shortcutController: _tabShortcuts[i],
+                                              ),
+                                    ],
+                                  );
                                 },
                               ),
                             ),
@@ -383,8 +450,6 @@ class _MacShellState extends State<MacShell> {
     );
   }
 
-  /// テキスト入力フィールドにフォーカスがある場合 true を返す
-  /// （IME変換中のスペースキーをスクロールに横取りしないため）
   bool _isTextInputFocused() {
     final focus = FocusManager.instance.primaryFocus;
     return focus?.context?.widget is EditableText;
@@ -424,59 +489,47 @@ class _MacShellState extends State<MacShell> {
     );
   }
 
-  /// センターペインのコンテンツをビルド
   Widget _buildCenterPaneContent(String sectionId) {
     final spec = _tabsById[sectionId];
     if (spec == null) {
       return const SizedBox.shrink();
     }
-    // 新着・人気タブは TopicListScreen を直接生成してコールバックを渡す
     if (spec.id == 'tab_new' || spec.id == 'tab_popular') {
       final key = spec.stateKey;
       return tl.TopicListScreen(
         key: key is GlobalKey<tl.TopicListScreenState> ? key : null,
         sortOrder: spec.id == 'tab_new' ? 'new' : 'popular',
         onTopicTap: (id, title, comments, postedAt) {
-          _selectionController.selectTopic(
-            id,
-            title: title,
-            comments: comments,
-            postedAt: postedAt,
-          );
+          _openInNew(id, title, comments, postedAt);
+        },
+        onTopicNewTabTap: (id, title, comments, postedAt) {
+          _openInNew(id, title, comments, postedAt);
         },
       );
     }
 
-    // その他のタブ（履歴、クリップなど）は既存の Navigator 構成を維持
-    // ※ これらも onTopicTap 対応すれば Navigator 不要にできるが、
-    //    今回は TopicListScreen を優先
-    // 履歴・クリップもここで直接ハンドリングして onTopicTap を渡す
     if (spec.id == 'tab_favorites') {
       final key = spec.stateKey;
       return FavoritesScreen(
         key: key is GlobalKey<FavoritesScreenState> ? key : null,
         onTopicTap: (id, title, comments, postedAt) {
-           _selectionController.selectTopic(
-            id,
-            title: title,
-            comments: comments,
-            postedAt: postedAt,
-          );
+          _openInNew(id, title, comments, postedAt);
+        },
+        onTopicNewTabTap: (id, title, comments, postedAt) {
+          _openInNew(id, title, comments, postedAt);
         },
       );
     }
-    
+
     if (spec.id == 'tab_clips') {
       final key = spec.stateKey;
       return ClipsScreen(
         key: key is GlobalKey<ClipsScreenState> ? key : null,
         onTopicTap: (id, title, comments, postedAt) {
-           _selectionController.selectTopic(
-            id,
-            title: title,
-            comments: comments,
-            postedAt: postedAt,
-          );
+          _openInNew(id, title, comments, postedAt);
+        },
+        onTopicNewTabTap: (id, title, comments, postedAt) {
+          _openInNew(id, title, comments, postedAt);
         },
       );
     }
@@ -489,12 +542,10 @@ class _MacShellState extends State<MacShell> {
             builder: (_) => SearchScreen(
               initialQuery: null,
               onTopicTap: (id, title, comments, postedAt) {
-                 _selectionController.selectTopic(
-                  id,
-                  title: title,
-                  comments: comments,
-                  postedAt: postedAt,
-                );
+                _openInNew(id, title, comments, postedAt);
+              },
+              onTopicNewTabTap: (id, title, comments, postedAt) {
+                _openInNew(id, title, comments, postedAt);
               },
             ),
             settings: settings,
@@ -503,7 +554,6 @@ class _MacShellState extends State<MacShell> {
       );
     }
 
-    // その他のタブ（設定など）は既存の Navigator 構成を維持
     if (_usesNestedNavigator(spec.id)) {
       return Navigator(
         key: _sectionNavKeys[spec.id],
@@ -528,5 +578,4 @@ class _MacShellState extends State<MacShell> {
     final index = _sectionItems.indexWhere((item) => item.id == _selectedSectionId);
     return index >= 0 ? index : 0;
   }
-
 }

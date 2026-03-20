@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'; // ★これを追加
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/cache_service.dart';
 import '../services/api_service.dart';
@@ -24,6 +26,12 @@ class TopicTile extends StatefulWidget {
   /// タップ時の挙動を親から指定できるようにする
   final Function(int topicId, String title, int comments, String postedAt)? onTopicTap;
 
+  /// 新規タブで開く（Cmd+クリック / 中クリック）
+  final Function(int topicId, String title, int comments, String postedAt)? onTopicNewTabTap;
+
+  /// true にすると、キャッシュ有無に関わらず削除ボタンを常に表示する
+  final bool alwaysShowRemove;
+
   const TopicTile({
     super.key,
     required this.topic,
@@ -31,7 +39,9 @@ class TopicTile extends StatefulWidget {
     this.onRemove,
     this.onAfterPop,
     this.showThumb = true,
-    this.onTopicTap, // ★コンストラクタに追加
+    this.onTopicTap,
+    this.onTopicNewTabTap,
+    this.alwaysShowRemove = false,
   });
 
   @override
@@ -177,7 +187,13 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     final displayData = _calculateDisplayData(comments, postedAt);
     final bgColor = _calculateBackgroundColor(displayData.isOld);
 
-    return Material(
+    return Listener(
+      onPointerDown: (event) {
+        if (event.buttons == kMiddleMouseButton) {
+          widget.onTopicNewTabTap?.call(id, title, comments, postedAt);
+        }
+      },
+      child: Material(
       color: bgColor,
       child: InkWell(
         onTap: () => _handleTap(context, id, title, comments, postedAt),
@@ -209,7 +225,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
                 ),
               ),
               // 削除ボタン
-              if (widget.onRemove != null && _hasCachedComments) _buildRemoveButton(id),
+              if (widget.onRemove != null && (_hasCachedComments || widget.alwaysShowRemove)) _buildRemoveButton(id),
               // ★ 読み込み中インジケーター
               if (_isLoading)
                 const Padding(
@@ -220,7 +236,8 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
           ),
         ),
       ),
-    );
+      ), // Material
+    ); // Listener
   }
 
   /// サムネイル部分のWidget
@@ -410,9 +427,19 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     }
 
 
+    // Cmd+クリック (macOS) / Ctrl+クリック (Windows) → 新規タブで開く
+    if (widget.onTopicNewTabTap != null) {
+      final isMeta = HardwareKeyboard.instance.isMetaPressed;
+      final isCtrl = HardwareKeyboard.instance.isControlPressed;
+      if (isMeta || isCtrl) {
+        widget.onTopicNewTabTap!(id, title, comments, postedAt);
+        if (mounted) await refreshCacheState();
+        return;
+      }
+    }
+
     // ★追加: 親から挙動が指定されていればそちらを優先実行
     if (widget.onTopicTap != null) {
-
       widget.onTopicTap!(id, title, comments, postedAt);
     } else {
 

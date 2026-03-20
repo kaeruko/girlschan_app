@@ -6,13 +6,14 @@ import '../app/app_tabs.dart';
 import '../screens/topic_detail.dart';
 import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
-import '../screens/favorites_screen.dart'; // ← 一旦残す（必要に応じて後で削除）
+import '../screens/favorites_screen.dart';
 import '../screens/search_screen.dart';
-import '../controllers/selection_controller.dart';
+import '../controllers/tabs_controller.dart';
 import '../controllers/topic_detail_shortcut_controller.dart';
 import '../utils/platform_helper.dart';
 import '../utils/log.dart';
-import '../widgets/history_panel.dart'; // ★追加
+import '../widgets/history_panel.dart';
+import '../widgets/topic_tab_bar.dart';
 
 class WindowsShell extends StatefulWidget {
   final List<TabSpec> tabs;
@@ -42,9 +43,16 @@ class _WindowsShellState extends State<WindowsShell> {
   final Map<String, GlobalKey<NavigatorState>> _sectionNavKeys = {};
   double _leftPaneWidth = 350.0;
 
-  // ★ 選択状態を管理
-  final _selectionController = SelectionController();
-  final _topicDetailShortcuts = TopicDetailShortcutController();
+  // タブ管理
+  final _tabsController = TabsController();
+  final List<TopicDetailShortcutController> _tabShortcuts = [];
+  final _noopShortcuts = TopicDetailShortcutController();
+
+  TopicDetailShortcutController get _activeShortcuts {
+    final idx = _tabsController.activeIndex;
+    if (idx < 0 || idx >= _tabShortcuts.length) return _noopShortcuts;
+    return _tabShortcuts[idx];
+  }
 
   @override
   void initState() {
@@ -57,6 +65,15 @@ class _WindowsShellState extends State<WindowsShell> {
           .where((item) => _usesNestedNavigator(item.id))
           .map((item) => MapEntry(item.id, GlobalKey<NavigatorState>())),
     );
+  }
+
+  @override
+  void dispose() {
+    _tabsController.dispose();
+    for (final sc in _tabShortcuts) {
+      sc.clear();
+    }
+    super.dispose();
   }
 
   List<_SectionNavItem> _buildSectionItems() {
@@ -98,10 +115,9 @@ class _WindowsShellState extends State<WindowsShell> {
 
   void _refreshCurrentSection() {
     logd('🔄 [WindowsShell] _refreshCurrentSection called');
-    // 詳細が開いている時は詳細をリロード
-    if (_selectionController.selectedTopicId != null) {
-      logd('🔄 [WindowsShell] detail is open (id=${_selectionController.selectedTopicId}), calling refresh callback');
-      _topicDetailShortcuts.refresh?.call();
+    if (_tabsController.activeTab != null) {
+      logd('🔄 [WindowsShell] detail tab is open (id=${_tabsController.activeTab!.topicId}), calling refresh callback');
+      _activeShortcuts.refresh?.call();
       return;
     }
 
@@ -133,17 +149,45 @@ class _WindowsShellState extends State<WindowsShell> {
     }
   }
 
+  void _openInCurrent(int id, String title, int comments, String postedAt) {
+    final tab = TopicTab(
+      topicId: id,
+      title: title,
+      commentCount: comments,
+      postedAt: postedAt,
+    );
+    final wasEmpty = _tabsController.tabs.isEmpty;
+    _tabsController.openInCurrent(tab);
+    if (wasEmpty) {
+      _tabShortcuts.add(TopicDetailShortcutController());
+    }
+  }
+
+  void _openInNew(int id, String title, int comments, String postedAt) {
+    if (_tabsController.tabs.length >= TabsController.maxTabs) return;
+    final tab = TopicTab(
+      topicId: id,
+      title: title,
+      commentCount: comments,
+      postedAt: postedAt,
+    );
+    _tabShortcuts.add(TopicDetailShortcutController());
+    _tabsController.openInNew(tab);
+  }
+
+  void _closeTab(int index) {
+    if (index < 0 || index >= _tabShortcuts.length) return;
+    _tabShortcuts[index].clear();
+    _tabShortcuts.removeAt(index);
+    _tabsController.closeTab(index);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ★ InkWell を反応させるため、全体を Material でラップ
-    // ★ InkWell を反応させるため、全体を Material でラップ
     return Material(
-      type: MaterialType.transparency, // 背景色を変えずにMaterial機能だけ提供
+      type: MaterialType.transparency,
       child: CallbackShortcuts(
           bindings: {
-            // CallbackShortcuts はフォーカスがある時用として残しておくが、
-            // PlatformMenuBar があればそちらが優先されるはず。
-            // ログを入れておく
             const SingleActivator(LogicalKeyboardKey.keyR, control: true): () {
               logd('⌨️ [WindowsShell] CallbackShortcuts Ctrl+R pressed');
               _refreshCurrentSection();
@@ -156,35 +200,34 @@ class _WindowsShellState extends State<WindowsShell> {
               logd('⌨️ [WindowsShell] CallbackShortcuts F5 pressed');
               _refreshCurrentSection();
             },
-            // 検索・ヒット移動・未読移動・ジャンプ
             const SingleActivator(LogicalKeyboardKey.keyF, control: true): () {
-              _topicDetailShortcuts.focusSearch?.call();
+              _activeShortcuts.focusSearch?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyG, control: true): () {
-              _topicDetailShortcuts.nextHit?.call();
+              _activeShortcuts.nextHit?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyG, control: true, shift: true): () {
-              _topicDetailShortcuts.prevHit?.call();
+              _activeShortcuts.prevHit?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyN, control: true, shift: true): () {
-              _topicDetailShortcuts.nextUnread?.call();
+              _activeShortcuts.nextUnread?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyP, control: true, shift: true): () {
-              _topicDetailShortcuts.prevUnread?.call();
+              _activeShortcuts.prevUnread?.call();
             },
             const SingleActivator(LogicalKeyboardKey.keyJ, control: true): () {
-              _topicDetailShortcuts.jumpToComment?.call();
+              _activeShortcuts.jumpToComment?.call();
             },
-            // Esc で戻る（詳細画面を開いている時など）
+            const SingleActivator(LogicalKeyboardKey.keyW, control: true): () {
+              logd('⌨️ [WindowsShell] CallbackShortcuts Ctrl+W: closing active tab');
+              _closeTab(_tabsController.activeIndex);
+            },
             const SingleActivator(LogicalKeyboardKey.escape): () {
-              // 3ペインの場合、Escで選択解除などが考えられるが、
-              // とりあえず既存のNavigatorがあればpopする
               final nav = _sectionNavKeys[_selectedSectionId]?.currentState;
               if (nav != null && nav.canPop()) {
                 nav.pop();
-              } else {
-                // 選択解除
-                _selectionController.clearSelection();
+              } else if (_tabsController.activeIndex >= 0) {
+                _closeTab(_tabsController.activeIndex);
               }
             },
           },
@@ -193,36 +236,32 @@ class _WindowsShellState extends State<WindowsShell> {
             onKeyEvent: (node, event) {
               if (event is KeyDownEvent && !_isTextInputFocused()) {
                 if (event.logicalKey == LogicalKeyboardKey.arrowDown &&
-                    _topicDetailShortcuts.scrollDownStep != null) {
-                  _topicDetailShortcuts.scrollDownStep!();
+                    _activeShortcuts.scrollDownStep != null) {
+                  _activeShortcuts.scrollDownStep!();
                   return KeyEventResult.handled;
                 }
                 if (event.logicalKey == LogicalKeyboardKey.arrowUp &&
-                    _topicDetailShortcuts.scrollUpStep != null) {
-                  _topicDetailShortcuts.scrollUpStep!();
+                    _activeShortcuts.scrollUpStep != null) {
+                  _activeShortcuts.scrollUpStep!();
                   return KeyEventResult.handled;
                 }
                 if (event.logicalKey == LogicalKeyboardKey.space &&
-                    _topicDetailShortcuts.scrollDown != null) {
-                  _topicDetailShortcuts.scrollDown!();
+                    _activeShortcuts.scrollDown != null) {
+                  _activeShortcuts.scrollDown!();
                   return KeyEventResult.handled;
                 }
               }
               return KeyEventResult.ignored;
             },
-            child: Scaffold( // CupertinoPageScaffold から Scaffold に変更（Material Widgetを使うため）
+            child: Scaffold(
               body: Column(
               children: [
-                // ★ 全幅に広がるメニューバー
                 _buildMenuBar(),
-                
                 const Divider(height: 1),
-
-                // 本体：2ペイン（リスト・詳細）構成
                 Expanded(
                   child: Row(
                     children: [
-                      // 【左】トピック一覧（タブの中身）
+                      // 【左】トピック一覧
                       SizedBox(
                         width: _leftPaneWidth,
                         child: IndexedStack(
@@ -234,34 +273,43 @@ class _WindowsShellState extends State<WindowsShell> {
                         ),
                       ),
 
-                      // ドラッグ可能な縦の区切り線
                       _buildResizableDivider(),
-  
-                      // 【右】詳細エリア（選択状態に応じて中身が変わる） + 履歴パネル
+
+                      // 【右】履歴パネル＋タブバー＋詳細エリア
                       Expanded(
                         child: Column(
                           children: [
-                            // ★ 履歴パネル（履歴がある場合のみ表示される）
                             HistoryPanel(
                               onTopicTap: (id, title, comments, postedAt) {
-                                _selectionController.selectTopic(
-                                  id,
-                                  title: title,
-                                  comments: comments,
-                                  postedAt: postedAt,
+                                _openInNew(id, title, comments, postedAt);
+                              },
+                              onTopicNewTabTap: (id, title, comments, postedAt) {
+                                _openInNew(id, title, comments, postedAt);
+                              },
+                            ),
+                            // タブバー（タブが1枚以上のとき表示）
+                            AnimatedBuilder(
+                              animation: _tabsController,
+                              builder: (_, __) {
+                                if (_tabsController.tabs.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                return TopicTabBar(
+                                  tabs: _tabsController.tabs,
+                                  activeIndex: _tabsController.activeIndex,
+                                  onTabTap: _tabsController.setActive,
+                                  onTabClose: _closeTab,
                                 );
                               },
                             ),
-                            
-                            // ★ トピック詳細（または未選択メッセージ）
+                            // 詳細エリア
                             Expanded(
                               child: AnimatedBuilder(
-                                animation: _selectionController,
+                                animation: _tabsController,
                                 builder: (context, _) {
-                                  final selectedId = _selectionController.selectedTopicId;
-                                  
-                                  if (selectedId == null) {
-                                    // 何も選ばれていない時
+                                  final tabs = _tabsController.tabs;
+
+                                  if (tabs.isEmpty) {
                                     return const Center(
                                       child: Text(
                                         "トピックを選択してください",
@@ -269,29 +317,34 @@ class _WindowsShellState extends State<WindowsShell> {
                                       ),
                                     );
                                   }
-                                  
-                                  // 選ばれていれば詳細画面を埋め込む
-                                  return PlatformHelper.isDesktop
-                                      ? TopicDetailPane(
-                                          key: ValueKey(selectedId), // IDが変わったら作り直す
-                                          topicId: selectedId,
-                                          title: _selectionController.title,
-                                          commentCount: _selectionController.commentCount,
-                                          postedAt: _selectionController.postedAt,
-                                          enableRefresh: true,
-                                          saveReadPosition: true,
-                                          shortcutController: _topicDetailShortcuts,
-                                        )
-                                      : TopicDetailScreen(
-                                          key: ValueKey(selectedId), // IDが変わったら作り直す
-                                          topicId: selectedId,
-                                          title: _selectionController.title,
-                                          commentCount: _selectionController.commentCount,
-                                          postedAt: _selectionController.postedAt,
-                                          enableRefresh: true,
-                                          saveReadPosition: true,
-                                          shortcutController: _topicDetailShortcuts,
-                                        );
+
+                                  return IndexedStack(
+                                    index: _tabsController.activeIndex,
+                                    children: [
+                                      for (int i = 0; i < tabs.length; i++)
+                                        PlatformHelper.isDesktop
+                                            ? TopicDetailPane(
+                                                key: ValueKey(tabs[i].topicId),
+                                                topicId: tabs[i].topicId,
+                                                title: tabs[i].title,
+                                                commentCount: tabs[i].commentCount,
+                                                postedAt: tabs[i].postedAt,
+                                                enableRefresh: true,
+                                                saveReadPosition: true,
+                                                shortcutController: _tabShortcuts[i],
+                                              )
+                                            : TopicDetailScreen(
+                                                key: ValueKey(tabs[i].topicId),
+                                                topicId: tabs[i].topicId,
+                                                title: tabs[i].title,
+                                                commentCount: tabs[i].commentCount,
+                                                postedAt: tabs[i].postedAt,
+                                                enableRefresh: true,
+                                                saveReadPosition: true,
+                                                shortcutController: _tabShortcuts[i],
+                                              ),
+                                    ],
+                                  );
                                 },
                               ),
                             ),
@@ -309,59 +362,47 @@ class _WindowsShellState extends State<WindowsShell> {
     );
   }
 
-  /// センターペインのコンテンツをビルド
   Widget _buildCenterPaneContent(String sectionId) {
     final spec = _tabsById[sectionId];
     if (spec == null) {
       return const SizedBox.shrink();
     }
-    // 新着・人気タブは TopicListScreen を直接生成してコールバックを渡す
     if (spec.id == 'tab_new' || spec.id == 'tab_popular') {
       final key = spec.stateKey;
       return tl.TopicListScreen(
         key: key is GlobalKey<tl.TopicListScreenState> ? key : null,
         sortOrder: spec.id == 'tab_new' ? 'new' : 'popular',
         onTopicTap: (id, title, comments, postedAt) {
-          _selectionController.selectTopic(
-            id,
-            title: title,
-            comments: comments,
-            postedAt: postedAt,
-          );
+          _openInNew(id, title, comments, postedAt);
+        },
+        onTopicNewTabTap: (id, title, comments, postedAt) {
+          _openInNew(id, title, comments, postedAt);
         },
       );
     }
 
-    // その他のタブ（履歴、クリップなど）は既存の Navigator 構成を維持
-    // ※ これらも onTopicTap 対応すれば Navigator 不要にできるが、
-    //    今回は TopicListScreen を優先
-    // 履歴・クリップもここで直接ハンドリングして onTopicTap を渡す
     if (spec.id == 'tab_favorites') {
       final key = spec.stateKey;
       return FavoritesScreen(
         key: key is GlobalKey<FavoritesScreenState> ? key : null,
         onTopicTap: (id, title, comments, postedAt) {
-           _selectionController.selectTopic(
-            id,
-            title: title,
-            comments: comments,
-            postedAt: postedAt,
-          );
+          _openInNew(id, title, comments, postedAt);
+        },
+        onTopicNewTabTap: (id, title, comments, postedAt) {
+          _openInNew(id, title, comments, postedAt);
         },
       );
     }
-    
+
     if (spec.id == 'tab_clips') {
       final key = spec.stateKey;
       return ClipsScreen(
         key: key is GlobalKey<ClipsScreenState> ? key : null,
         onTopicTap: (id, title, comments, postedAt) {
-           _selectionController.selectTopic(
-            id,
-            title: title,
-            comments: comments,
-            postedAt: postedAt,
-          );
+          _openInNew(id, title, comments, postedAt);
+        },
+        onTopicNewTabTap: (id, title, comments, postedAt) {
+          _openInNew(id, title, comments, postedAt);
         },
       );
     }
@@ -374,12 +415,10 @@ class _WindowsShellState extends State<WindowsShell> {
             builder: (_) => SearchScreen(
               initialQuery: null,
               onTopicTap: (id, title, comments, postedAt) {
-                 _selectionController.selectTopic(
-                  id,
-                  title: title,
-                  comments: comments,
-                  postedAt: postedAt,
-                );
+                _openInNew(id, title, comments, postedAt);
+              },
+              onTopicNewTabTap: (id, title, comments, postedAt) {
+                _openInNew(id, title, comments, postedAt);
               },
             ),
             settings: settings,
@@ -388,7 +427,6 @@ class _WindowsShellState extends State<WindowsShell> {
       );
     }
 
-    // その他のタブ（設定など）は既存の Navigator 構成を維持
     if (_usesNestedNavigator(spec.id)) {
       return Navigator(
         key: _sectionNavKeys[spec.id],
@@ -439,14 +477,13 @@ class _WindowsShellState extends State<WindowsShell> {
     );
   }
 
-  // ★ 新しいメニューバー風の横並びナビゲーション
   Widget _buildMenuBar() {
     return Container(
       color: CupertinoColors.systemBackground,
-      height: 36, // メニューバーらしく少し低めに
+      height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start, // 左詰め
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           for (final item in _sectionItems)
             _buildMenuBarItem(item),
@@ -461,7 +498,7 @@ class _WindowsShellState extends State<WindowsShell> {
 
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      minSize: 0, // 縦幅をContainerに合わせる
+      minSize: 0,
       onPressed: () {
         _onSectionSelected(item.id);
         final scaffold = Scaffold.maybeOf(context);
