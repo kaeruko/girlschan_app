@@ -917,7 +917,8 @@ class _TopicDetailViewState extends State<TopicDetailView> {
         },
         settings: _settings,
         // ★ ここで再帰呼び出しを可能にする（自分自身を呼ぶ）
-        onRepliesTap: (ids) => _showRepliesList(ids), 
+        onRepliesTap: (ids) => _showRepliesList(ids),
+        onGoToComment: (no) => _jumpToCommentNo(no),
       ),
     );
   }
@@ -1973,6 +1974,14 @@ class _TopicSearchRailState extends State<TopicSearchRail> {
   List<Comment> _filteredComments = [];
 
   @override
+  void didUpdateWidget(TopicSearchRail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.allComments != widget.allComments && _searchCtrl.text.isNotEmpty) {
+      _onSearchChanged(_searchCtrl.text);
+    }
+  }
+
+  @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
@@ -2173,6 +2182,7 @@ class ReplyListSheet extends StatelessWidget {
   final SettingsService settings;
   // ★ 追加: 再帰呼び出し用のコールバック
   final Function(List<int>)? onRepliesTap;
+  final Function(int no)? onGoToComment;
 
   const ReplyListSheet({
     super.key,
@@ -2181,6 +2191,7 @@ class ReplyListSheet extends StatelessWidget {
     required this.onImageTap,
     required this.settings,
     this.onRepliesTap, // ★ 追加
+    this.onGoToComment,
   });
 
   @override
@@ -2224,12 +2235,16 @@ class ReplyListSheet extends StatelessWidget {
                     final c = replies[index];
                       return CommentTile(
                         comment: c,
-                        userStatus: CommentUserStatus.none, 
+                        userStatus: CommentUserStatus.none,
                         onAnchorTap: (no, pos) => onAnchorTap(no, pos),
                         onImageTap: onImageTap,
                         checkAnchorAvailability: (no) => true,
                         fontSize: settings.fontSize,
-                        onRepliesTap: onRepliesTap, 
+                        onRepliesTap: onRepliesTap,
+                        onTap: onGoToComment != null ? () {
+                          Navigator.pop(context);
+                          onGoToComment!(c.id);
+                        } : null,
                       );
                   },
                 ),
