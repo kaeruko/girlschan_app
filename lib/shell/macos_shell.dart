@@ -182,6 +182,11 @@ class _MacShellState extends State<MacShell> {
   }
 
   void _openInNew(int id, String title, int comments, String postedAt) {
+    final existingIndex = _tabsController.tabs.indexWhere((t) => t.topicId == id);
+    if (existingIndex >= 0) {
+      _tabsController.setActive(existingIndex);
+      return;
+    }
     if (_tabsController.tabs.length >= TabsController.maxTabs) return;
     final tab = TopicTab(
       topicId: id,

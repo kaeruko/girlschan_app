@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart'; // ★これを追加
+import 'package:url_launcher/url_launcher.dart';
 import '../models/comment.dart';
 import 'vote_bar_graph.dart';
 import 'url_preview_list.dart';
@@ -79,7 +81,7 @@ class CommentTile extends StatelessWidget {
         
         // ★ 変更: reverseAnchors (チップ表示) は削除し、下のボタンへ移動
         
-        Text(body, style: TextStyle(fontSize: fontSize)),
+        _LinkText(text: body, fontSize: fontSize),
         if (urls.isNotEmpty) UrlPreviewList(urls: urls),
         if (imageUrl != null) ...[
           const SizedBox(height: 8),
@@ -197,6 +199,80 @@ class CommentTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: innerWidget,
         ),
+      ),
+    );
+  }
+}
+
+final _urlPattern = RegExp(r'https?://[^\s　]+');
+
+class _LinkText extends StatefulWidget {
+  final String text;
+  final double fontSize;
+
+  const _LinkText({required this.text, required this.fontSize});
+
+  @override
+  State<_LinkText> createState() => _LinkTextState();
+}
+
+class _LinkTextState extends State<_LinkText> {
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  List<InlineSpan> _buildSpans(String text, double fontSize) {
+    _recognizers.clear();
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+
+    for (final match in _urlPattern.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+      }
+      final url = match.group(0)!;
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () async {
+          final uri = Uri.tryParse(url);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        };
+      _recognizers.add(recognizer);
+      spans.add(TextSpan(
+        text: url,
+        style: const TextStyle(
+          color: CupertinoColors.activeBlue,
+          decoration: TextDecoration.underline,
+        ),
+        recognizer: recognizer,
+      ));
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+
+    return spans;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = _buildSpans(widget.text, widget.fontSize);
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: widget.fontSize,
+          color: CupertinoColors.label.resolveFrom(context),
+        ),
+        children: spans,
       ),
     );
   }
