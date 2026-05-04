@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/log.dart';
 
 /// 右ペインのトピックタブ1枚分のデータ
 class TopicTab {
@@ -42,9 +43,14 @@ class TabsController extends ChangeNotifier {
   /// 新規タブでトピックを開く。上限(maxTabs)に達している場合は何もしない。
   /// 戻り値: 追加できた場合 true
   bool openInNew(TopicTab tab) {
-    if (_tabs.length >= maxTabs) return false;
+    logd('🗂️ [TabsController] openInNew: topicId=${tab.topicId}, currentTabCount=${_tabs.length}', name: 'Tabs');
+    if (_tabs.length >= maxTabs) {
+      logd('⚠️ [TabsController] openInNew: maxTabs reached, ignoring', name: 'Tabs');
+      return false;
+    }
     _tabs.add(tab);
     _activeIndex = _tabs.length - 1;
+    logd('✅ [TabsController] openInNew: added, activeIndex=$_activeIndex, totalTabs=${_tabs.length}', name: 'Tabs');
     notifyListeners();
     return true;
   }
@@ -63,6 +69,7 @@ class TabsController extends ChangeNotifier {
 
   /// アクティブタブを切り替える
   void setActive(int index) {
+    logd('🗂️ [TabsController] setActive: index=$index, currentActive=$_activeIndex, totalTabs=${_tabs.length}', name: 'Tabs');
     if (index < 0 || index >= _tabs.length) return;
     if (index == _activeIndex) return;
     _activeIndex = index;

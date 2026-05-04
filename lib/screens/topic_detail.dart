@@ -154,6 +154,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   final Map<int, double> _pageScrollOffsets = {}; // ページ内スクロール位置キャッシュ
   int _currentPage = 0;
   final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _contentFocusNode = FocusNode(debugLabel: 'TopicDetailContentFocus');
   String _searchQuery = '';
   List<int> _searchHitNos = [];
   int _searchHitIndex = -1;
@@ -265,6 +266,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   void dispose() {
     _bannerAd?.dispose();
     _searchFocusNode.dispose();
+    _contentFocusNode.dispose();
     _saveFromPage(_currentPage);
     for (final sc in _pageScroll.values) {
       sc.dispose();
@@ -298,6 +300,8 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   }
 
   void _registerShortcutController(TopicDetailShortcutController? controller) {
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    logd('🎮 [TopicDetail] _registerShortcutController: controller=${controller != null ? "set" : "null"} topicId=${widget.topicId} contentFocusHasFocus=${_contentFocusNode.hasFocus} primaryFocus=${primaryFocus?.debugLabel}');
     controller?.bind(
       focusSearch: _handleSearchFocus,
       nextHit: () => _jumpToSearchHit(1),
@@ -316,36 +320,58 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   /// スペースキーで画面1つ分下にスクロール
   void _scrollDown() {
     final sc = _scForPage(_currentPage);
-    logd('📜 [TopicDetail] _scrollDown: page=$_currentPage, hasClients=${sc.hasClients}');
-    if (!sc.hasClients) return;
-    final viewportHeight = sc.position.viewportDimension;
-    final target = (sc.offset + viewportHeight * 0.9).clamp(0.0, sc.position.maxScrollExtent);
+    if (!sc.hasClients) {
+      logd('📜 [TopicDetail] _scrollDown: page=$_currentPage hasClients=false → skip', name: 'Scroll');
+      return;
+    }
+    final offset = sc.offset;
+    final maxExt = sc.position.maxScrollExtent;
+    final viewport = sc.position.viewportDimension;
+    final target = (offset + viewport * 0.9).clamp(0.0, maxExt);
+    logd('📜 [TopicDetail] _scrollDown: page=$_currentPage offset=$offset maxExt=$maxExt viewport=$viewport target=$target', name: 'Scroll');
     sc.animateTo(target, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
   }
 
   /// Shift+スペースで画面1つ分上にスクロール
   void _scrollUp() {
     final sc = _scForPage(_currentPage);
-    if (!sc.hasClients) return;
-    final viewportHeight = sc.position.viewportDimension;
-    final target = (sc.offset - viewportHeight * 0.9).clamp(0.0, sc.position.maxScrollExtent);
+    if (!sc.hasClients) {
+      logd('📜 [TopicDetail] _scrollUp: page=$_currentPage hasClients=false → skip', name: 'Scroll');
+      return;
+    }
+    final offset = sc.offset;
+    final maxExt = sc.position.maxScrollExtent;
+    final viewport = sc.position.viewportDimension;
+    final target = (offset - viewport * 0.9).clamp(0.0, maxExt);
+    logd('📜 [TopicDetail] _scrollUp: page=$_currentPage offset=$offset maxExt=$maxExt target=$target', name: 'Scroll');
     sc.animateTo(target, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
   }
 
   /// 矢印キーで小刻みに下スクロール
   void _scrollDownStep() {
     final sc = _scForPage(_currentPage);
-    logd('📜 [TopicDetail] _scrollDownStep: page=$_currentPage, hasClients=${sc.hasClients}');
-    if (!sc.hasClients) return;
-    final target = (sc.offset + 120.0).clamp(0.0, sc.position.maxScrollExtent);
+    if (!sc.hasClients) {
+      logd('📜 [TopicDetail] _scrollDownStep: page=$_currentPage hasClients=false → skip', name: 'Scroll');
+      return;
+    }
+    final offset = sc.offset;
+    final maxExt = sc.position.maxScrollExtent;
+    final target = (offset + 120.0).clamp(0.0, maxExt);
+    logd('📜 [TopicDetail] _scrollDownStep: page=$_currentPage offset=$offset maxExt=$maxExt target=$target', name: 'Scroll');
     sc.animateTo(target, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
   }
 
   /// 矢印キーで小刻みに上スクロール
   void _scrollUpStep() {
     final sc = _scForPage(_currentPage);
-    if (!sc.hasClients) return;
-    final target = (sc.offset - 120.0).clamp(0.0, sc.position.maxScrollExtent);
+    if (!sc.hasClients) {
+      logd('📜 [TopicDetail] _scrollUpStep: page=$_currentPage hasClients=false → skip', name: 'Scroll');
+      return;
+    }
+    final offset = sc.offset;
+    final maxExt = sc.position.maxScrollExtent;
+    final target = (offset - 120.0).clamp(0.0, maxExt);
+    logd('📜 [TopicDetail] _scrollUpStep: page=$_currentPage offset=$offset maxExt=$maxExt target=$target', name: 'Scroll');
     sc.animateTo(target, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
   }
 
@@ -1170,6 +1196,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       },
       child: Focus(
         autofocus: true,
+        focusNode: _contentFocusNode,
         child: child,
       ),
     );
@@ -1770,6 +1797,9 @@ class _TopicDetailViewState extends State<TopicDetailView> {
   Future<void> _openPostDialog({String? initialText, Comment? repliedComment}) async {
     if (!mounted) return;
 
+    final focusBefore = FocusManager.instance.primaryFocus;
+    logd('📝 [TopicDetail] _openPostDialog: pushing CommentComposePage, focusBefore=${focusBefore?.runtimeType}', name: 'Scroll');
+
     final result = await Navigator.push<dynamic>(
       context,
       CupertinoPageRoute(
@@ -1783,6 +1813,19 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     );
 
     if (!mounted) return;
+
+    final focusAfterPop = FocusManager.instance.primaryFocus;
+    logd('📝 [TopicDetail] _openPostDialog: popped from CommentComposePage, result=${result != null}, focusAfterPop=${focusAfterPop?.runtimeType}, focusContext=${focusAfterPop?.context?.widget.runtimeType}', name: 'Scroll');
+
+    // ComposePage を閉じた後、孤立した FocusScopeNode が primaryFocus になりキーイベントが
+    // MacShell に届かなくなるため、明示的に再フォーカスする
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _contentFocusNode.requestFocus();
+        logd('📝 [TopicDetail] _openPostDialog: requestFocus -> _contentFocusNode', name: 'Scroll');
+      }
+    });
+
     await _vm.checkDraft();
 
     if (result != null) {

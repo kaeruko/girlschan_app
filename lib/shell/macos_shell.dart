@@ -182,8 +182,11 @@ class _MacShellState extends State<MacShell> {
   }
 
   void _openInNew(int id, String title, int comments, String postedAt) {
+    logd('👆 [MacShell] _openInNew called: id=$id, title=$title', name: 'Tabs');
     final existingIndex = _tabsController.tabs.indexWhere((t) => t.topicId == id);
+    logd('👆 [MacShell] existingIndex=$existingIndex, tabCount=${_tabsController.tabs.length}', name: 'Tabs');
     if (existingIndex >= 0) {
+      logd('👆 [MacShell] switching to existing tab at index=$existingIndex', name: 'Tabs');
       _tabsController.setActive(existingIndex);
       return;
     }
@@ -296,10 +299,33 @@ class _MacShellState extends State<MacShell> {
           },
           child: Focus(
             autofocus: true,
+            debugLabel: 'MacShellRootFocus',
             onKeyEvent: (node, event) {
               if (event is KeyDownEvent) {
-                if (event.logicalKey == LogicalKeyboardKey.space) {
-                  logd('⌨️ [MacShell] Focus.onKeyEvent Space: textFocused=${_isTextInputFocused()}, scrollDown=${_activeShortcuts.scrollDown != null}');
+                final key = event.logicalKey;
+                final isScroll = key == LogicalKeyboardKey.space ||
+                    key == LogicalKeyboardKey.arrowDown ||
+                    key == LogicalKeyboardKey.arrowUp;
+                // スクロールキーは常にログ出力（届いていないと何も出ない）
+                if (isScroll) {
+                  final textFocused = _isTextInputFocused();
+                  final focusedNode = FocusManager.instance.primaryFocus;
+                  final focusedWidget = focusedNode?.context?.widget;
+                  final focusLabel = focusedNode?.debugLabel;
+                  final activeIdx = _tabsController.activeIndex;
+                  final shortcutsLen = _tabShortcuts.length;
+                  final scrollDown = _activeShortcuts.scrollDown;
+                  final scrollDownStep = _activeShortcuts.scrollDownStep;
+                  logd('⌨️ [MacShell] onKeyEvent key=${key.keyLabel}'
+                      ' textFocused=$textFocused'
+                      ' focusedWidget=${focusedWidget.runtimeType}'
+                      ' focusLabel=$focusLabel'
+                      ' activeIdx=$activeIdx shortcutsLen=$shortcutsLen'
+                      ' scrollDown=${scrollDown != null} scrollDownStep=${scrollDownStep != null}',
+                      name: 'Scroll');
+                }
+
+                if (key == LogicalKeyboardKey.space) {
                   if (_isTextInputFocused()) return KeyEventResult.ignored;
                   if (HardwareKeyboard.instance.isShiftPressed) {
                     _activeShortcuts.scrollUp?.call();
@@ -308,17 +334,25 @@ class _MacShellState extends State<MacShell> {
                   }
                   return KeyEventResult.handled;
                 }
-                if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                  if (!_isTextInputFocused() && _activeShortcuts.scrollDownStep != null) {
-                    _activeShortcuts.scrollDownStep!();
+                if (key == LogicalKeyboardKey.arrowDown) {
+                  final textFocused = _isTextInputFocused();
+                  final step = _activeShortcuts.scrollDownStep;
+                  logd('⌨️ [MacShell] ArrowDown: textFocused=$textFocused scrollDownStep=${step != null}', name: 'Scroll');
+                  if (!textFocused && step != null) {
+                    step();
                     return KeyEventResult.handled;
                   }
+                  return KeyEventResult.ignored;
                 }
-                if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                  if (!_isTextInputFocused() && _activeShortcuts.scrollUpStep != null) {
-                    _activeShortcuts.scrollUpStep!();
+                if (key == LogicalKeyboardKey.arrowUp) {
+                  final textFocused = _isTextInputFocused();
+                  final step = _activeShortcuts.scrollUpStep;
+                  logd('⌨️ [MacShell] ArrowUp: textFocused=$textFocused scrollUpStep=${step != null}', name: 'Scroll');
+                  if (!textFocused && step != null) {
+                    step();
                     return KeyEventResult.handled;
                   }
+                  return KeyEventResult.ignored;
                 }
               }
               return KeyEventResult.ignored;
@@ -352,9 +386,11 @@ class _MacShellState extends State<MacShell> {
                           children: [
                             HistoryPanel(
                               onTopicTap: (id, title, comments, postedAt) {
+                                logd('👆 [MacShell] HistoryPanel.onTopicTap: id=$id', name: 'Tabs');
                                 _openInNew(id, title, comments, postedAt);
                               },
                               onTopicNewTabTap: (id, title, comments, postedAt) {
+                                logd('👆 [MacShell] HistoryPanel.onTopicNewTabTap: id=$id', name: 'Tabs');
                                 _openInNew(id, title, comments, postedAt);
                               },
                             ),
@@ -457,7 +493,12 @@ class _MacShellState extends State<MacShell> {
 
   bool _isTextInputFocused() {
     final focus = FocusManager.instance.primaryFocus;
-    return focus?.context?.widget is EditableText;
+    final widget = focus?.context?.widget;
+    final result = widget is EditableText;
+    if (result) {
+      logd('⌨️ [MacShell] _isTextInputFocused=true: focusedWidget=${widget.runtimeType} label=${focus?.debugLabel}', name: 'Scroll');
+    }
+    return result;
   }
 
   Widget _buildMenuBar() {

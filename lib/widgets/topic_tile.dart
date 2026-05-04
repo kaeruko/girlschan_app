@@ -387,6 +387,7 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     int comments,
     String postedAt,
   ) async {
+    logd('👆 [TopicTile] _handleTap: id=$id, onTopicTap=${widget.onTopicTap != null}', name: 'Tabs');
     // 既に既読キャッシュがない場合はローディング開始
     bool startLoading = !_hasCachedComments;
     if (startLoading && mounted) {

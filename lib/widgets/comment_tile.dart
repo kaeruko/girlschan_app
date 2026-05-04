@@ -228,6 +228,9 @@ class _LinkTextState extends State<_LinkText> {
   }
 
   List<InlineSpan> _buildSpans(String text, double fontSize) {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
     _recognizers.clear();
     final spans = <InlineSpan>[];
     int lastEnd = 0;
