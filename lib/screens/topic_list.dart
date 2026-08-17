@@ -281,6 +281,46 @@ class TopicListScreenState extends State<TopicListScreen>
     )..load();
   }
 
+  Future<void> _scrollToTop() async {
+    if (!_scrollController.hasClients) {
+      throw StateError('TopicList ScrollController is not attached.');
+    }
+    await _scrollController.animateTo(
+      _scrollController.position.minScrollExtent,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Widget _buildScrollToTopButton() {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: CupertinoColors.black.withValues(alpha: 0.18),
+            blurRadius: 7,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(38, 38),
+        borderRadius: BorderRadius.circular(19),
+        onPressed: _scrollToTop,
+        child: Icon(
+          CupertinoIcons.arrow_up,
+          size: 20,
+          color: CupertinoColors.label.resolveFrom(context),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -316,35 +356,46 @@ class TopicListScreenState extends State<TopicListScreen>
       body: Column(
               children: [
                 Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: fetchFromServer,
-                    child: Scrollbar(
-                      thumbVisibility: true, // ★ Macでは常にバーを表示
-                      controller: _scrollController,
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
+                  child: Stack(
+                    children: [
+                      RefreshIndicator(
+                        onRefresh: fetchFromServer,
+                        child: Scrollbar(
+                          thumbVisibility: true, // ★ Macでは常にバーを表示
+                          controller: _scrollController,
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            itemCount: _topics.length,
+                            itemBuilder: (context, index) {
+                              final topic = _topics[index];
+                              // logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
+                              final id = topic['id'] as int;
+                              final idx = index;
+                              return TopicTile(
+                                key: ValueKey<int>(id), // ★ これ必須
+                                topic: topic,
+                                controller: _controller,
+                                showThumb: true,                      // 一覧はサムネ表示
+                                onRemove: _removeCommentsCache,        // ×でコメントキャッシュ削除
+                                onAfterPop: () => _onAfterPopFromTile(idx, id),
+                                onTopicTap: widget.onTopicTap,
+                                onTopicNewTabTap: widget.onTopicNewTabTap,
+                              );
+                            },
+                          ),
                         ),
-                        itemCount: _topics.length,
-                        itemBuilder: (context, index) {
-                          final topic = _topics[index];
-                          // logd('🎨 [TopicList.itemBuilder] アイテム[$index]: id=${topic['id']}, title=${topic['title']}', name: 'TopicList');
-                          final id = topic['id'] as int;
-                          final idx = index;
-                          return TopicTile(
-                            key: ValueKey<int>(id), // ★ これ必須
-                            topic: topic,
-                            controller: _controller,
-                            showThumb: true,                      // 一覧はサムネ表示
-                            onRemove: _removeCommentsCache,        // ×でコメントキャッシュ削除
-                            onAfterPop: () => _onAfterPopFromTile(idx, id),
-                            onTopicTap: widget.onTopicTap,
-                            onTopicNewTabTap: widget.onTopicNewTabTap,
-                          );
-                        },
                       ),
-                    ),
+                      if (widget.sortOrder == 'new')
+                        Positioned(
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
+                          child: Center(child: _buildScrollToTopButton()),
+                        ),
+                    ],
                   ),
                 ),
                 // 広告バナー表示
