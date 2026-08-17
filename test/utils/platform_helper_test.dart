@@ -26,7 +26,10 @@ void main() {
     PlatformHelper.setTestPlatform(PlatformKind.android);
 
     expect(PlatformHelper.isDesktop, isFalse);
+    expect(PlatformHelper.isAndroid, isTrue);
+    expect(PlatformHelper.isMobile, isTrue);
     expect(PlatformHelper.isWindows, isFalse);
     expect(PlatformHelper.isMacOS, isFalse);
+    expect(PlatformHelper.isIOS, isFalse);
   });
 }

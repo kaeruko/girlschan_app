@@ -82,6 +82,7 @@ class _WindowsShellState extends State<WindowsShell> {
       'tab_popular',
       'tab_clips',
       'tab_search',
+      'tab_annotation',
       'tab_settings',
     ];
 
@@ -104,6 +105,7 @@ class _WindowsShellState extends State<WindowsShell> {
     return sectionId == 'tab_favorites' ||
         sectionId == 'tab_clips' ||
         sectionId == 'tab_search' ||
+        sectionId == 'tab_annotation' ||
         sectionId == 'tab_settings';
   }
 
@@ -264,7 +266,9 @@ class _WindowsShellState extends State<WindowsShell> {
                 _buildMenuBar(),
                 const Divider(height: 1),
                 Expanded(
-                  child: Row(
+                  child: _selectedSectionId == 'tab_annotation'
+                      ? _buildCenterPaneContent('tab_annotation')
+                      : Row(
                     children: [
                       // 【左】トピック一覧
                       SizedBox(

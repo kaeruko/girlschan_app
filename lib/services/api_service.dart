@@ -19,6 +19,9 @@ Future<dynamic> _fetchJson(
   Map<String, String>? headers,
   Duration? timeout,
 }) async {
+  if (!uri.hasScheme || uri.host.isEmpty) {
+    throw StateError('API URLが空または不正です: $uri');
+  }
   logd('📡 APIリクエスト: $uri');
 
   final response = await http.get(uri, headers: headers).timeout(
@@ -285,14 +288,32 @@ Future<Map<String, dynamic>> fetchCommentsWithPagination(
     
     final data = await _fetchMap(uri);
     
-    final comments = data['comments'] as List<dynamic>? ?? [];
-    final total = data['total'] as int? ?? comments.length;
+    final rawComments = data['comments'];
+    final rawTotal = data['total'];
+    final rawTitle = data['title'];
+    if (rawComments is! List<dynamic>) {
+      throw const FormatException(
+        'コメントレスポンスの comments が配列ではありません。',
+      );
+    }
+    if (rawTotal is! int || rawTotal < 0) {
+      throw const FormatException(
+        'コメントレスポンスの total が0以上の整数ではありません。',
+      );
+    }
+    if (rawTitle is! String || rawTitle.trim().isEmpty) {
+      throw const FormatException(
+        'コメントレスポンスの title が空または文字列ではありません。',
+      );
+    }
+    final comments = rawComments;
+    final total = rawTotal;
     
     logd('📥 [fetchComments] topicId=$topicId offset=$offset limit=$limit -> comments=${comments.length}, total=$total (raw=${data['total']})');
 
     final postedAt = data['posted_at'] as String? ?? '';
     final thumb = data['thumb'] as String?;
-    final title = data['title'] as String? ?? ''; // ★タイトルを取得
+    final title = rawTitle; // ★タイトルを取得
 
     // DBにコメント保存
     final commentEntries = comments.map((c) {

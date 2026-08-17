@@ -6,7 +6,7 @@ import 'macos_shell.dart';
 import 'windows_shell.dart';
 
 /// プラットフォーム別に適切なシェルを選択
-/// iOS: IOSShell（ボトムタブ）
+/// iOS/Android: IOSShell（共通のモバイル向けボトムタブ）
 /// macOS/Windows: MacShell/WindowsShell（サイドバー）
 class AdaptiveShell extends StatelessWidget {
   final List<TabSpec> tabs;
@@ -16,6 +16,7 @@ class AdaptiveShell extends StatelessWidget {
   Widget build(BuildContext context) {
     if (PlatformHelper.isMacOS) return MacShell(tabs: tabs);
     if (PlatformHelper.isWindows) return WindowsShell(tabs: tabs);
+    if (PlatformHelper.isAndroid) return IOSShell(tabs: tabs);
     return IOSShell(tabs: tabs);
   }
 }

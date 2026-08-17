@@ -90,15 +90,73 @@ class ClipLabels extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
+/// 開発者向けコメントアノテーションのプロジェクト
+class AnnotationProjects extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name =>
+      text().customConstraint('NOT NULL CHECK (length(trim(name)) > 0)')();
+  DateTimeColumn get createdAt => dateTime()();
+}
+
+/// プロジェクトへ登録したアノテーション対象トピック
+class AnnotationTopics extends Table {
+  IntColumn get projectId => integer().references(AnnotationProjects, #id)();
+  IntColumn get topicId => integer()();
+  TextColumn get title => text()();
+  IntColumn get totalComments => integer()
+      .customConstraint('NOT NULL CHECK (total_comments >= 0)')();
+  DateTimeColumn get addedAt => dateTime()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {projectId, topicId};
+}
+
+/// 取得時点のコメントを保持するアノテーション対象
+class AnnotationItems extends Table {
+  IntColumn get projectId => integer().references(AnnotationProjects, #id)();
+  IntColumn get topicId => integer()();
+  IntColumn get commentNo =>
+      integer().customConstraint('NOT NULL CHECK (comment_no > 0)')();
+  TextColumn get topicTitleSnapshot => text()();
+  TextColumn get bodySnapshot => text()();
+  TextColumn get nameSnapshot => text().nullable()();
+  TextColumn get postedAtSnapshot => text().nullable()();
+  IntColumn get plusSnapshot => integer()();
+  IntColumn get minusSnapshot => integer()();
+  TextColumn get anchorsSnapshot =>
+      text().map(const IntListConverter()).withDefault(const Constant('[]'))();
+  TextColumn get label => text()
+      .nullable()
+      .customConstraint(
+        "CHECK (label IS NULL OR label IN "
+        "('experience', 'not_experience', 'skipped'))",
+      )();
+  DateTimeColumn get importedAt => dateTime()();
+  DateTimeColumn get annotatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {projectId, topicId, commentNo};
+}
+
 // ==========================================
 // 🏠 Database Class
 // ==========================================
-@DriftDatabase(tables: [Topics, Comments, ClipLabels])
+@DriftDatabase(
+  tables: [
+    Topics,
+    Comments,
+    ClipLabels,
+    AnnotationProjects,
+    AnnotationTopics,
+    AnnotationItems,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -110,6 +168,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           // comments テーブルに original_image_url カラムを追加
           await m.addColumn(comments, comments.originalImageUrl);
+        }
+        if (from < 3) {
+          await m.createTable(annotationProjects);
+          await m.createTable(annotationTopics);
+          await m.createTable(annotationItems);
         }
       },
       beforeOpen: (details) async {

@@ -4,7 +4,9 @@ import '../app/app_tabs.dart';
 import '../screens/topic_list.dart' as tl;
 import '../screens/clips_screen.dart';
 import '../screens/favorites_screen.dart';
+import '../utils/platform_helper.dart';
 
+/// iOSとAndroidで共用するモバイル向けボトムタブシェル。
 class IOSShell extends StatefulWidget {
   final List<TabSpec> tabs;
   const IOSShell({super.key, required this.tabs});
@@ -79,7 +81,12 @@ class _IOSShellState extends State<IOSShell> {
                 label: t.label,
               )
             else
-              BottomNavigationBarItem(icon: Icon(t.icon), label: t.label),
+              BottomNavigationBarItem(
+                icon: Icon(t.icon),
+                label: PlatformHelper.isAndroid && t.id == 'tab_annotation'
+                    ? '注釈'
+                    : t.label,
+              ),
         ],
       ),
       tabBuilder: (context, i) {
@@ -95,9 +102,7 @@ class _IOSShellState extends State<IOSShell> {
               builder: (_) => FavoritesScreen(key: _favoritesKey),
             );
           default:
-            return CupertinoTabView(
-              builder: spec.builder,
-            );
+            return CupertinoTabView(builder: spec.builder);
         }
       },
     );
@@ -108,11 +113,7 @@ class _RotatingIcon extends StatefulWidget {
   final ValueNotifier<bool> loadingNotifier;
   final Widget child;
 
-  const _RotatingIcon({
-    super.key,
-    required this.loadingNotifier,
-    required this.child,
-  });
+  const _RotatingIcon({required this.loadingNotifier, required this.child});
 
   @override
   State<_RotatingIcon> createState() => _RotatingIconState();
@@ -184,9 +185,6 @@ class _RotatingIconState extends State<_RotatingIcon> {
 
   @override
   Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: _angle,
-      child: widget.child,
-    );
+    return Transform.rotate(angle: _angle, child: widget.child);
   }
 }
