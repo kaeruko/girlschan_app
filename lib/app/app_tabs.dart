@@ -4,6 +4,12 @@ import '../screens/favorites_screen.dart';
 import '../screens/clips_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/annotation_screen.dart';
+
+const bool kAnnotationMode = bool.fromEnvironment(
+  'ANNOTATION_MODE',
+  defaultValue: false,
+);
 
 /// タブの仕様定義
 class TabSpec {
@@ -43,7 +49,7 @@ final ValueNotifier<bool> historyUpdatingNotifier = ValueNotifier(false);
 // ★ クリップ更新中かどうかを通知する Notifier
 final ValueNotifier<bool> clipsUpdatingNotifier = ValueNotifier(false);
 
-final List<TabSpec> kAppTabs = [
+List<TabSpec> buildAppTabs({bool annotationMode = kAnnotationMode}) => [
   TabSpec(
     id: 'tab_new',
     label: '新着',
@@ -94,6 +100,14 @@ final List<TabSpec> kAppTabs = [
     stateKey: _searchKey,
     builder: (_) => SearchScreen(key: _searchKey),
   ),
+  if (annotationMode)
+    TabSpec(
+      id: 'tab_annotation',
+      label: 'アノテーション',
+      icon: CupertinoIcons.tag,
+      title: 'コメントアノテーション',
+      builder: (_) => const AnnotationScreen(),
+    ),
   TabSpec(
     id: 'tab_settings',
     label: '設定',
@@ -103,3 +117,5 @@ final List<TabSpec> kAppTabs = [
     builder: (_) => SettingsScreen(key: _settingsKey),
   ),
 ];
+
+final List<TabSpec> kAppTabs = buildAppTabs();

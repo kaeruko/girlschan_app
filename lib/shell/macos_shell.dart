@@ -99,6 +99,7 @@ class _MacShellState extends State<MacShell> {
       'tab_favorites',
       'tab_clips',
       'tab_search',
+      'tab_annotation',
       'tab_settings',
     ];
 
@@ -121,6 +122,7 @@ class _MacShellState extends State<MacShell> {
     return sectionId == 'tab_favorites' ||
         sectionId == 'tab_clips' ||
         sectionId == 'tab_search' ||
+        sectionId == 'tab_annotation' ||
         sectionId == 'tab_settings';
   }
 
@@ -364,7 +366,9 @@ class _MacShellState extends State<MacShell> {
                 _buildMenuBar(),
                 const Divider(height: 1),
                 Expanded(
-                  child: Row(
+                  child: _selectedSectionId == 'tab_annotation'
+                      ? _buildCenterPaneContent('tab_annotation')
+                      : Row(
                     children: [
                       // 【左】トピック一覧
                       SizedBox(

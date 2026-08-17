@@ -16,13 +16,20 @@ class PlatformHelper {
   static PlatformKind? _override; // テスト用。通常は null のまま。
 
   // ===== 判定系 =====
-  static bool get isMacOS => _override != null ? _override == PlatformKind.macOS : Platform.isMacOS;
-  static bool get isIOS => _override != null ? _override == PlatformKind.iOS : Platform.isIOS;
-  static bool get isWindows => _override != null ? _override == PlatformKind.windows : Platform.isWindows;
+  static bool get isMacOS =>
+      _override != null ? _override == PlatformKind.macOS : Platform.isMacOS;
+  static bool get isIOS =>
+      _override != null ? _override == PlatformKind.iOS : Platform.isIOS;
+  static bool get isAndroid => _override != null
+      ? _override == PlatformKind.android
+      : Platform.isAndroid;
+  static bool get isWindows => _override != null
+      ? _override == PlatformKind.windows
+      : Platform.isWindows;
   static bool get isApple => isMacOS || isIOS;
 
   static bool get isDesktop => isMacOS || isWindows;
-  static bool get isMobile => isIOS; // iOS だけ想定
+  static bool get isMobile => isIOS || isAndroid;
 
   /// テスト用：明示的にプラットフォームを上書き（テスト終了時は reset）
   static void setTestPlatform(PlatformKind? kind) {
@@ -35,10 +42,7 @@ class PlatformHelper {
     WidgetBuilder builder, {
     RouteSettings? settings,
   }) {
-    return CupertinoPageRoute<T>(
-      builder: builder,
-      settings: settings,
-    );
+    return CupertinoPageRoute<T>(builder: builder, settings: settings);
   }
 
   /// 従来の buildPageRoute（後方互換性）
@@ -50,7 +54,8 @@ class PlatformHelper {
   }
 
   // ===== ローディング・通知（統一窓口） =====
-  static Widget buildLoadingIndicator({double size = 16}) => AppSpinner(size: size);
+  static Widget buildLoadingIndicator({double size = 16}) =>
+      AppSpinner(size: size);
 
   /// 画面上部に薄いお知らせ
   static Widget buildInlineNotice(
@@ -119,14 +124,8 @@ class PlatformHelper {
     );
   }
 
-
-
   /// Cupertino区切り線を返す
   static Widget buildDivider() {
-    return Container(
-      height: 0.5,
-      color: CupertinoColors.separator,
-    );
+    return Container(height: 0.5, color: CupertinoColors.separator);
   }
 }
-
