@@ -186,58 +186,91 @@ class _TopicTileState extends State<TopicTile> implements TileRefreshable {
     // 表示用データの計算
     final displayData = _calculateDisplayData(comments, postedAt);
     final bgColor = _calculateBackgroundColor(displayData.isOld);
+    final showRemove =
+        widget.onRemove != null && (_hasCachedComments || widget.alwaysShowRemove);
 
-    return Listener(
-      onPointerDown: (event) {
-        if (event.buttons == kMiddleMouseButton) {
-          widget.onTopicNewTabTap?.call(id, title, comments, postedAt);
-        }
-      },
-      child: Material(
+    // タイル本体と削除ボタンを兄弟にして、×タップが本体の onTap に
+    // 伝播して詳細画面を開かないようにする。
+    return Material(
       color: bgColor,
-      child: InkWell(
-        onTap: () => _handleTap(context, id, title, comments, postedAt),
-        hoverColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-        mouseCursor: SystemMouseCursors.click,
-        child: Container(
-          decoration: BoxDecoration(
-            border: _hasCachedComments
-                ? const Border(left: BorderSide(color: CupertinoColors.systemBlue, width: 4))
-                : null,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // サムネイル部分
-              if (widget.showThumb) ...[
-                _buildThumbnail(thumb),
-                const SizedBox(width: 12),
-              ],
-              // トピック情報
-              Expanded(
-                child: _buildTopicInfo(
-                  title,
-                  displayData.isBold,
-                  displayData.isOld,
-                  displayData.commentDisplay,
-                  displayData.cacheTimeDisplay,
+      child: Container(
+        decoration: BoxDecoration(
+          border: _hasCachedComments
+              ? const Border(
+                  left: BorderSide(
+                    color: CupertinoColors.systemBlue,
+                    width: 4,
+                  ),
+                )
+              : null,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Listener(
+                onPointerDown: (event) {
+                  if (event.buttons == kMiddleMouseButton) {
+                    widget.onTopicNewTabTap?.call(
+                      id,
+                      title,
+                      comments,
+                      postedAt,
+                    );
+                  }
+                },
+                child: InkWell(
+                  onTap: () =>
+                      _handleTap(context, id, title, comments, postedAt),
+                  hoverColor: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.08),
+                  mouseCursor: SystemMouseCursors.click,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // サムネイル部分
+                        if (widget.showThumb) ...[
+                          _buildThumbnail(thumb),
+                          const SizedBox(width: 12),
+                        ],
+                        // トピック情報
+                        Expanded(
+                          child: _buildTopicInfo(
+                            title,
+                            displayData.isBold,
+                            displayData.isOld,
+                            displayData.commentDisplay,
+                            displayData.cacheTimeDisplay,
+                          ),
+                        ),
+                        // ★ 読み込み中インジケーター
+                        if (_isLoading)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 8.0),
+                            child: CupertinoActivityIndicator(radius: 10),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              // 削除ボタン
-              if (widget.onRemove != null && (_hasCachedComments || widget.alwaysShowRemove)) _buildRemoveButton(id),
-              // ★ 読み込み中インジケーター
-              if (_isLoading)
-                const Padding(
-                  padding: EdgeInsets.only(left: 8.0),
-                  child: CupertinoActivityIndicator(radius: 10),
-                ),
-            ],
-          ),
+            ),
+            if (showRemove)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildRemoveButton(id),
+              ),
+          ],
         ),
       ),
-      ), // Material
-    ); // Listener
+    );
   }
 
   /// サムネイル部分のWidget
