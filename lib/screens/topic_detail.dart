@@ -1548,7 +1548,15 @@ class _TopicDetailViewState extends State<TopicDetailView> {
                 includeFilter: false,
                 availableWidth: width,
                 padding: EdgeInsets.zero,
-              ),
+              )
+                  .map(
+                    (button) => SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: button,
+                    ),
+                  )
+                  .toList(),
             ),
           ),
           child: SafeArea(
@@ -1715,17 +1723,6 @@ class _TopicDetailViewState extends State<TopicDetailView> {
                       isClipped: _vm.getUserStatus(c.id) != CommentUserStatus.none,
                       onAnchorTap: (targetNo) {
                         Navigator.pop(context); // 閉じて次へ
-                        // 少し遅延させて閉じるアニメーションと干渉しないようにしてもいいが
-                        // ここでは直で呼ぶ（次のPopoverが出る）
-                        // タップ位置は不明になるので、次は中央orBottomSheetになるかもしれないが
-                        // "Popover内のタップ"の位置を取ればPopoverチェーン可能。
-                        // 今回はシンプルに offset なしで呼んでみる（スマホ的挙動になるか、nullチェックで分岐）
-                        // ※Desktopなら位置が欲しいが、連鎖プレビューは中央でも許容範囲？
-                        //   -> 要望通りシンプルに実装するなら、ここも位置を取りたいが
-                        //      AnchorPreviewSheetのonAnchorTapはまだintのみ。
-                        //      「次へ」はBottom Sheetで妥協するか、
-                        //      AnchorPreviewSheetもGestureDetectorで囲って位置を取るか。
-                        //      ここでは一旦「位置なし」で呼ぶ。（Bottom Sheetになる）
                          _showAnchorPreview(targetNo); 
                       },
                       onGoTo: () => _goToAnchor(c.id, fromPreview: true),
@@ -1739,16 +1736,11 @@ class _TopicDetailViewState extends State<TopicDetailView> {
                       },
                       onClipToggle: () async {
                         await _handleClipAction(c);
-                        // 親(TopicDetail)の更新が必要なら通知が必要だが、
-                        // ここではsetStateできないので、閉じた後に反映されるか、
-                        // あるいはVM経由で変わる。
-                        // 簡易実装としてVM操作のみ。
                       },
                        onVote: (isPlus) async {
                         if (c.isLocal) return;
                         final commentId = 'vbox${c.id}';
                         await rateComment(widget.topicId, commentId, isPlus ? 1 : 0);
-                        // UI反映は省略(閉じる前提ならOK)
                       },
                     ),
                   ),
@@ -1766,16 +1758,13 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       Navigator.pop(context); // プレビューを閉じる
     }
 
-    // 元の位置を保存（戻るボタン用）
     final currentNo = _currentVisibleCommentNo();
     if (currentNo != null) {
       _returnToCommentNo = currentNo;
     }
 
-    // ジャンプ
     _jumpToCommentNo(targetNo);
 
-    // ハイライト演出
     setState(() => _highlightedCommentId = targetNo);
     Timer(const Duration(seconds: 2), () {
       if (mounted) {
@@ -1783,7 +1772,6 @@ class _TopicDetailViewState extends State<TopicDetailView> {
       }
     });
 
-    // 戻るアクションのSnackBarを表示
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1927,8 +1915,6 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     final focusAfterPop = FocusManager.instance.primaryFocus;
     logd('📝 [TopicDetail] _openPostDialog: popped from CommentComposePage, result=${result != null}, focusAfterPop=${focusAfterPop?.runtimeType}, focusContext=${focusAfterPop?.context?.widget.runtimeType}', name: 'Scroll');
 
-    // ComposePage を閉じた後、孤立した FocusScopeNode が primaryFocus になりキーイベントが
-    // MacShell に届かなくなるため、明示的に再フォーカスする
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _contentFocusNode.requestFocus();
