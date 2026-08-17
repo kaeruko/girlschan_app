@@ -375,6 +375,60 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     sc.animateTo(target, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
   }
 
+  Future<void> _jumpToTop() async {
+    await _jumpToScrollEdge(toBottom: false);
+  }
+
+  Future<void> _jumpToBottom() async {
+    await _jumpToScrollEdge(toBottom: true);
+  }
+
+  Future<void> _jumpToScrollEdge({required bool toBottom}) async {
+    final pageCount = _pageCountLive;
+    if (pageCount <= 0) return;
+
+    final targetPage = toBottom ? pageCount - 1 : 0;
+    final currentSc = _scForPage(_currentPage);
+    if (currentSc.hasClients) {
+      _pageScrollOffsets[_currentPage] = currentSc.offset;
+    }
+    _saveFromPage(_currentPage);
+
+    // 対象ページの過去位置を復元すると端への移動と競合するため破棄する。
+    _pageScrollOffsets.remove(targetPage);
+
+    await _waitForPageController();
+    if (!mounted) return;
+    if (!_pc.hasClients) {
+      throw StateError('TopicDetail PageController is not attached.');
+    }
+
+    if (_pc.page?.round() != targetPage) {
+      await _pc.animateToPage(
+        targetPage,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOut,
+      );
+    }
+
+    final sc = _scForPage(targetPage);
+    await _waitForAttach(sc);
+    if (!mounted) return;
+    if (!sc.hasClients) {
+      throw StateError('TopicDetail ScrollController is not attached for page $targetPage.');
+    }
+
+    final targetOffset = toBottom
+        ? sc.position.maxScrollExtent
+        : sc.position.minScrollExtent;
+    await sc.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+    );
+    _saveFromPage(targetPage);
+  }
+
   // ========== ページング ==========
   int _pageCountFor(int total) => (total + _pageSize - 1) ~/ _pageSize;
 
@@ -1086,6 +1140,40 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     );
   }
 
+  Widget _buildScrollEdgeButton({
+    required IconData icon,
+    required Future<void> Function() onPressed,
+  }) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: CupertinoColors.black.withValues(alpha: 0.18),
+            blurRadius: 7,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(38, 38),
+        borderRadius: BorderRadius.circular(19),
+        onPressed: () async {
+          await onPressed();
+        },
+        child: Icon(
+          icon,
+          size: 20,
+          color: CupertinoColors.label.resolveFrom(context),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMainContent(List<Comment> items, Widget pageView) {
     if (_vm.loading) {
       return const Center(child: AppSpinner(size: 32, showLabel: true));
@@ -1116,6 +1204,28 @@ class _TopicDetailViewState extends State<TopicDetailView> {
     return Stack(
       children: [
         pageView,
+        Positioned(
+          top: 10,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: _buildScrollEdgeButton(
+              icon: CupertinoIcons.arrow_up,
+              onPressed: _jumpToTop,
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 10,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: _buildScrollEdgeButton(
+              icon: CupertinoIcons.arrow_down,
+              onPressed: _jumpToBottom,
+            ),
+          ),
+        ),
         if (_pageCountLive > 1 && _hasPrev)
           Positioned(
             left: 8, top: 0, bottom: 0,
@@ -1142,7 +1252,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
           ),
         if (_pageCountLive > 1)
           Positioned(
-            bottom: 8, left: 0, right: 0,
+            bottom: 58, left: 0, right: 0,
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
