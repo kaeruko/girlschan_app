@@ -1216,7 +1216,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
           ),
         ),
         Positioned(
-          bottom: 10,
+          bottom: 10 + MediaQuery.paddingOf(context).bottom,
           left: 0,
           right: 0,
           child: Center(
@@ -1252,7 +1252,7 @@ class _TopicDetailViewState extends State<TopicDetailView> {
           ),
         if (_pageCountLive > 1)
           Positioned(
-            bottom: 58, left: 0, right: 0,
+            bottom: 58 + MediaQuery.paddingOf(context).bottom, left: 0, right: 0,
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
