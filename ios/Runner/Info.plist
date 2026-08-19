@@ -254,14 +254,6 @@
 		<true/>
 	</dict>
 
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_dartVmService._tcp</string>
-	</array>
-
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>デバッグ機能のためローカルネットワークに接続します。</string>
-
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
