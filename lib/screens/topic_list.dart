@@ -390,7 +390,7 @@ class TopicListScreenState extends State<TopicListScreen>
                       ),
                       if (widget.sortOrder == 'new')
                         Positioned(
-                          bottom: 12,
+                          bottom: 12 + MediaQuery.paddingOf(context).bottom,
                           left: 0,
                           right: 0,
                           child: Center(child: _buildScrollToTopButton()),
