@@ -149,6 +149,37 @@ jobs:
             exit 1
           }
 
+      - name: Configure Runner signing only
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TEAM_ID PROFILE_NAME
+          ruby <<'RUBY'
+          require 'xcodeproj'
+
+          team_id = ENV.fetch('TEAM_ID')
+          profile_name = ENV.fetch('PROFILE_NAME')
+          project_path = 'ios/Runner.xcodeproj'
+          project = Xcodeproj::Project.open(project_path)
+          runner = project.targets.find { |target| target.name == 'Runner' }
+          abort('Runner target was not found') unless runner
+
+          runner.build_configurations.each do |config|
+            config.build_settings['DEVELOPMENT_TEAM'] = team_id
+            config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
+            config.build_settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
+            config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = profile_name
+            config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = ENV.fetch('BUNDLE_ID')
+          end
+
+          project.save
+          RUBY
+
+          SETTINGS="$(xcodebuild -project ios/Runner.xcodeproj -target Runner -configuration Release -showBuildSettings)"
+          printf '%s\n' "$SETTINGS" | grep -E 'DEVELOPMENT_TEAM|CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE_SPECIFIER|PRODUCT_BUNDLE_IDENTIFIER'
+          grep -Fq "DEVELOPMENT_TEAM = $TEAM_ID" <<< "$SETTINGS" || { echo "::error::Runner DEVELOPMENT_TEAM was not configured"; exit 1; }
+          grep -Fq "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_NAME" <<< "$SETTINGS" || { echo "::error::Runner provisioning profile was not configured"; exit 1; }
+
       - name: Archive signed app
         shell: bash
         run: |
@@ -163,11 +194,6 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$ARCHIVE_PATH" \
             -derivedDataPath "$DERIVED_DATA_PATH" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY='Apple Distribution' \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
             FLUTTER_BUILD_NAME="$BUILD_NAME" \
             FLUTTER_BUILD_NUMBER="$BUILD_NUMBER" \
             COMPILER_INDEX_STORE_ENABLE=NO \
