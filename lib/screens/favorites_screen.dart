@@ -105,6 +105,10 @@ class FavoritesScreenState extends State<FavoritesScreen>
         _watchedTopics = topics;
         _loading = false;
       });
+
+      // 履歴タブへ戻ったときも、表示中タイルの下書き有無を再評価する。
+      // TopicTile 自体には下書きバッジ表示があるため、状態更新だけ明示的に行う。
+      await _controller.refreshAll(parallel: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
