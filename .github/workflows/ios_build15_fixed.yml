@@ -45,6 +45,18 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Force CocoaPods plugin integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter config --no-enable-swift-package-manager
+          CONFIG_OUTPUT="$(flutter config --list)"
+          printf '%s\n' "$CONFIG_OUTPUT"
+          grep -Eq 'enable-swift-package-manager[^a-zA-Z]*(false|disabled)' <<< "$CONFIG_OUTPUT" || {
+            echo "::error::Flutter Swift Package Manager is still enabled"
+            exit 1
+          }
+
       - name: Validate signing secrets
         shell: bash
         env:
@@ -114,6 +126,10 @@ jobs:
           set -euo pipefail
           flutter --version
           flutter pub get
+          grep -q 'webview_flutter_wkwebview' .flutter-plugins-dependencies || {
+            echo "::error::webview_flutter_wkwebview is missing from Flutter plugin dependencies"
+            exit 1
+          }
 
       - name: Install CocoaPods 1.16.2
         shell: bash
@@ -128,6 +144,10 @@ jobs:
           set -euo pipefail
           cd ios
           pod _${COCOAPODS_VERSION}_ install
+          [[ -e .symlinks/plugins/webview_flutter_wkwebview ]] || {
+            echo "::error::CocoaPods did not register webview_flutter_wkwebview as a local Flutter plugin"
+            exit 1
+          }
 
       - name: Archive signed app
         shell: bash
