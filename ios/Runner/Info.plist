@@ -41,6 +41,9 @@
 	<key>NSUserTrackingUsageDescription</key>
 	<string>より関連性の高い広告の表示と広告効果の測定のために使用します。</string>
 
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ファイル選択機能のため、システムのファイル選択機能を使用します。</string>
+
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
