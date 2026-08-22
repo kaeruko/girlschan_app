@@ -106,7 +106,6 @@ jobs:
           [[ -n "$ASC_API_KEY_P8_BASE64" ]] || { echo "::error::Missing secret APP_STORE_CONNECT_API_KEY_P8_BASE64"; exit 1; }
 
       - name: Install signing certificate and provisioning profile
-        id: signing
         shell: bash
         env:
           CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
@@ -141,7 +140,7 @@ jobs:
             -s \
             -k "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
 
           IDENTITIES="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH")"
           printf '%s\n' "$IDENTITIES"
@@ -217,7 +216,6 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY='Apple Distribution' \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
             FLUTTER_BUILD_NAME="$BUILD_NAME" \
             FLUTTER_BUILD_NUMBER="$BUILD_NUMBER" \
             COMPILER_INDEX_STORE_ENABLE=NO \
@@ -273,7 +271,8 @@ jobs:
             -exportPath "$EXPORT_PATH" \
             -exportOptionsPlist "$EXPORT_OPTIONS"
 
-          mapfile -t IPA_FILES < <(find "$EXPORT_PATH" -maxdepth 1 -type f -name '*.ipa' -print)
+          shopt -s nullglob
+          IPA_FILES=("$EXPORT_PATH"/*.ipa)
           if [[ "${#IPA_FILES[@]}" -ne 1 ]]; then
             echo "::error::Expected exactly one IPA in $EXPORT_PATH, found ${#IPA_FILES[@]}"
             printf '%s\n' "${IPA_FILES[@]:-}"
@@ -287,8 +286,8 @@ jobs:
           mkdir -p "$VERIFY_DIR"
           unzip -q "$IPA_PATH" -d "$VERIFY_DIR"
 
-          mapfile -t APP_DIRS < <(find "$VERIFY_DIR/Payload" -maxdepth 1 -type d -name '*.app' -print)
-          if [[ "${#APP_DIRS[@]}" -ne 1 ]]; then
+          APP_DIRS=("$VERIFY_DIR"/Payload/*.app)
+          if [[ "${#APP_DIRS[@]}" -ne 1 || ! -d "${APP_DIRS[0]}" ]]; then
             echo "::error::Expected exactly one .app in IPA Payload, found ${#APP_DIRS[@]}"
             exit 1
           fi
@@ -309,7 +308,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: girlschan-ios-${{ inputs.build_name }}-${{ inputs.build_number }}
-          path: ${{ env.IPA_PATH }}
+          path: ${{ runner.temp }}/export/*.ipa
           if-no-files-found: error
           retention-days: 14
 
