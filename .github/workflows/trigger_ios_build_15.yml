@@ -22,6 +22,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          echo "Retrying signed iOS build 15 after signing secret update"
           gh workflow run ios_release.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref main \
