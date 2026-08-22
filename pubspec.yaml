@@ -53,6 +53,8 @@ dev_dependencies:
   build_runner: ^2.0.0
 
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   # Materialを使わないなら `uses-material-design` は不要
   assets:
@@ -83,4 +85,3 @@ msix_config:
   store_logo_path: "C:\\Users\\mail\\work\\girlschan_app\\icons\\icon.png"
   start_menu_icon_path: "C:\\Users\\mail\\work\\girlschan_app\\icons\\icon.png"
   tile_icon_path: "C:\\Users\\mail\\work\\girlschan_app\\icons\\icon.png"
-
