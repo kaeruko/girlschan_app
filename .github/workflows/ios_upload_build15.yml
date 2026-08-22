@@ -1,0 +1,126 @@
+name: Upload iOS Build 15 to App Store Connect
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/workflows/ios_upload_build15.yml
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN_ID: "32554489854"
+  ARTIFACT_NAME: girlschan-ios-1.0-15
+  BUNDLE_ID: jp.cloxs.girlschanApp
+  BUILD_NAME: "1.0"
+  BUILD_NUMBER: "15"
+
+jobs:
+  upload:
+    runs-on: macos-26
+    timeout-minutes: 15
+
+    steps:
+      - name: Select Xcode 26.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          XCODE_PATH="/Applications/Xcode_26.6.app"
+          [[ -d "$XCODE_PATH" ]] || { echo "::error::Required Xcode was not found: $XCODE_PATH"; exit 1; }
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+
+      - name: Validate App Store Connect secrets
+        shell: bash
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          API_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          [[ -n "$API_KEY_ID" ]] || { echo "::error::Missing secret APP_STORE_CONNECT_API_KEY_ID"; exit 1; }
+          [[ -n "$ISSUER_ID" ]] || { echo "::error::Missing secret APP_STORE_CONNECT_ISSUER_ID"; exit 1; }
+          [[ -n "$API_KEY_P8_BASE64" ]] || { echo "::error::Missing secret APP_STORE_CONNECT_API_KEY_P8_BASE64"; exit 1; }
+
+      - name: Download signed IPA from successful build
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ runner.temp }}/ipa
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Verify downloaded IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          IPA_FILES=("$RUNNER_TEMP/ipa"/*.ipa)
+          [[ "${#IPA_FILES[@]}" -eq 1 ]] || { echo "::error::Expected exactly one IPA, found ${#IPA_FILES[@]}"; exit 1; }
+          IPA_PATH="${IPA_FILES[0]}"
+
+          VERIFY_DIR="$RUNNER_TEMP/verify-upload-ipa"
+          mkdir -p "$VERIFY_DIR"
+          unzip -q "$IPA_PATH" -d "$VERIFY_DIR"
+          APP_DIRS=("$VERIFY_DIR"/Payload/*.app)
+          [[ "${#APP_DIRS[@]}" -eq 1 && -d "${APP_DIRS[0]}" ]] || { echo "::error::Expected exactly one .app in IPA"; exit 1; }
+
+          APP_INFO="${APP_DIRS[0]}/Info.plist"
+          ACTUAL_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_INFO")"
+          ACTUAL_BUILD_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_INFO")"
+          ACTUAL_BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_INFO")"
+          PHOTO_USAGE="$(/usr/libexec/PlistBuddy -c 'Print :NSPhotoLibraryUsageDescription' "$APP_INFO")"
+
+          [[ "$ACTUAL_BUNDLE_ID" == "$BUNDLE_ID" ]] || { echo "::error::Bundle id mismatch: $ACTUAL_BUNDLE_ID"; exit 1; }
+          [[ "$ACTUAL_BUILD_NAME" == "$BUILD_NAME" ]] || { echo "::error::Version mismatch: $ACTUAL_BUILD_NAME"; exit 1; }
+          [[ "$ACTUAL_BUILD_NUMBER" == "$BUILD_NUMBER" ]] || { echo "::error::Build number mismatch: $ACTUAL_BUILD_NUMBER"; exit 1; }
+          [[ -n "$PHOTO_USAGE" ]] || { echo "::error::NSPhotoLibraryUsageDescription is missing from IPA"; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "${APP_DIRS[0]}"
+
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+
+      - name: Install App Store Connect API key
+        shell: bash
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          KEY_PATH="$KEY_DIR/AuthKey_${API_KEY_ID}.p8"
+          mkdir -p "$KEY_DIR"
+          printf '%s' "$API_KEY_P8_BASE64" | /usr/bin/base64 -D > "$KEY_PATH"
+          [[ -s "$KEY_PATH" ]] || { echo "::error::Decoded App Store Connect .p8 key is empty"; exit 1; }
+          grep -q 'BEGIN PRIVATE KEY' "$KEY_PATH" || { echo "::error::APP_STORE_CONNECT_API_KEY_P8_BASE64 did not decode to a .p8 private key"; exit 1; }
+          chmod 600 "$KEY_PATH"
+          echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload IPA to App Store Connect
+        shell: bash
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          [[ -f "$IPA_PATH" ]] || { echo "::error::IPA not found: $IPA_PATH"; exit 1; }
+          [[ -f "$ASC_KEY_PATH" ]] || { echo "::error::App Store Connect key not found: $ASC_KEY_PATH"; exit 1; }
+
+          xcrun altool \
+            --upload-app \
+            -f "$IPA_PATH" \
+            -t ios \
+            --apiKey "$API_KEY_ID" \
+            --apiIssuer "$ISSUER_ID"
+
+      - name: Clean up App Store Connect key
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${ASC_KEY_PATH:-}" && -f "$ASC_KEY_PATH" ]]; then
+            rm -f "$ASC_KEY_PATH"
+          fi
