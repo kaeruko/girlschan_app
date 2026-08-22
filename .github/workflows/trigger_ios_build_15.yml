@@ -1,0 +1,30 @@
+name: Trigger iOS Build 15
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/workflows/trigger_ios_build_15.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    name: Dispatch signed iOS build 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch iOS Release workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run ios_release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f build_name=1.0 \
+            -f build_number=15 \
+            -f upload_to_app_store=false
