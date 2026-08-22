@@ -1,5 +1,6 @@
-name: iOS Build 15 Fixed
+name: iOS App Store Build 15 (manual signing)
 
+# Retriggered after refreshing IOS_PROVISIONING_PROFILE_BASE64 with a manually generated App Store profile.
 on:
   push:
     branches: [ main ]
